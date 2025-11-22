@@ -1,0 +1,125 @@
+/* Bootstrap CSS */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+/* Custom Color Palette Variables */
+:root {
+  /* Primary Accent Colors */
+  --cobalt-sky: #34D399;
+  --prussian-blue: #059669;
+  --golden-hour: #F59E0B;
+  --copper-penny: #EA580C;
+  --dark-amber: #92400E;
+  
+  /* Base Colors */
+  --bg-primary: #FAFAF8;
+  --bg-secondary: #F5F5F3;
+  --text-primary: #2C2C2C;
+  --text-secondary: #6B6B6B;
+  --text-muted: #9B9B9B;
+  
+  /* Neutrals */
+  --border-light: #E5E5E3;
+  --border-medium: #D0D0CE;
+  --white: #FFFFFF;
+  
+  /* Bootstrap Theme Overrides */
+  --bs-primary: var(--cobalt-sky);
+  --bs-secondary: var(--prussian-blue);
+  --bs-success: var(--cobalt-sky);
+  --bs-info: var(--prussian-blue);
+  --bs-warning: var(--golden-hour);
+  --bs-danger: var(--copper-penny);
+  --bs-dark: var(--text-primary);
+  --bs-light: var(--bg-secondary);
+  --bs-body-bg: var(--bg-primary);
+  --bs-body-color: var(--text-primary);
+  --bs-border-color: var(--border-light);
+  --bs-link-color: var(--cobalt-sky);
+  --bs-link-hover-color: var(--prussian-blue);
+}
+
+/* Base Styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* Custom Utility Classes */
+.text-primary-custom {
+  color: var(--text-primary) !important;
+}
+
+.text-secondary-custom {
+  color: var(--text-secondary) !important;
+}
+
+.bg-primary-custom {
+  background-color: var(--bg-primary) !important;
+}
+
+.bg-secondary-custom {
+  background-color: var(--bg-secondary) !important;
+}
+
+/* Minimalist Button Styles */
+.btn-custom {
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.2s;
+}
+
+.btn-custom:hover {
+  transform: translateY(-2px);
+}
+
+/* Minimalist Card Styles */
+.card-custom {
+  border-radius: 12px;
+  border: 2px solid var(--border-light);
+  transition: all 0.3s;
+}
+
+.card-custom:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Minimalist Input Styles */
+.form-control-custom,
+.form-select-custom {
+  border-radius: 8px;
+  border: 2px solid var(--border-light);
+  padding: 0.75rem;
+  transition: all 0.2s;
+}
+
+.form-control-custom:focus,
+.form-select-custom:focus {
+  border-color: var(--copper-penny);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1);
+  outline: none;
+}
+
+/* Badge Styles */
+.badge-custom {
+  border-radius: 20px;
+  padding: 0.375rem 0.875rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Alert Styles */
+.alert-custom {
+  border-radius: 8px;
+  border-left: 4px solid;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+}
