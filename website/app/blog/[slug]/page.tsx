@@ -82,7 +82,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   <h1 className="display-5 fw-bold mb-3">
                     {post.title}
                   </h1>
-                  <div className="d-flex align-items-center text-secondary-custom mb-4" style={{ fontSize: '0.875rem' }}>
+                  <div className="d-flex align-items-center text-secondary-custom mb-4 font-typewriter" style={{ fontSize: '0.875rem' }}>
                     <time dateTime={post.date}>
                       {formatDate(post.date)}
                     </time>

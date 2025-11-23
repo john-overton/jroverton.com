@@ -48,7 +48,7 @@ export default function BlogPostCard({ post }: BlogPostCardProps) {
             <h2 className="h4 fw-bold mb-2" style={{ color: 'var(--text-primary)' }}>
               {post.title}
             </h2>
-            <span className="text-secondary-custom" style={{ fontSize: '0.875rem', whiteSpace: 'nowrap', marginLeft: '1rem' }}>
+            <span className="text-secondary-custom font-typewriter" style={{ fontSize: '0.875rem', whiteSpace: 'nowrap', marginLeft: '1rem' }}>
               {formatDate(post.date)}
             </span>
           </div>
@@ -59,6 +59,7 @@ export default function BlogPostCard({ post }: BlogPostCardProps) {
           )}
           <div className="mt-3">
             <span 
+              className="font-typewriter"
               style={{ 
                 color: 'var(--cobalt-sky)', 
                 fontWeight: '600',

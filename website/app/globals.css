@@ -117,6 +117,12 @@ body {
   border-left: 4px solid;
 }
 
+/* Typewriter Font */
+.font-typewriter {
+  font-family: var(--font-typewriter), 'Courier New', Courier, monospace;
+  letter-spacing: 0.02em;
+}
+
 /* Footer Link Hover */
 .hover-opacity {
   transition: opacity 0.2s;
