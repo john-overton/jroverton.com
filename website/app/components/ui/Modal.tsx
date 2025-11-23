@@ -27,3 +27,4 @@ export default function Modal({ show, onHide, title, children, footer }: ModalPr
   );
 }
 
+

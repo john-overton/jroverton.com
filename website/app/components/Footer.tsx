@@ -19,25 +19,16 @@ export default function Footer() {
             <ul className="list-unstyled">
               <li className="mb-2">
                 <a 
-                  href="/" 
+                  href="/blog" 
                   style={{ color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'none' }}
                   className="hover-opacity"
                 >
-                  Home
+                  Blog
                 </a>
               </li>
               <li className="mb-2">
                 <a 
-                  href="#about" 
-                  style={{ color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'none' }}
-                  className="hover-opacity"
-                >
-                  About
-                </a>
-              </li>
-              <li className="mb-2">
-                <a 
-                  href="#projects" 
+                  href="/projects" 
                   style={{ color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'none' }}
                   className="hover-opacity"
                 >
@@ -46,7 +37,16 @@ export default function Footer() {
               </li>
               <li className="mb-2">
                 <a 
-                  href="#contact" 
+                  href="/about" 
+                  style={{ color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'none' }}
+                  className="hover-opacity"
+                >
+                  About Me
+                </a>
+              </li>
+              <li className="mb-2">
+                <a 
+                  href="/contact" 
                   style={{ color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'none' }}
                   className="hover-opacity"
                 >
@@ -111,13 +111,8 @@ export default function Footer() {
           </Col>
         </Row>
       </Container>
-      <style jsx>{`
-        .hover-opacity:hover {
-          opacity: 0.7;
-          transition: opacity 0.2s;
-        }
-      `}</style>
     </footer>
   );
 }
+
 

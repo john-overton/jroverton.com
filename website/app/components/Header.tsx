@@ -25,28 +25,28 @@ export default function Header() {
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="ms-auto">
             <Nav.Link 
-              href="/" 
+              href="/blog" 
               className="px-3"
               onClick={() => setExpanded(false)}
             >
-              Home
+              Blog
             </Nav.Link>
             <Nav.Link 
-              href="#about" 
-              className="px-3"
-              onClick={() => setExpanded(false)}
-            >
-              About
-            </Nav.Link>
-            <Nav.Link 
-              href="#projects" 
+              href="/projects" 
               className="px-3"
               onClick={() => setExpanded(false)}
             >
               Projects
             </Nav.Link>
             <Nav.Link 
-              href="#contact" 
+              href="/about" 
+              className="px-3"
+              onClick={() => setExpanded(false)}
+            >
+              About Me
+            </Nav.Link>
+            <Nav.Link 
+              href="/contact" 
               className="px-3"
               onClick={() => setExpanded(false)}
             >
@@ -58,4 +58,5 @@ export default function Header() {
     </Navbar>
   );
 }
+
 
