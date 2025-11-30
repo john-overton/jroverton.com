@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writer's Portfolio</title>
+    
+    <!-- Google Fonts: Courier Prime for that typewriter look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'paper': '#fdfbf7', // Warm off-white
+                        'ink': '#2d2d2d',   // Soft dark grey
+                        'accent-green': '#10b981', // Emerald
+                        'accent-blue': '#3b82f6',  // Blue
+                    },
+                    fontFamily: {
+                        'typewriter': ['"Courier Prime"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Courier Prime', monospace;
+            background-color: #fdfbf7;
+            color: #2d2d2d;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%239C92AC' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.7);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            border-color: var(--hover-border, #ccc);
+        }
+
+        /* Gradient Text */
+        .gradient-text {
+            background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Navigation Active State */
+        .nav-link.active {
+            font-weight: 700;
+            color: #10b981;
+            text-decoration: underline;
+            text-decoration-thickness: 2px;
+            text-underline-offset: 4px;
+        }
+
+        /* Smooth page transitions */
+        .page-section {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Scrollbar customization */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-accent-green selection:text-white">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 pt-4 px-4 sm:px-8">
+        <div class="glass-panel max-w-2xl mx-auto rounded-full px-6 py-3 flex justify-between items-center">
+            <div class="font-bold text-lg tracking-tight cursor-pointer" onclick="showPage('home')">
+                <span class="text-accent-green">&lt;</span>Dev<span class="text-accent-blue">/&gt;</span>
+            </div>
+            <div class="flex gap-4 sm:gap-6 text-sm sm:text-base">
+                <button onclick="showPage('home')" class="nav-link active hover:text-accent-green transition-colors" id="nav-home">Home</button>
+                <button onclick="showPage('blog')" class="nav-link hover:text-accent-green transition-colors" id="nav-blog">Archive</button>
+                <button onclick="showPage('about')" class="nav-link hover:text-accent-green transition-colors" id="nav-about">About</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow pt-24 pb-12 px-4 sm:px-6">
+        <div class="max-w-2xl mx-auto">
+            
+            <!-- PAGE: HOME -->
+            <div id="home" class="page-section">
+                <!-- Hero -->
+                <header class="mb-12 text-center sm:text-left">
+                    <h1 class="text-3xl sm:text-4xl font-bold mb-3 text-ink">Hello, I'm <span class="gradient-text">Alex</span>.</h1>
+                    <p class="text-lg text-gray-600 leading-relaxed">
+                        A digital gardener building simple tools and writing about minimal web design.
+                    </p>
+                </header>
+
+                <!-- Linktree / Projects -->
+                <section class="mb-12">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 mb-4 font-bold">Projects & Links</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <a href="#" class="glass-card p-4 rounded-lg group" style="--hover-border: #10b981;">
+                            <div class="flex items-center gap-3">
+                                <i class="ph ph-github-logo text-2xl text-ink group-hover:text-accent-green transition-colors"></i>
+                                <div>
+                                    <div class="font-bold text-sm">Open Source</div>
+                                    <div class="text-xs text-gray-500">My code repositories</div>
+                                </div>
+                                <i class="ph ph-arrow-right ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-accent-green"></i>
+                            </div>
+                        </a>
+                        <a href="#" class="glass-card p-4 rounded-lg group" style="--hover-border: #3b82f6;">
+                            <div class="flex items-center gap-3">
+                                <i class="ph ph-paint-brush text-2xl text-ink group-hover:text-accent-blue transition-colors"></i>
+                                <div>
+                                    <div class="font-bold text-sm">Design System</div>
+                                    <div class="text-xs text-gray-500">Figma UI Kit</div>
+                                </div>
+                                <i class="ph ph-arrow-right ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-accent-blue"></i>
+                            </div>
+                        </a>
+                        <a href="#" class="glass-card p-4 rounded-lg group" style="--hover-border: #10b981;">
+                            <div class="flex items-center gap-3">
+                                <i class="ph ph-coffee text-2xl text-ink group-hover:text-accent-green transition-colors"></i>
+                                <div>
+                                    <div class="font-bold text-sm">Buy me a Coffee</div>
+                                    <div class="text-xs text-gray-500">Support my work</div>
+                                </div>
+                                <i class="ph ph-arrow-right ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-accent-green"></i>
+                            </div>
+                        </a>
+                    </div>
+                </section>
+
+                <!-- Latest Posts -->
+                <section>
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-xs uppercase tracking-widest text-gray-400 font-bold">Latest Thoughts</h2>
+                        <button onclick="showPage('blog')" class="text-xs text-accent-blue hover:underline">View All</button>
+                    </div>
+                    
+                    <div class="space-y-4" id="recent-posts-container">
+                        <!-- Content injected via JS -->
+                    </div>
+                </section>
+            </div>
+
+            <!-- PAGE: BLOG (ARCHIVE) -->
+            <div id="blog" class="page-section hidden">
+                <header class="mb-8 border-b-2 border-gray-200 pb-4 border-dashed">
+                    <h1 class="text-2xl font-bold mb-2">The Archive</h1>
+                    <p class="text-sm text-gray-500">A collection of notes, drafts, and tutorials.</p>
+                </header>
+                
+                <div class="space-y-6" id="all-posts-container">
+                    <!-- Content injected via JS -->
+                </div>
+            </div>
+
+            <!-- PAGE: ABOUT -->
+            <div id="about" class="page-section hidden">
+                <div class="glass-panel p-8 rounded-xl relative overflow-hidden">
+                    <!-- Decorational blobs -->
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-accent-green opacity-10 rounded-full blur-2xl"></div>
+                    <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-accent-blue opacity-10 rounded-full blur-2xl"></div>
+
+                    <h1 class="text-2xl font-bold mb-6">About Me</h1>
+                    
+                    <div class="prose prose-stone font-typewriter text-sm sm:text-base">
+                        <p class="mb-4">
+                            I am a minimalist developer focusing on sustainability in software and clean aesthetics. I believe websites should be lightweight, accessible, and beautiful.
+                        </p>
+                        <p class="mb-4">
+                            This site is built with pure HTML, CSS (Tailwind), and a sprinkle of JavaScript. No frameworks, no heavy build steps. Just digital paper.
+                        </p>
+                        <p class="mb-6">
+                            When I'm not coding, I'm usually reading sci-fi novels, brewing pour-over coffee, or hiking.
+                        </p>
+
+                        <div class="mt-8 pt-6 border-t border-gray-200 border-dashed">
+                            <h3 class="font-bold mb-3">Connect</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-center gap-2">
+                                    <i class="ph ph-envelope-simple text-accent-blue"></i>
+                                    <a href="mailto:hello@example.com" class="hover:text-accent-blue hover:underline">hello@example.com</a>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="ph ph-twitter-logo text-accent-blue"></i>
+                                    <a href="#" class="hover:text-accent-blue hover:underline">@alexdev</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-6 text-center text-xs text-gray-400">
+        <p>&copy; 2024 Alex Doe. Crafted with <i class="ph-fill ph-heart text-accent-green mx-1"></i> and simple code.</p>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Mock Data for Blog Posts
+        const posts = [
+            {
+                id: 1,
+                title: "The Return of Static Sites",
+                date: "Oct 24, 2024",
+                excerpt: "Why we are moving back to the simplicity of HTML and CSS after a decade of complex frameworks.",
+                tags: ["Web", "Minimalism"]
+            },
+            {
+                id: 2,
+                title: "Color Theory for Developers",
+                date: "Oct 12, 2024",
+                excerpt: "Understanding how to use accent colors like Emerald and Blue effectively in dark-on-light themes.",
+                tags: ["Design"]
+            },
+            {
+                id: 3,
+                title: "Digital Gardening 101",
+                date: "Sep 28, 2024",
+                excerpt: "Treating your website like a garden that grows slowly over time, rather than a stream of fleeting content.",
+                tags: ["Philosophy"]
+            },
+            {
+                id: 4,
+                title: "My VS Code Setup",
+                date: "Sep 15, 2024",
+                excerpt: "A look at the extensions and themes I use to keep my development environment distraction-free.",
+                tags: ["Tools"]
+            },
+            {
+                id: 5,
+                title: "Learning Rust",
+                date: "Aug 30, 2024",
+                excerpt: "First impressions coming from a JavaScript background. The borrow checker is tough but fair.",
+                tags: ["Code"]
+            },
+            {
+                id: 6,
+                title: "The Art of Note Taking",
+                date: "Aug 10, 2024",
+                excerpt: "How I organize my thoughts using the Zettelkasten method.",
+                tags: ["Productivity"]
+            }
+        ];
+
+        // Function to render blog posts
+        function renderPosts() {
+            const recentContainer = document.getElementById('recent-posts-container');
+            const allContainer = document.getElementById('all-posts-container');
+
+            // Render Recent (First 5)
+            posts.slice(0, 5).forEach(post => {
+                const html = `
+                    <article class="glass-card p-4 rounded-lg group cursor-pointer" style="--hover-border: #3b82f6;">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-lg group-hover:text-accent-blue transition-colors">${post.title}</h3>
+                            <span class="text-xs text-gray-400 font-mono whitespace-nowrap ml-2">${post.date}</span>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-3 leading-relaxed">${post.excerpt}</p>
+                        <div class="flex items-center gap-2">
+                            ${post.tags.map(tag => `<span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-500">${tag}</span>`).join('')}
+                            <span class="text-xs text-accent-blue ml-auto opacity-0 group-hover:opacity-100 transition-opacity">Read more -></span>
+                        </div>
+                    </article>
+                `;
+                recentContainer.innerHTML += html;
+            });
+
+            // Render All (Archive View)
+            posts.forEach(post => {
+                const html = `
+                    <article class="group">
+                        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4 mb-1">
+                            <span class="text-xs font-mono text-gray-400 w-24 shrink-0">${post.date}</span>
+                            <h3 class="font-bold text-lg cursor-pointer hover:text-accent-green hover:underline decoration-dashed underline-offset-4 transition-colors">${post.title}</h3>
+                        </div>
+                        <p class="text-sm text-gray-600 sm:ml-28 mb-3 max-w-lg leading-relaxed">${post.excerpt}</p>
+                    </article>
+                `;
+                allContainer.innerHTML += html;
+            });
+        }
+
+        // Router Logic
+        function showPage(pageId) {
+            // Hide all sections
+            document.querySelectorAll('.page-section').forEach(el => {
+                el.classList.add('hidden');
+            });
+            
+            // Show target section
+            document.getElementById(pageId).classList.remove('hidden');
+            
+            // Update Navigation
+            document.querySelectorAll('.nav-link').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.getElementById(`nav-${pageId}`).classList.add('active');
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            renderPosts();
+        });
+
+    </script>
+</body>
+</html>

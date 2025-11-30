@@ -2,7 +2,7 @@ import { BlogPostMetadata } from './types';
 
 export const metadata: BlogPostMetadata = {
   title: 'Deploy First, Pivot Fast: How Using My Own App Killed My Original Vision',
-  date: '2024-11-22',
+  date: '2025-11-22',
   slug: 'building-astryk',
   excerpt: 'A journey of building a productivity tool, learning from real usage, and pivoting based on actual needs rather than assumptions.',
   author: 'John Overton'

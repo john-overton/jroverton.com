@@ -1,62 +1,49 @@
 'use client';
 
-import { Navbar, Nav, Container } from 'react-bootstrap';
-import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export default function Header() {
-  const [expanded, setExpanded] = useState(false);
+  const pathname = usePathname();
+
+  const isActive = (path: string) => {
+    if (path === '/' && pathname === '/') return true;
+    if (path !== '/' && pathname.startsWith(path)) return true;
+    return false;
+  };
 
   return (
-    <Navbar 
-      expand="lg" 
-      className="bg-white border-bottom border-light"
-      style={{ minHeight: '70px' }}
-      expanded={expanded}
-    >
-      <Container>
-        <Navbar.Brand href="/" className="fw-bold fs-4">
-          {/* Logo placeholder - replace with actual logo */}
-          <span style={{ color: 'var(--cobalt-sky)' }}>JO</span>
-        </Navbar.Brand>
-        <Navbar.Toggle 
-          aria-controls="basic-navbar-nav"
-          onClick={() => setExpanded(!expanded)}
-        />
-        <Navbar.Collapse id="basic-navbar-nav">
-          <Nav className="ms-auto">
-            <Nav.Link 
-              href="/blog" 
-              className="px-3"
-              onClick={() => setExpanded(false)}
-            >
-              Blog
-            </Nav.Link>
-            <Nav.Link 
-              href="/projects" 
-              className="px-3"
-              onClick={() => setExpanded(false)}
-            >
-              Projects
-            </Nav.Link>
-            <Nav.Link 
-              href="/about" 
-              className="px-3"
-              onClick={() => setExpanded(false)}
-            >
-              About Me
-            </Nav.Link>
-            <Nav.Link 
-              href="/contact" 
-              className="px-3"
-              onClick={() => setExpanded(false)}
-            >
-              Contact
-            </Nav.Link>
-          </Nav>
-        </Navbar.Collapse>
-      </Container>
-    </Navbar>
+    <nav className="position-fixed w-100 top-0 z-3 pt-4 px-3 px-sm-4">
+      <div className="glass-panel max-w-2xl mx-auto rounded-pill px-4 py-2 d-flex justify-content-between align-items-center">
+        <Link href="/" className="text-decoration-none">
+          <div className="fw-bold fs-6 text-ink terminal-prompt font-monospace">
+            <span className="d-none d-md-inline">john@jroverton.com:~$ ./thoughts.sh</span>
+            <span className="d-inline d-md-none text-sm">$ ./thoughts.sh</span>
+            <span className="blinking-cursor">_</span>
+          </div>
+        </Link>
+        
+        <div className="d-flex gap-3 gap-sm-4 small sm-text-base">
+          <Link 
+            href="/" 
+            className={`nav-link-custom ${isActive('/') ? 'active' : ''}`}
+          >
+            Home
+          </Link>
+          <Link 
+            href="/blog" 
+            className={`nav-link-custom ${isActive('/blog') ? 'active' : ''}`}
+          >
+            Archive
+          </Link>
+          <Link 
+            href="/#about" 
+            className="nav-link-custom"
+          >
+            About
+          </Link>
+        </div>
+      </div>
+    </nav>
   );
 }
-
-

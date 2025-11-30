@@ -1,9 +1,7 @@
-import { Container } from 'react-bootstrap';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
-import AuthorCard from '../../components/AuthorCard';
 import { getBlogPostBySlug, blogPosts } from '../../components/blog';
 
 interface BlogPostPageProps {
@@ -52,9 +50,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
   const formatDate = (dateString: string) => {
     // Parse date string as local date to avoid timezone conversion issues
-    // Format: YYYY-MM-DD
     const [year, month, day] = dateString.split('-').map(Number);
-    const date = new Date(year, month - 1, day); // month is 0-indexed
+    const date = new Date(year, month - 1, day); 
     
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
@@ -69,47 +66,42 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     <div className="d-flex flex-column min-vh-100">
       <Header />
       
-      <main className="flex-grow-1 py-5">
-        <Container>
-          <div className="row justify-content-center">
-            <div className="col-lg-8">
-              {/* Author Card */}
-              <AuthorCard />
+      <main className="flex-grow-1 pt-5 mt-5 px-3 px-sm-4 pb-5">
+        <div className="max-w-2xl page-fade-in">
+          <article className="blog-post">
+            <header className="mb-5 pb-4">
+              <div className="d-flex align-items-center gap-2 mb-3 small text-muted">
+                <time dateTime={post.date} className="font-monospace">
+                  {formatDate(post.date)}
+                </time>
+                {post.author && (
+                  <>
+                    <span>/</span>
+                    <span>{post.author}</span>
+                  </>
+                )}
+              </div>
+              
+              <h1 className="display-5 fw-bold mb-3 text-ink">
+                {post.title}
+              </h1>
+            </header>
 
-              {/* Blog Post */}
-              <article className="blog-post">
-                <header className="mb-4">
-                  <h1 className="display-5 fw-bold mb-3">
-                    {post.title}
-                  </h1>
-                  <div className="d-flex align-items-center text-secondary-custom mb-4 font-typewriter" style={{ fontSize: '0.875rem' }}>
-                    <time dateTime={post.date}>
-                      {formatDate(post.date)}
-                    </time>
-                    {post.author && (
-                      <>
-                        <span className="mx-2">•</span>
-                        <span>{post.author}</span>
-                      </>
-                    )}
-                  </div>
-                </header>
-
-                <div className="blog-content" style={{ 
-                  fontSize: '1.125rem', 
-                  lineHeight: '1.8',
-                  color: 'var(--text-primary)'
-                }}>
-                  <PostContent />
-                </div>
-              </article>
+            <div className="blog-content" style={{ fontSize: '1.0625rem', lineHeight: '1.8' }}>
+              <PostContent />
             </div>
-          </div>
-        </Container>
+            
+            {/* Back to Archive Link */}
+            <div className="mt-5 pt-5">
+               <a href="/blog" className="text-decoration-none text-accent-blue hover-underline">
+                 &larr; Back to Archive
+               </a>
+            </div>
+          </article>
+        </div>
       </main>
 
       <Footer />
     </div>
   );
 }
-
