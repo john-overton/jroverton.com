@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Link from 'next/link';
 import { sortedBlogPosts } from './components/blog';
+import { Mail } from 'lucide-react';
 
 export default function Home() {
   const recentPosts = sortedBlogPosts.slice(0, 5);
@@ -126,7 +127,7 @@ export default function Home() {
                     <h3 className="h6 fw-bold mb-3">Connect</h3>
                     <div className="d-flex gap-3">
                       <a href="mailto:john@jroverton.com" className="text-decoration-none text-secondary hover-text-blue transition-colors" title="Email">
-                        <i className="ph ph-envelope-simple" style={{ width: '20px', height: '20px', fontSize: '20px', display: 'inline-block' }}></i>
+                        <Mail size={20} style={{ width: '20px', height: '20px' }} />
                       </a>
                       <a href="https://x.com/overton_stuff" className="text-decoration-none text-secondary hover-text-blue transition-colors" title="X (Twitter)">
                         <img src="/x-logo.svg" alt="X" style={{ width: '20px', height: '20px', filter: 'invert(0.5)' }} className="hover-filter-invert-0" />
