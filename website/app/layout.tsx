@@ -12,8 +12,13 @@ const garamond = EB_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "John Overton - Personal Website",
+  title: "John Overton - ./thoughts.sh",
   description: "Personal website of John Overton",
+  icons: {
+    icon: '/JO.svg',
+    shortcut: '/JO.svg',
+    apple: '/JO.svg',
+  },
 };
 
 export default function RootLayout({

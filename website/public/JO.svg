@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:1.5;">
+    <g transform="matrix(1.23067,0,0,1.21419,-139.753,-88.6321)">
+        <rect x="155" y="115" width="750" height="761" style="fill:none;"/>
+        <rect x="155" y="115" width="750" height="761" style="fill:none;stroke:rgb(53,120,149);stroke-width:40.9px;"/>
+    </g>
+    <g transform="matrix(38.75,0,0,38.75,-10405.5,-11579.3)">
+        <g transform="matrix(18.0645,0,0,18.0645,292.316,321.58)">
+        </g>
+        <text x="278.768px" y="321.58px" style="font-family:'PlantagenetCherokee', 'Plantagenet Cherokee', serif;font-size:18.065px;fill:rgb(53,120,149);">O</text>
+    </g>
+    <g transform="matrix(38.75,0,0,38.75,-10564.5,-11846.3)">
+        <g transform="matrix(18.0645,0,0,18.0645,285.614,321.58)">
+        </g>
+        <text x="278.768px" y="321.58px" style="font-family:'PlantagenetCherokee', 'Plantagenet Cherokee', serif;font-size:18.065px;fill:rgb(53,120,149);">J</text>
+    </g>
+</svg>
