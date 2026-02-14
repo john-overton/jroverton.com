@@ -10,6 +10,12 @@
 !.yarn/releases
 !.yarn/versions
 
+# data
+data/clearcut/
+*.db
+*.db-shm
+*.db-wal
+
 # testing
 /coverage
 
