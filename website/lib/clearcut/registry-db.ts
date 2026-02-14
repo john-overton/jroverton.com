@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 import { getRegistryDbPath } from './config';
 import { ApiError } from './errors';
 import { REGISTRY_SCHEMA_SQL } from './schema';
-import type { SessionRecord } from './types';
+import type { ImportTemplateRecord, SessionRecord } from './types';
 
 let registryDb: Database.Database | null = null;
 
@@ -132,4 +132,106 @@ export function updateSessionCounts(editToken: string, tripCount: number, routeC
 
 export function deleteSessionRecord(editToken: string): void {
   getRegistryDb().prepare('DELETE FROM sessions WHERE edit_token = ?').run(editToken);
+}
+
+export function listImportTemplates(editToken: string): ImportTemplateRecord[] {
+  return getRegistryDb()
+    .prepare(
+      `SELECT *
+       FROM import_templates
+       WHERE edit_token = ?
+       ORDER BY updated_at DESC, id DESC`,
+    )
+    .all(editToken) as ImportTemplateRecord[];
+}
+
+export function createImportTemplate(input: {
+  editToken: string;
+  templateName: string;
+  sourceSystem: string;
+  notes?: string | null;
+  eventMappingJson: string;
+  fieldMappingJson: string;
+  matchRulesJson: string;
+}): ImportTemplateRecord {
+  const db = getRegistryDb();
+  const result = db
+    .prepare(
+      `INSERT INTO import_templates (
+         edit_token,
+         template_name,
+         source_system,
+         notes,
+         event_mapping_json,
+         field_mapping_json,
+         match_rules_json
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      input.editToken,
+      input.templateName.trim(),
+      input.sourceSystem.trim(),
+      input.notes?.trim() || null,
+      input.eventMappingJson,
+      input.fieldMappingJson,
+      input.matchRulesJson,
+    );
+
+  const created = getImportTemplateById(Number(result.lastInsertRowid));
+  if (!created) {
+    throw new ApiError(500, 'template_insert_failed', 'Failed to create import template.');
+  }
+  return created;
+}
+
+export function getImportTemplateById(id: number): ImportTemplateRecord | null {
+  const row = getRegistryDb()
+    .prepare('SELECT * FROM import_templates WHERE id = ?')
+    .get(id) as ImportTemplateRecord | undefined;
+  return row ?? null;
+}
+
+export function updateImportTemplate(
+  id: number,
+  input: {
+    templateName?: string;
+    sourceSystem?: string;
+    notes?: string | null;
+    eventMappingJson?: string;
+    fieldMappingJson?: string;
+    matchRulesJson?: string;
+  },
+): ImportTemplateRecord {
+  const existing = getImportTemplateById(id);
+  if (!existing) {
+    throw new ApiError(404, 'template_not_found', 'Import template not found.');
+  }
+
+  getRegistryDb()
+    .prepare(
+      `UPDATE import_templates
+       SET template_name = COALESCE(@template_name, template_name),
+           source_system = COALESCE(@source_system, source_system),
+           notes = @notes,
+           event_mapping_json = COALESCE(@event_mapping_json, event_mapping_json),
+           field_mapping_json = COALESCE(@field_mapping_json, field_mapping_json),
+           match_rules_json = COALESCE(@match_rules_json, match_rules_json),
+           updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+       WHERE id = @id`,
+    )
+    .run({
+      id,
+      template_name: input.templateName?.trim(),
+      source_system: input.sourceSystem?.trim(),
+      notes: input.notes ?? existing.notes,
+      event_mapping_json: input.eventMappingJson,
+      field_mapping_json: input.fieldMappingJson,
+      match_rules_json: input.matchRulesJson,
+    });
+
+  return getImportTemplateById(id) as ImportTemplateRecord;
+}
+
+export function deleteImportTemplate(id: number): void {
+  getRegistryDb().prepare('DELETE FROM import_templates WHERE id = ?').run(id);
 }

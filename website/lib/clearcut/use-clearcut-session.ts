@@ -3,20 +3,33 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
+  applyImportMappingConfig,
   ClearcutClientError,
   authSession,
   cloneSession,
+  createImportTemplateRecord,
   deleteSession,
+  deleteImportTemplateRecord,
   getSession,
   importRoutes,
   importTrips,
+  listImportTemplates,
+  previewImportFile,
   removeSessionPassword,
   renameSession,
   setSessionPassword,
   updateSession,
+  updateImportTemplateRecord,
+  validateImportMappingConfig,
 } from './client';
 import { clearSessionJwt, getSessionJwt, setSessionJwt } from './session-auth';
-import type { AccessLevel, SessionState, SessionStateUpdateInput } from './types';
+import type {
+  AccessLevel,
+  ImportMappingConfig,
+  ImportPreviewResponse,
+  SessionState,
+  SessionStateUpdateInput,
+} from './types';
 
 export type ClearcutMode = 'edit' | 'readonly';
 
@@ -200,6 +213,57 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
     [loadSession, token, withEditJwt],
   );
 
+  const previewImport = useCallback(
+    async (file: File): Promise<ImportPreviewResponse> =>
+      withEditJwt((jwt) => previewImportFile(token, jwt, file)),
+    [token, withEditJwt],
+  );
+
+  const validateImport = useCallback(
+    async (preview: ImportPreviewResponse, config: ImportMappingConfig) =>
+      withEditJwt((jwt) => validateImportMappingConfig(token, jwt, preview, config)),
+    [token, withEditJwt],
+  );
+
+  const applyImport = useCallback(
+    async (file: File, config: ImportMappingConfig) =>
+      withEditJwt(async (jwt) => {
+        const result = await applyImportMappingConfig(token, jwt, file, config);
+        await loadSession();
+        return result;
+      }),
+    [loadSession, token, withEditJwt],
+  );
+
+  const listTemplates = useCallback(
+    async () => withEditJwt((jwt) => listImportTemplates(token, jwt)),
+    [token, withEditJwt],
+  );
+
+  const createTemplate = useCallback(
+    async (input: { templateName: string; sourceSystem: string; notes?: string; config: ImportMappingConfig }) =>
+      withEditJwt((jwt) => createImportTemplateRecord(token, jwt, input)),
+    [token, withEditJwt],
+  );
+
+  const updateTemplate = useCallback(
+    async (
+      id: number,
+      input: {
+        templateName?: string;
+        sourceSystem?: string;
+        notes?: string | null;
+        config?: ImportMappingConfig;
+      },
+    ) => withEditJwt((jwt) => updateImportTemplateRecord(id, jwt, input)),
+    [withEditJwt],
+  );
+
+  const deleteTemplate = useCallback(
+    async (id: number) => withEditJwt((jwt) => deleteImportTemplateRecord(id, jwt)),
+    [withEditJwt],
+  );
+
   return {
     loadState,
     loadSession,
@@ -212,6 +276,13 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
     removePassword,
     uploadTrips,
     uploadRoutes,
+    previewImport,
+    validateImport,
+    applyImport,
+    listTemplates,
+    createTemplate,
+    updateTemplate,
+    deleteTemplate,
     clearAuth: () => clearSessionJwt(token),
   };
 }

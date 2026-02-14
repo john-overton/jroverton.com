@@ -111,3 +111,74 @@ export interface SessionStateUpdateInput {
   trips?: TripRow[];
   routes?: RouteRow[];
 }
+
+export type ImportEventType =
+  | 'pullout'
+  | 'pullin'
+  | 'pickup'
+  | 'dropoff'
+  | 'break'
+  | 'other';
+
+export interface ImportPreviewResponse {
+  headers: string[];
+  rows: Array<Record<string, string | null>>;
+  row_count: number;
+  sample_count: number;
+}
+
+export interface ImportFieldMapping {
+  trip: Partial<Record<keyof TripRow, string>>;
+  route: Partial<Record<keyof RouteRow, string>>;
+}
+
+export interface ImportMatchRules {
+  trip_keys: Array<keyof TripRow>;
+  route_keys: Array<keyof RouteRow>;
+  create_missing_trip?: boolean;
+  create_missing_route?: boolean;
+}
+
+export interface ImportMappingConfig {
+  event_column: string;
+  event_values: Record<string, ImportEventType>;
+  field_mapping: ImportFieldMapping;
+  match_rules: ImportMatchRules;
+}
+
+export interface ImportValidateResponse {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  summary: {
+    sampled_rows: number;
+    event_types_detected: ImportEventType[];
+  };
+}
+
+export interface ImportApplyResponse {
+  imported: true;
+  summary: {
+    processed_rows: number;
+    created_trips: number;
+    updated_trips: number;
+    created_routes: number;
+    updated_routes: number;
+    skipped_rows: number;
+    errors: number;
+  };
+  errors: Array<{ row: number; reason: string }>;
+}
+
+export interface ImportTemplateRecord {
+  id: number;
+  edit_token: string;
+  template_name: string;
+  source_system: string;
+  notes: string | null;
+  event_mapping_json: string;
+  field_mapping_json: string;
+  match_rules_json: string;
+  created_at: string;
+  updated_at: string;
+}

@@ -4,12 +4,27 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from 'react';
 
+import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
 import { ClearcutClientError } from '@/lib/clearcut/client';
 import { buildDemoTripsAndRoutes } from '@/lib/clearcut/demo-data';
 import { computeClearcutMetrics } from '@/lib/clearcut/metrics';
 import { useClearcutSession, type ClearcutMode } from '@/lib/clearcut/use-clearcut-session';
 
 type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runs' | 'optimize' | 'deadhead';
+type ImportViewMode = 'main' | 'wizard' | 'flat';
+type TripDataColumnKey =
+  | 'trip_id'
+  | 'route_id'
+  | 'pickup_time'
+  | 'dropoff_time'
+  | 'status'
+  | 'passenger_type';
+type RouteDataColumnKey =
+  | 'route_id'
+  | 'scheduled_start_time'
+  | 'scheduled_end_time'
+  | 'actual_start_time'
+  | 'actual_end_time';
 
 const TAB_ITEMS: Array<{ key: TabKey; label: string }> = [
   { key: 'import', label: 'Import' },
@@ -22,6 +37,8 @@ const TAB_ITEMS: Array<{ key: TabKey; label: string }> = [
 ];
 const CLEARCUT_FONT_STACK =
   '"Inter", "SF Pro Text", "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif';
+const TRIP_DATA_PAGE_SIZE = 10;
+const ROUTE_DATA_PAGE_SIZE = 10;
 
 interface Props {
   token: string;
@@ -100,6 +117,25 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [mapBlockIdx, setMapBlockIdx] = useState(0);
+  const [importViewMode, setImportViewMode] = useState<ImportViewMode>('main');
+  const [wizardKey, setWizardKey] = useState(0);
+  const [tripPage, setTripPage] = useState(1);
+  const [routePage, setRoutePage] = useState(1);
+  const [tripVisibleColumns, setTripVisibleColumns] = useState<Record<TripDataColumnKey, boolean>>({
+    trip_id: true,
+    route_id: true,
+    pickup_time: true,
+    dropoff_time: true,
+    status: true,
+    passenger_type: true,
+  });
+  const [routeVisibleColumns, setRouteVisibleColumns] = useState<Record<RouteDataColumnKey, boolean>>({
+    route_id: true,
+    scheduled_start_time: true,
+    scheduled_end_time: true,
+    actual_start_time: true,
+    actual_end_time: true,
+  });
 
   const readonlyView = mode === 'readonly';
 
@@ -107,6 +143,89 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const metrics = useMemo(
     () => (ready ? computeClearcutMetrics(ready.state) : null),
     [ready],
+  );
+  const tripColumns = useMemo(
+    () =>
+      [
+        { key: 'trip_id', label: 'Trip', getValue: (trip: (typeof ready.state.trips)[number]) => trip.trip_id },
+        { key: 'route_id', label: 'Route', getValue: (trip: (typeof ready.state.trips)[number]) => trip.route_id },
+        {
+          key: 'pickup_time',
+          label: 'Pickup',
+          getValue: (trip: (typeof ready.state.trips)[number]) =>
+            trip.pickup_arrive_time ?? trip.scheduled_pickup_time,
+        },
+        {
+          key: 'dropoff_time',
+          label: 'Dropoff',
+          getValue: (trip: (typeof ready.state.trips)[number]) =>
+            trip.dropoff_leave_time ?? trip.scheduled_appointment_time,
+        },
+        { key: 'status', label: 'Status', getValue: (trip: (typeof ready.state.trips)[number]) => trip.status },
+        {
+          key: 'passenger_type',
+          label: 'Passenger Type',
+          getValue: (trip: (typeof ready.state.trips)[number]) => trip.passenger_type,
+        },
+      ] satisfies Array<{
+        key: TripDataColumnKey;
+        label: string;
+        getValue: (trip: (typeof ready.state.trips)[number]) => string | null;
+      }>,
+    [ready],
+  );
+  const routeColumns = useMemo(
+    () =>
+      [
+        {
+          key: 'route_id',
+          label: 'Route',
+          getValue: (route: (typeof ready.state.routes)[number]) => route.route_id,
+        },
+        {
+          key: 'scheduled_start_time',
+          label: 'Scheduled Start',
+          getValue: (route: (typeof ready.state.routes)[number]) => route.scheduled_start_time,
+        },
+        {
+          key: 'scheduled_end_time',
+          label: 'Scheduled End',
+          getValue: (route: (typeof ready.state.routes)[number]) => route.scheduled_end_time,
+        },
+        {
+          key: 'actual_start_time',
+          label: 'Actual Start',
+          getValue: (route: (typeof ready.state.routes)[number]) => route.actual_start_time ?? '-',
+        },
+        {
+          key: 'actual_end_time',
+          label: 'Actual End',
+          getValue: (route: (typeof ready.state.routes)[number]) => route.actual_end_time ?? '-',
+        },
+      ] satisfies Array<{
+        key: RouteDataColumnKey;
+        label: string;
+        getValue: (route: (typeof ready.state.routes)[number]) => string | null;
+      }>,
+    [ready],
+  );
+  const activeTripColumns = tripColumns.filter((column) => tripVisibleColumns[column.key]);
+  const activeRouteColumns = routeColumns.filter((column) => routeVisibleColumns[column.key]);
+  const tripCount = ready?.state.trips.length ?? 0;
+  const routeCount = ready?.state.routes.length ?? 0;
+  const tripTotalPages = Math.max(1, Math.ceil(tripCount / TRIP_DATA_PAGE_SIZE));
+  const routeTotalPages = Math.max(1, Math.ceil(routeCount / ROUTE_DATA_PAGE_SIZE));
+  const currentTripPage = Math.min(tripPage, tripTotalPages);
+  const currentRoutePage = Math.min(routePage, routeTotalPages);
+  const tripRows = ready?.state.trips ?? [];
+  const routeRows = ready?.state.routes ?? [];
+  const tripPageRows = tripRows.slice(
+    (currentTripPage - 1) * TRIP_DATA_PAGE_SIZE,
+    currentTripPage * TRIP_DATA_PAGE_SIZE,
+  );
+  const routePageRows = routeRows.slice(
+    (currentRoutePage - 1) * ROUTE_DATA_PAGE_SIZE,
+    currentRoutePage * ROUTE_DATA_PAGE_SIZE,
   );
   const hasData = ready ? ready.state.session.trip_count > 0 || ready.state.session.route_count > 0 : false;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -144,6 +263,28 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       setStatus(null);
       setError(demoError instanceof Error ? demoError.message : 'Failed to load demo data.');
     }
+  }
+
+  function downloadSampleCsv(kind: 'trips' | 'routes') {
+    const tripSample = [
+      'trip_id,scheduled_pickup_time,scheduled_appointment_time,pickup_arrive_time,pickup_leave_time,dropoff_arrive_time,dropoff_leave_time,route_id,pickup_address,pickup_lat,pickup_lon,dropoff_address,dropoff_lat,dropoff_lon,status,passenger_type,passenger_count,pick_odometer,drop_odometer',
+      'TRIP-001,2026-02-01 08:00:00,2026-02-01 08:30:00,2026-02-01 07:58:00,2026-02-01 08:02:00,2026-02-01 08:27:00,2026-02-01 08:31:00,ROUTE-001,123 Main St,,,456 Oak St,,,completed,ambulatory,1,1000,1010',
+    ].join('\n');
+    const routeSample = [
+      'route_id,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time',
+      'ROUTE-001,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00',
+    ].join('\n');
+
+    const content = kind === 'trips' ? tripSample : routeSample;
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = kind === 'trips' ? 'clearcut-flat-trip-sample.csv' : 'clearcut-flat-route-sample.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   }
 
   async function onSave() {
@@ -260,29 +401,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
       setError(unlockError instanceof Error ? unlockError.message : 'Unlock failed.');
     }
-  }
-
-  function onSettingsChange(
-    key:
-      | 'avg_ride_time_min'
-      | 'otp_target_pct'
-      | 'productivity_baseline'
-      | 'deadhead_threshold_pct'
-      | 'service_day_start'
-      | 'service_day_end'
-      | 'day_type'
-      | 'time_range_start'
-      | 'time_range_end',
-    value: number | string | null,
-  ) {
-    if (!ready || readonlyView) {
-      return;
-    }
-    const current = ready.state.settings;
-    const next = { ...current, [key]: value };
-    session.saveState({ settings: next }).catch((saveError) => {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to persist setting.');
-    });
   }
 
   function onOptimizationChange(
@@ -471,24 +589,117 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       {tab === 'import' && (
         <>
           <SectionCard title="Data Import">
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <UploadCard
-                  label="Trip File (CSV/XLSX)"
-                  disabled={readonlyView}
-                  onUpload={(file) => onUpload('trips', file)}
+            {importViewMode === 'main' && (
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: '0.9rem' }}>
+                    <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
+                      Event-based import with templates and field mapping.
+                    </div>
+                    <button
+                      className="btn btn-outline-primary w-100"
+                      type="button"
+                      onClick={() => setImportViewMode('wizard')}
+                    >
+                      Trip Import Wizard
+                    </button>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: '0.9rem' }}>
+                    <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
+                      Direct trip/route file upload with CSV samples.
+                    </div>
+                    <button
+                      className="btn btn-outline-secondary w-100"
+                      type="button"
+                      onClick={() => setImportViewMode('flat')}
+                    >
+                      Flat File Import
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {importViewMode === 'wizard' && (
+              <div className="mt-2">
+                <button
+                  className="btn btn-sm btn-outline-secondary mb-3"
+                  type="button"
+                  onClick={() => {
+                    setImportViewMode('main');
+                    setWizardKey((prev) => prev + 1);
+                    setStatus(null);
+                    setError(null);
+                  }}
+                >
+                  Back to Import Options
+                </button>
+                <ImportMapperWizard
+                  key={`import-wizard-${wizardKey}`}
+                  readonlyView={readonlyView}
+                  onPreview={session.previewImport}
+                  onValidate={session.validateImport}
+                  onApply={session.applyImport}
+                  onListTemplates={session.listTemplates}
+                  onCreateTemplate={session.createTemplate}
+                  onDeleteTemplate={session.deleteTemplate}
                 />
               </div>
-              <div className="col-md-6 mb-3">
-                <UploadCard
-                  label="Route File (CSV/XLSX)"
-                  disabled={readonlyView}
-                  onUpload={(file) => onUpload('routes', file)}
-                />
+            )}
+
+            {importViewMode === 'flat' && (
+              <div className="mt-2">
+                <button
+                  className="btn btn-sm btn-outline-secondary mb-3"
+                  type="button"
+                  onClick={() => {
+                    setImportViewMode('main');
+                    setStatus(null);
+                    setError(null);
+                  }}
+                >
+                  Back to Import Options
+                </button>
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <div className="d-flex gap-2 mb-2">
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        type="button"
+                        onClick={() => downloadSampleCsv('trips')}
+                      >
+                        Download Trip Sample CSV
+                      </button>
+                    </div>
+                    <UploadCard
+                      label="Flat Trip Import (CSV/XLSX)"
+                      disabled={readonlyView}
+                      onUpload={(file) => onUpload('trips', file)}
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <div className="d-flex gap-2 mb-2">
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        type="button"
+                        onClick={() => downloadSampleCsv('routes')}
+                      >
+                        Download Route Sample CSV
+                      </button>
+                    </div>
+                    <UploadCard
+                      label="Flat Route Import (CSV/XLSX)"
+                      disabled={readonlyView}
+                      onUpload={(file) => onUpload('routes', file)}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
             {!readonlyView && (
-              <button className="btn btn-outline-primary" onClick={onLoadDemo} type="button">
+              <button className="btn btn-outline-primary mt-3" onClick={onLoadDemo} type="button">
                 Load Demo Dataset
               </button>
             )}
@@ -497,85 +708,209 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           <SectionCard title="System Settings">
             <div className="row g-3">
               <div className="col-md-4">
-                <label className="form-label">Average Ride Time (min)</label>
-                <input
-                  className="form-control"
-                  type="number"
-                  min={5}
-                  max={180}
-                  disabled={readonlyView}
-                  value={ready.state.settings.avg_ride_time_min}
-                  onChange={(event) =>
-                    onSettingsChange('avg_ride_time_min', Number(event.target.value))
-                  }
-                />
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Derived Service Start</div>
+                <div style={{ fontWeight: 600 }}>{metrics.derivedServiceWindow.startLabel}</div>
               </div>
               <div className="col-md-4">
-                <label className="form-label">OTP Target (%)</label>
-                <input
-                  className="form-control"
-                  type="number"
-                  min={50}
-                  max={100}
-                  step={0.5}
-                  disabled={readonlyView}
-                  value={ready.state.settings.otp_target_pct}
-                  onChange={(event) =>
-                    onSettingsChange('otp_target_pct', Number(event.target.value))
-                  }
-                />
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Derived Service End</div>
+                <div style={{ fontWeight: 600 }}>{metrics.derivedServiceWindow.endLabel}</div>
               </div>
               <div className="col-md-4">
-                <label className="form-label">Productivity Baseline</label>
-                <input
-                  className="form-control"
-                  type="number"
-                  min={0.5}
-                  max={5}
-                  step={0.1}
-                  disabled={readonlyView}
-                  value={ready.state.settings.productivity_baseline}
-                  onChange={(event) =>
-                    onSettingsChange('productivity_baseline', Number(event.target.value))
-                  }
-                />
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Service Hours</div>
+                <div style={{ fontWeight: 600 }}>
+                  {metrics.derivedServiceWindow.isTwentyFourHours
+                    ? '24:00'
+                    : metrics.derivedServiceWindow.durationLabel}
+                </div>
               </div>
-              <div className="col-md-4">
-                <label className="form-label">Deadhead Threshold (%)</label>
-                <input
-                  className="form-control"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={1}
-                  disabled={readonlyView}
-                  value={ready.state.settings.deadhead_threshold_pct}
-                  onChange={(event) =>
-                    onSettingsChange('deadhead_threshold_pct', Number(event.target.value))
-                  }
-                />
+              <div className="col-md-6">
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Earliest Data Time</div>
+                <div style={{ fontWeight: 600 }}>
+                  {metrics.derivedServiceWindow.earliestDataTime ?? 'No trip data'}
+                </div>
               </div>
-              <div className="col-md-4">
-                <label className="form-label">Service Start</label>
-                <input
-                  className="form-control"
-                  type="time"
-                  disabled={readonlyView}
-                  value={ready.state.settings.service_day_start}
-                  onChange={(event) => onSettingsChange('service_day_start', event.target.value)}
-                />
+              <div className="col-md-6">
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Latest Data Time</div>
+                <div style={{ fontWeight: 600 }}>
+                  {metrics.derivedServiceWindow.latestDataTime ?? 'No trip data'}
+                </div>
               </div>
-              <div className="col-md-4">
-                <label className="form-label">Service End</label>
-                <input
-                  className="form-control"
-                  type="time"
-                  disabled={readonlyView}
-                  value={ready.state.settings.service_day_end}
-                  onChange={(event) => onSettingsChange('service_day_end', event.target.value)}
-                />
+              <div className="col-12">
+                <div style={{ fontSize: 12, color: '#6b7280' }}>
+                  Service window is auto-derived from imported data (actual times preferred, fallback to scheduled), with a 1-hour buffer before first pickup and after last dropoff.
+                </div>
               </div>
             </div>
+          </SectionCard>
+
+          <SectionCard title="Data Views">
+            <details style={{ marginBottom: 12 }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+                Trips ({ready.state.trips.length})
+              </summary>
+              <div style={{ overflowX: 'auto', marginTop: 8 }}>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Columns</div>
+                  <div className="d-flex flex-wrap gap-3">
+                    {tripColumns.map((column) => (
+                      <label key={`trip-col-toggle-${column.key}`} className="form-check-label" style={{ fontSize: 13 }}>
+                        <input
+                          type="checkbox"
+                          className="form-check-input me-1"
+                          checked={tripVisibleColumns[column.key]}
+                          onChange={(event) =>
+                            setTripVisibleColumns((prev) => ({
+                              ...prev,
+                              [column.key]: event.target.checked,
+                            }))
+                          }
+                        />
+                        {column.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      {activeTripColumns.map((column) => (
+                        <th key={`trip-col-head-${column.key}`}>{column.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tripPageRows.map((trip) => (
+                      <tr key={`trip-view-${trip.trip_id}-${trip.route_id}`}>
+                        {activeTripColumns.map((column) => (
+                          <td key={`trip-row-${trip.trip_id}-${column.key}`}>
+                            {column.getValue(trip) ?? '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {ready.state.trips.length === 0 && (
+                      <tr>
+                        <td colSpan={Math.max(activeTripColumns.length, 1)} style={{ color: '#6b7280' }}>
+                          No trips available.
+                        </td>
+                      </tr>
+                    )}
+                    {ready.state.trips.length > 0 && activeTripColumns.length === 0 && (
+                      <tr>
+                        <td style={{ color: '#6b7280' }}>Select at least one column.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {ready.state.trips.length > 0 && (
+                  <div className="d-flex align-items-center justify-content-between">
+                    <button
+                      className="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      disabled={currentTripPage <= 1}
+                      onClick={() => setTripPage((prev) => Math.max(1, prev - 1))}
+                    >
+                      Previous
+                    </button>
+                    <div style={{ fontSize: 13 }}>
+                      Page {currentTripPage} of {tripTotalPages}
+                    </div>
+                    <button
+                      className="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      disabled={currentTripPage >= tripTotalPages}
+                      onClick={() => setTripPage((prev) => Math.min(tripTotalPages, prev + 1))}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            </details>
+
+            <details>
+              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+                Routes ({ready.state.routes.length})
+              </summary>
+              <div style={{ overflowX: 'auto', marginTop: 8 }}>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Columns</div>
+                  <div className="d-flex flex-wrap gap-3">
+                    {routeColumns.map((column) => (
+                      <label key={`route-col-toggle-${column.key}`} className="form-check-label" style={{ fontSize: 13 }}>
+                        <input
+                          type="checkbox"
+                          className="form-check-input me-1"
+                          checked={routeVisibleColumns[column.key]}
+                          onChange={(event) =>
+                            setRouteVisibleColumns((prev) => ({
+                              ...prev,
+                              [column.key]: event.target.checked,
+                            }))
+                          }
+                        />
+                        {column.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      {activeRouteColumns.map((column) => (
+                        <th key={`route-col-head-${column.key}`}>{column.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {routePageRows.map((route) => (
+                      <tr key={`route-view-${route.route_id}`}>
+                        {activeRouteColumns.map((column) => (
+                          <td key={`route-row-${route.route_id}-${column.key}`}>
+                            {column.getValue(route) ?? '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {ready.state.routes.length === 0 && (
+                      <tr>
+                        <td colSpan={Math.max(activeRouteColumns.length, 1)} style={{ color: '#6b7280' }}>
+                          No routes available.
+                        </td>
+                      </tr>
+                    )}
+                    {ready.state.routes.length > 0 && activeRouteColumns.length === 0 && (
+                      <tr>
+                        <td style={{ color: '#6b7280' }}>Select at least one column.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {ready.state.routes.length > 0 && (
+                  <div className="d-flex align-items-center justify-content-between">
+                    <button
+                      className="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      disabled={currentRoutePage <= 1}
+                      onClick={() => setRoutePage((prev) => Math.max(1, prev - 1))}
+                    >
+                      Previous
+                    </button>
+                    <div style={{ fontSize: 13 }}>
+                      Page {currentRoutePage} of {routeTotalPages}
+                    </div>
+                    <button
+                      className="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      disabled={currentRoutePage >= routeTotalPages}
+                      onClick={() => setRoutePage((prev) => Math.min(routeTotalPages, prev + 1))}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            </details>
           </SectionCard>
         </>
       )}

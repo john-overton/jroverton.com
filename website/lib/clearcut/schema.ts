@@ -13,6 +13,21 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_readonly_token ON sessions(readonly_token);
 CREATE INDEX IF NOT EXISTS idx_accessed_at ON sessions(accessed_at);
+
+CREATE TABLE IF NOT EXISTS import_templates (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  edit_token TEXT NOT NULL,
+  template_name TEXT NOT NULL,
+  source_system TEXT NOT NULL,
+  notes TEXT,
+  event_mapping_json TEXT NOT NULL,
+  field_mapping_json TEXT NOT NULL,
+  match_rules_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_import_templates_edit_token ON import_templates(edit_token);
 `;
 
 export const SESSION_SCHEMA_SQL = `

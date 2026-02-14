@@ -31,6 +31,15 @@ export interface ClearcutMetrics {
   avgDeadheadEndMiles: number;
   highDeadheadTripsStart: TripRow[];
   highDeadheadTripsEnd: TripRow[];
+  derivedServiceWindow: {
+    startLabel: string;
+    endLabel: string;
+    durationLabel: string;
+    isTwentyFourHours: boolean;
+    source: 'actual_preferred';
+    earliestDataTime: string | null;
+    latestDataTime: string | null;
+  };
 }
 
 function parseMinutes(value: string | null | undefined, fallback: number): number {
@@ -52,6 +61,21 @@ function asDate(value: string): Date | null {
 
 function dateToMinutes(date: Date): number {
   return date.getHours() * 60 + date.getMinutes();
+}
+
+function formatClockLabel(date: Date): string {
+  const h = `${date.getHours()}`.padStart(2, '0');
+  const m = `${date.getMinutes()}`.padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function formatDateTimeLabel(date: Date): string {
+  const y = date.getFullYear();
+  const mo = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  const hh = `${date.getHours()}`.padStart(2, '0');
+  const mm = `${date.getMinutes()}`.padStart(2, '0');
+  return `${y}-${mo}-${d} ${hh}:${mm}`;
 }
 
 function blockLabel(minutes: number): string {
@@ -95,6 +119,73 @@ function pickMiles(trip: TripRow): number {
     return 0;
   }
   return Math.max(0, end - start);
+}
+
+function deriveServiceWindow(trips: TripRow[]): ClearcutMetrics['derivedServiceWindow'] {
+  let earliest: Date | null = null;
+  let latest: Date | null = null;
+
+  for (const trip of trips) {
+    const startCandidate =
+      asDate(trip.pickup_arrive_time ?? '') ??
+      asDate(trip.pickup_leave_time ?? '') ??
+      asDate(trip.scheduled_pickup_time);
+    const endCandidate =
+      asDate(trip.dropoff_leave_time ?? '') ??
+      asDate(trip.dropoff_arrive_time ?? '') ??
+      asDate(trip.scheduled_appointment_time);
+
+    if (startCandidate && (!earliest || startCandidate.getTime() < earliest.getTime())) {
+      earliest = startCandidate;
+    }
+    if (endCandidate && (!latest || endCandidate.getTime() > latest.getTime())) {
+      latest = endCandidate;
+    }
+  }
+
+  if (!earliest || !latest) {
+    return {
+      startLabel: '--:--',
+      endLabel: '--:--',
+      durationLabel: '--',
+      isTwentyFourHours: false,
+      source: 'actual_preferred',
+      earliestDataTime: null,
+      latestDataTime: null,
+    };
+  }
+
+  const derivedStart = new Date(earliest.getTime() - 60 * 60 * 1000);
+  const derivedEnd = new Date(latest.getTime() + 60 * 60 * 1000);
+  const rawDurationMinutes = Math.max(0, Math.round((derivedEnd.getTime() - derivedStart.getTime()) / 60000));
+  const crossesMidnight =
+    derivedStart.toDateString() !== derivedEnd.toDateString() || rawDurationMinutes >= 24 * 60;
+
+  if (crossesMidnight) {
+    return {
+      startLabel: '00:00',
+      endLabel: '24:00',
+      durationLabel: '24:00',
+      isTwentyFourHours: true,
+      source: 'actual_preferred',
+      earliestDataTime: formatDateTimeLabel(earliest),
+      latestDataTime: formatDateTimeLabel(latest),
+    };
+  }
+
+  const hours = Math.floor(rawDurationMinutes / 60);
+  const minutes = rawDurationMinutes % 60;
+  const durationLabel = `${`${hours}`.padStart(2, '0')}:${`${minutes}`.padStart(2, '0')}`;
+
+  return {
+    startLabel: formatClockLabel(derivedStart),
+    endLabel: formatClockLabel(derivedEnd),
+    durationLabel,
+    isTwentyFourHours: false,
+    source: 'actual_preferred',
+    earliestDataTime: formatDateTimeLabel(earliest),
+    latestDataTime: formatDateTimeLabel(latest),
+  };
 }
 
 export function computeClearcutMetrics(session: SessionState): ClearcutMetrics {
@@ -174,6 +265,7 @@ export function computeClearcutMetrics(session: SessionState): ClearcutMetrics {
   const splitIndex = Math.floor(highDeadhead.length / 2);
   const highDeadheadTripsStart = highDeadhead.slice(0, 6).map((row) => row.trip);
   const highDeadheadTripsEnd = highDeadhead.slice(splitIndex, splitIndex + 6).map((row) => row.trip);
+  const derivedServiceWindow = deriveServiceWindow(session.trips);
 
   const importedServiceHours = sumServiceHours(session.routes);
   const targetProductivity = session.optimization.target_productivity ?? 0;
@@ -206,5 +298,6 @@ export function computeClearcutMetrics(session: SessionState): ClearcutMetrics {
     avgDeadheadEndMiles: Math.round(average(deadheadByBlock.slice(-2)) * 10) / 10,
     highDeadheadTripsStart,
     highDeadheadTripsEnd,
+    derivedServiceWindow,
   };
 }
