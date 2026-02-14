@@ -13,11 +13,17 @@ export interface ClearcutMetrics {
   vehiclesByBlock: number[];
   deadheadByBlock: number[];
   otpByBlock: number[];
+  pickupOtpByBlock: number[];
+  dropoffOtpByBlock: number[];
+  tripOtpByBlock: number[];
   productivityByBlock: number[];
   peakPickups: number;
   peakVehicles: number;
   peakOnBoard: number;
   avgOtp: number;
+  pickupOtpPct: number;
+  dropoffOtpPct: number;
+  tripOtpPct: number;
   blocksBelowOtp: number;
   avgProductivity: number;
   peakProductivity: number;
@@ -121,6 +127,20 @@ function pickMiles(trip: TripRow): number {
   return Math.max(0, end - start);
 }
 
+function minutesBetween(actual: Date, scheduled: Date): number {
+  return (actual.getTime() - scheduled.getTime()) / 60_000;
+}
+
+function isOnTimeWithWindow(params: {
+  actual: Date;
+  scheduled: Date;
+  beforeMin: number;
+  afterMin: number;
+}): boolean {
+  const diff = minutesBetween(params.actual, params.scheduled);
+  return diff >= -Math.max(0, params.beforeMin) && diff <= Math.max(0, params.afterMin);
+}
+
 function deriveServiceWindow(trips: TripRow[]): ClearcutMetrics['derivedServiceWindow'] {
   let earliest: Date | null = null;
   let latest: Date | null = null;
@@ -207,9 +227,24 @@ export function computeClearcutMetrics(session: SessionState): ClearcutMetrics {
   const vehiclesByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const deadheadByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const otpByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const pickupOtpByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const dropoffOtpByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const tripOtpByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const productivityByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const blockTripCounts = Array.from({ length: blockCount }).fill(0) as number[];
-  const blockOntimeCounts = Array.from({ length: blockCount }).fill(0) as number[];
+  const pickupEligibleCounts = Array.from({ length: blockCount }).fill(0) as number[];
+  const pickupOnTimeCounts = Array.from({ length: blockCount }).fill(0) as number[];
+  const dropoffEligibleCounts = Array.from({ length: blockCount }).fill(0) as number[];
+  const dropoffOnTimeCounts = Array.from({ length: blockCount }).fill(0) as number[];
+  const tripEligibleCounts = Array.from({ length: blockCount }).fill(0) as number[];
+  const tripOnTimeCounts = Array.from({ length: blockCount }).fill(0) as number[];
+
+  let totalPickupEligible = 0;
+  let totalPickupOnTime = 0;
+  let totalDropoffEligible = 0;
+  let totalDropoffOnTime = 0;
+  let totalTripEligible = 0;
+  let totalTripOnTime = 0;
 
   for (const trip of session.trips) {
     const pickupDate = asDate(trip.scheduled_pickup_time);
@@ -219,9 +254,52 @@ export function computeClearcutMetrics(session: SessionState): ClearcutMetrics {
     const idx = pickBlockIndex(dateToMinutes(pickupDate), blocks);
     pickupsByBlock[idx] += 1;
     blockTripCounts[idx] += 1;
-    const onTime = !trip.status.toLowerCase().includes('late');
-    if (onTime) {
-      blockOntimeCounts[idx] += 1;
+    const scheduledPickup = asDate(trip.scheduled_pickup_time);
+    const actualPickup = asDate(trip.pickup_arrive_time ?? '') ?? asDate(trip.pickup_leave_time ?? '');
+    const hasPickupOtp = Boolean(scheduledPickup && actualPickup);
+    let pickupOnTime = false;
+    if (hasPickupOtp && scheduledPickup && actualPickup) {
+      pickupOnTime = isOnTimeWithWindow({
+        actual: actualPickup,
+        scheduled: scheduledPickup,
+        beforeMin: session.settings.pickup_otp_window_before_min,
+        afterMin: session.settings.pickup_otp_window_after_min,
+      });
+      pickupEligibleCounts[idx] += 1;
+      totalPickupEligible += 1;
+      if (pickupOnTime) {
+        pickupOnTimeCounts[idx] += 1;
+        totalPickupOnTime += 1;
+      }
+    }
+
+    const hasScheduledAppointment = Boolean(trip.scheduled_appointment_time);
+    const scheduledDropoff = hasScheduledAppointment ? asDate(trip.scheduled_appointment_time) : null;
+    const actualDropoff = asDate(trip.dropoff_arrive_time ?? '') ?? asDate(trip.dropoff_leave_time ?? '');
+    const hasDropoffOtp = Boolean(hasScheduledAppointment && scheduledDropoff && actualDropoff);
+    let dropoffOnTime = false;
+    if (hasDropoffOtp && scheduledDropoff && actualDropoff) {
+      dropoffOnTime = isOnTimeWithWindow({
+        actual: actualDropoff,
+        scheduled: scheduledDropoff,
+        beforeMin: session.settings.dropoff_otp_window_before_min,
+        afterMin: session.settings.dropoff_otp_window_after_min,
+      });
+      dropoffEligibleCounts[idx] += 1;
+      totalDropoffEligible += 1;
+      if (dropoffOnTime) {
+        dropoffOnTimeCounts[idx] += 1;
+        totalDropoffOnTime += 1;
+      }
+    }
+
+    if (hasPickupOtp && hasDropoffOtp) {
+      tripEligibleCounts[idx] += 1;
+      totalTripEligible += 1;
+      if (pickupOnTime && dropoffOnTime) {
+        tripOnTimeCounts[idx] += 1;
+        totalTripOnTime += 1;
+      }
     }
     const miles = pickMiles(trip);
     deadheadByBlock[idx] += miles > 0 ? Math.max(0, miles * 0.18) : 0;
@@ -245,7 +323,12 @@ export function computeClearcutMetrics(session: SessionState): ClearcutMetrics {
 
   for (let i = 0; i < blocks.length; i += 1) {
     const trips = blockTripCounts[i];
-    otpByBlock[i] = trips > 0 ? (blockOntimeCounts[i] / trips) * 100 : 100;
+    pickupOtpByBlock[i] =
+      pickupEligibleCounts[i] > 0 ? (pickupOnTimeCounts[i] / pickupEligibleCounts[i]) * 100 : 0;
+    dropoffOtpByBlock[i] =
+      dropoffEligibleCounts[i] > 0 ? (dropoffOnTimeCounts[i] / dropoffEligibleCounts[i]) * 100 : 0;
+    tripOtpByBlock[i] = tripEligibleCounts[i] > 0 ? (tripOnTimeCounts[i] / tripEligibleCounts[i]) * 100 : 0;
+    otpByBlock[i] = tripOtpByBlock[i];
     productivityByBlock[i] = vehiclesByBlock[i] > 0 ? trips / vehiclesByBlock[i] : 0;
     deadheadByBlock[i] = trips > 0 ? (deadheadByBlock[i] / trips) * 10 : 0;
   }
@@ -280,12 +363,19 @@ export function computeClearcutMetrics(session: SessionState): ClearcutMetrics {
     vehiclesByBlock,
     deadheadByBlock,
     otpByBlock,
+    pickupOtpByBlock,
+    dropoffOtpByBlock,
+    tripOtpByBlock,
     productivityByBlock,
     peakPickups: Math.max(...pickupsByBlock, 0),
     peakVehicles: Math.max(...vehiclesByBlock, 0),
     peakOnBoard: Math.round(Math.max(...pickupsByBlock, 0) * 1.15),
-    avgOtp: Math.round(average(otpByBlock) * 10) / 10,
-    blocksBelowOtp: otpByBlock.filter((value) => value < session.settings.otp_target_pct).length,
+    avgOtp: totalTripEligible > 0 ? Math.round((totalTripOnTime / totalTripEligible) * 1000) / 10 : 0,
+    pickupOtpPct: totalPickupEligible > 0 ? Math.round((totalPickupOnTime / totalPickupEligible) * 1000) / 10 : 0,
+    dropoffOtpPct:
+      totalDropoffEligible > 0 ? Math.round((totalDropoffOnTime / totalDropoffEligible) * 1000) / 10 : 0,
+    tripOtpPct: totalTripEligible > 0 ? Math.round((totalTripOnTime / totalTripEligible) * 1000) / 10 : 0,
+    blocksBelowOtp: tripOtpByBlock.filter((value) => value < session.settings.otp_target_pct).length,
     avgProductivity: Math.round(average(productivityByBlock) * 100) / 100,
     peakProductivity: Math.round(Math.max(...productivityByBlock, 0) * 100) / 100,
     totalTrips: session.trips.length,

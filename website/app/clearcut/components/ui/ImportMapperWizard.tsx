@@ -45,10 +45,13 @@ const TRIP_FIELD_OPTIONS: Array<keyof TripRow> = [
 
 const ROUTE_FIELD_OPTIONS: Array<keyof RouteRow> = [
   'route_id',
+  'route_name',
   'scheduled_start_time',
   'scheduled_end_time',
   'actual_start_time',
   'actual_end_time',
+  'break1',
+  'break2',
 ];
 
 interface Props {

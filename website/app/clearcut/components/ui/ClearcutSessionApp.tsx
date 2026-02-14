@@ -8,6 +8,7 @@ import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard'
 import { ClearcutClientError } from '@/lib/clearcut/client';
 import { buildDemoTripsAndRoutes } from '@/lib/clearcut/demo-data';
 import { computeClearcutMetrics } from '@/lib/clearcut/metrics';
+import type { RouteRow, TripRow } from '@/lib/clearcut/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/clearcut/use-clearcut-session';
 
 type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runs' | 'optimize' | 'deadhead';
@@ -21,10 +22,13 @@ type TripDataColumnKey =
   | 'passenger_type';
 type RouteDataColumnKey =
   | 'route_id'
+  | 'route_name'
   | 'scheduled_start_time'
   | 'scheduled_end_time'
   | 'actual_start_time'
-  | 'actual_end_time';
+  | 'actual_end_time'
+  | 'break1'
+  | 'break2';
 
 const TAB_ITEMS: Array<{ key: TabKey; label: string }> = [
   { key: 'import', label: 'Import' },
@@ -39,6 +43,48 @@ const CLEARCUT_FONT_STACK =
   '"Inter", "SF Pro Text", "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif';
 const TRIP_DATA_PAGE_SIZE = 10;
 const ROUTE_DATA_PAGE_SIZE = 10;
+const TRIP_DATA_COLUMNS: Array<{
+  key: TripDataColumnKey;
+  label: string;
+  getValue: (trip: TripRow) => string | null;
+}> = [
+  { key: 'trip_id', label: 'Trip', getValue: (trip) => trip.trip_id },
+  { key: 'route_id', label: 'Route', getValue: (trip) => trip.route_id },
+  {
+    key: 'pickup_time',
+    label: 'Pickup',
+    getValue: (trip) => trip.pickup_arrive_time ?? trip.scheduled_pickup_time,
+  },
+  {
+    key: 'dropoff_time',
+    label: 'Dropoff',
+    getValue: (trip) => trip.dropoff_leave_time ?? trip.scheduled_appointment_time,
+  },
+  { key: 'status', label: 'Status', getValue: (trip) => trip.status },
+  { key: 'passenger_type', label: 'Passenger Type', getValue: (trip) => trip.passenger_type },
+];
+const ROUTE_DATA_COLUMNS: Array<{
+  key: RouteDataColumnKey;
+  label: string;
+  getValue: (route: RouteRow) => string | null;
+}> = [
+  { key: 'route_id', label: 'Route', getValue: (route) => route.route_id },
+  { key: 'route_name', label: 'Route Name', getValue: (route) => route.route_name ?? '-' },
+  {
+    key: 'scheduled_start_time',
+    label: 'Scheduled Start',
+    getValue: (route) => route.scheduled_start_time,
+  },
+  {
+    key: 'scheduled_end_time',
+    label: 'Scheduled End',
+    getValue: (route) => route.scheduled_end_time,
+  },
+  { key: 'actual_start_time', label: 'Actual Start', getValue: (route) => route.actual_start_time ?? '-' },
+  { key: 'actual_end_time', label: 'Actual End', getValue: (route) => route.actual_end_time ?? '-' },
+  { key: 'break1', label: 'Break 1', getValue: (route) => route.break1 ?? '-' },
+  { key: 'break2', label: 'Break 2', getValue: (route) => route.break2 ?? '-' },
+];
 
 interface Props {
   token: string;
@@ -131,10 +177,13 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   });
   const [routeVisibleColumns, setRouteVisibleColumns] = useState<Record<RouteDataColumnKey, boolean>>({
     route_id: true,
+    route_name: true,
     scheduled_start_time: true,
     scheduled_end_time: true,
     actual_start_time: true,
     actual_end_time: true,
+    break1: true,
+    break2: true,
   });
 
   const readonlyView = mode === 'readonly';
@@ -144,73 +193,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     () => (ready ? computeClearcutMetrics(ready.state) : null),
     [ready],
   );
-  const tripColumns = useMemo(
-    () =>
-      [
-        { key: 'trip_id', label: 'Trip', getValue: (trip: (typeof ready.state.trips)[number]) => trip.trip_id },
-        { key: 'route_id', label: 'Route', getValue: (trip: (typeof ready.state.trips)[number]) => trip.route_id },
-        {
-          key: 'pickup_time',
-          label: 'Pickup',
-          getValue: (trip: (typeof ready.state.trips)[number]) =>
-            trip.pickup_arrive_time ?? trip.scheduled_pickup_time,
-        },
-        {
-          key: 'dropoff_time',
-          label: 'Dropoff',
-          getValue: (trip: (typeof ready.state.trips)[number]) =>
-            trip.dropoff_leave_time ?? trip.scheduled_appointment_time,
-        },
-        { key: 'status', label: 'Status', getValue: (trip: (typeof ready.state.trips)[number]) => trip.status },
-        {
-          key: 'passenger_type',
-          label: 'Passenger Type',
-          getValue: (trip: (typeof ready.state.trips)[number]) => trip.passenger_type,
-        },
-      ] satisfies Array<{
-        key: TripDataColumnKey;
-        label: string;
-        getValue: (trip: (typeof ready.state.trips)[number]) => string | null;
-      }>,
-    [ready],
-  );
-  const routeColumns = useMemo(
-    () =>
-      [
-        {
-          key: 'route_id',
-          label: 'Route',
-          getValue: (route: (typeof ready.state.routes)[number]) => route.route_id,
-        },
-        {
-          key: 'scheduled_start_time',
-          label: 'Scheduled Start',
-          getValue: (route: (typeof ready.state.routes)[number]) => route.scheduled_start_time,
-        },
-        {
-          key: 'scheduled_end_time',
-          label: 'Scheduled End',
-          getValue: (route: (typeof ready.state.routes)[number]) => route.scheduled_end_time,
-        },
-        {
-          key: 'actual_start_time',
-          label: 'Actual Start',
-          getValue: (route: (typeof ready.state.routes)[number]) => route.actual_start_time ?? '-',
-        },
-        {
-          key: 'actual_end_time',
-          label: 'Actual End',
-          getValue: (route: (typeof ready.state.routes)[number]) => route.actual_end_time ?? '-',
-        },
-      ] satisfies Array<{
-        key: RouteDataColumnKey;
-        label: string;
-        getValue: (route: (typeof ready.state.routes)[number]) => string | null;
-      }>,
-    [ready],
-  );
-  const activeTripColumns = tripColumns.filter((column) => tripVisibleColumns[column.key]);
-  const activeRouteColumns = routeColumns.filter((column) => routeVisibleColumns[column.key]);
+  const activeTripColumns = TRIP_DATA_COLUMNS.filter((column) => tripVisibleColumns[column.key]);
+  const activeRouteColumns = ROUTE_DATA_COLUMNS.filter((column) => routeVisibleColumns[column.key]);
   const tripCount = ready?.state.trips.length ?? 0;
   const routeCount = ready?.state.routes.length ?? 0;
   const tripTotalPages = Math.max(1, Math.ceil(tripCount / TRIP_DATA_PAGE_SIZE));
@@ -271,8 +255,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       'TRIP-001,2026-02-01 08:00:00,2026-02-01 08:30:00,2026-02-01 07:58:00,2026-02-01 08:02:00,2026-02-01 08:27:00,2026-02-01 08:31:00,ROUTE-001,123 Main St,,,456 Oak St,,,completed,ambulatory,1,1000,1010',
     ].join('\n');
     const routeSample = [
-      'route_id,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time',
-      'ROUTE-001,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00',
+      'route_id,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1,break2',
+      'ROUTE-001,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 14:00:00',
     ].join('\n');
 
     const content = kind === 'trips' ? tripSample : routeSample;
@@ -401,6 +385,29 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
       setError(unlockError instanceof Error ? unlockError.message : 'Unlock failed.');
     }
+  }
+
+  function onOtpWindowChange(
+    key:
+      | 'pickup_otp_window_before_min'
+      | 'pickup_otp_window_after_min'
+      | 'dropoff_otp_window_before_min'
+      | 'dropoff_otp_window_after_min',
+    value: number,
+  ) {
+    if (!ready || readonlyView) {
+      return;
+    }
+    const sanitizedValue = Math.max(0, Math.min(180, Number.isFinite(value) ? value : 0));
+    const nextSettings = {
+      ...ready.state.settings,
+      [key]: sanitizedValue,
+    };
+    session
+      .saveState({ settings: nextSettings })
+      .catch((saveError) => {
+        setError(saveError instanceof Error ? saveError.message : 'Failed to update OTP windows.');
+      });
   }
 
   function onOptimizationChange(
@@ -740,6 +747,81 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                   Service window is auto-derived from imported data (actual times preferred, fallback to scheduled), with a 1-hour buffer before first pickup and after last dropoff.
                 </div>
               </div>
+              <div className="col-12">
+                <hr style={{ margin: '0.5rem 0' }} />
+              </div>
+              <div className="col-md-3">
+                <label className="form-label">Pickup OTP: minutes before</label>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: '-2px', marginBottom: 6 }}>
+                  Minutes before scheduled pickup that is on time.
+                </div>
+                <input
+                  className="form-control"
+                  type="number"
+                  min={0}
+                  max={180}
+                  step={1}
+                  disabled={readonlyView}
+                  value={ready.state.settings.pickup_otp_window_before_min}
+                  onChange={(event) =>
+                    onOtpWindowChange('pickup_otp_window_before_min', Number(event.target.value))
+                  }
+                />
+              </div>
+              <div className="col-md-3">
+                <label className="form-label">Pickup OTP: minutes after</label>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: '-2px', marginBottom: 6 }}>
+                  Minutes after scheduled pickup that is on time.
+                </div>
+                <input
+                  className="form-control"
+                  type="number"
+                  min={0}
+                  max={180}
+                  step={1}
+                  disabled={readonlyView}
+                  value={ready.state.settings.pickup_otp_window_after_min}
+                  onChange={(event) =>
+                    onOtpWindowChange('pickup_otp_window_after_min', Number(event.target.value))
+                  }
+                />
+              </div>
+              <div className="col-md-3">
+                <label className="form-label">Dropoff OTP: minutes before</label>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: '-2px', marginBottom: 6 }}>
+                  Minutes before dropoff that is on time.
+                </div>
+                <input
+                  className="form-control"
+                  type="number"
+                  min={0}
+                  max={180}
+                  step={1}
+                  disabled={readonlyView}
+                  value={ready.state.settings.dropoff_otp_window_before_min}
+                  onChange={(event) =>
+                    onOtpWindowChange('dropoff_otp_window_before_min', Number(event.target.value))
+                  }
+                />
+              </div>
+              <div className="col-md-3">
+                <label className="form-label">Dropoff OTP: minutes after</label>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: '-2px', marginBottom: 6 }}>
+                  Minutes after dropoff that is on time.
+                </div>
+                <input
+                  className="form-control"
+                  type="number"
+                  min={0}
+                  max={180}
+                  step={1}
+                  disabled={readonlyView}
+                  value={ready.state.settings.dropoff_otp_window_after_min}
+                  onChange={(event) =>
+                    onOtpWindowChange('dropoff_otp_window_after_min', Number(event.target.value))
+                  }
+                />
+              </div>
             </div>
           </SectionCard>
 
@@ -752,7 +834,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Columns</div>
                   <div className="d-flex flex-wrap gap-3">
-                    {tripColumns.map((column) => (
+                    {TRIP_DATA_COLUMNS.map((column) => (
                       <label key={`trip-col-toggle-${column.key}`} className="form-check-label" style={{ fontSize: 13 }}>
                         <input
                           type="checkbox"
@@ -836,7 +918,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Columns</div>
                   <div className="d-flex flex-wrap gap-3">
-                    {routeColumns.map((column) => (
+                    {ROUTE_DATA_COLUMNS.map((column) => (
                       <label key={`route-col-toggle-${column.key}`} className="form-check-label" style={{ fontSize: 13 }}>
                         <input
                           type="checkbox"
@@ -935,13 +1017,25 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       {tab === 'performance' && (
         <>
           <div className="row">
-            <MetricCard label="Average OTP" value={`${metrics.avgOtp}%`} />
+            <MetricCard label="Pickup OTP" value={`${metrics.pickupOtpPct}%`} />
+            <MetricCard label="Dropoff OTP" value={`${metrics.dropoffOtpPct}%`} />
+            <MetricCard label="Trip OTP" value={`${metrics.tripOtpPct}%`} />
             <MetricCard label="Blocks Below Target" value={`${metrics.blocksBelowOtp}`} />
+          </div>
+          <div className="row">
             <MetricCard label="Average Productivity" value={`${metrics.avgProductivity}`} />
             <MetricCard label="Peak Productivity" value={`${metrics.peakProductivity}`} />
+            <MetricCard label="OTP Target" value={`${ready.state.settings.otp_target_pct}%`} />
+            <MetricCard label="Total Trips" value={`${metrics.totalTrips}`} />
           </div>
-          <SectionCard title="On-Time Performance (by block)">
-            <MiniBars values={metrics.otpByBlock} max={100} />
+          <SectionCard title="Pickup OTP (by block)">
+            <MiniBars values={metrics.pickupOtpByBlock} max={100} />
+          </SectionCard>
+          <SectionCard title="Dropoff OTP (by block)">
+            <MiniBars values={metrics.dropoffOtpByBlock} max={100} />
+          </SectionCard>
+          <SectionCard title="Trip OTP (by block)">
+            <MiniBars values={metrics.tripOtpByBlock} max={100} />
           </SectionCard>
           <SectionCard title="Productivity (trips/vehicle)">
             <MiniBars values={metrics.productivityByBlock} />

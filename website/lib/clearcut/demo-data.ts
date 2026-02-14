@@ -26,10 +26,13 @@ export function buildDemoTripsAndRoutes(): { trips: TripRow[]; routes: RouteRow[
 
     routes.push({
       route_id: routeId,
+      route_name: `Route ${routeIndex}`,
       scheduled_start_time: fmtDate(routeStart),
       scheduled_end_time: fmtDate(routeEnd),
       actual_start_time: null,
       actual_end_time: null,
+      break1: null,
+      break2: null,
     });
 
     for (let i = 0; i < 6; i += 1) {

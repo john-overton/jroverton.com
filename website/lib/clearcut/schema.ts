@@ -58,16 +58,23 @@ CREATE INDEX IF NOT EXISTS idx_trips_pickup_time ON trips(scheduled_pickup_time)
 
 CREATE TABLE IF NOT EXISTS routes (
   route_id TEXT NOT NULL PRIMARY KEY,
+  route_name TEXT,
   scheduled_start_time TEXT NOT NULL,
   scheduled_end_time TEXT NOT NULL,
   actual_start_time TEXT,
-  actual_end_time TEXT
+  actual_end_time TEXT,
+  break1 TEXT,
+  break2 TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (
   id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
   avg_ride_time_min INTEGER NOT NULL DEFAULT 28,
   otp_target_pct REAL NOT NULL DEFAULT 85.0,
+  pickup_otp_window_before_min INTEGER NOT NULL DEFAULT 15,
+  pickup_otp_window_after_min INTEGER NOT NULL DEFAULT 15,
+  dropoff_otp_window_before_min INTEGER NOT NULL DEFAULT 30,
+  dropoff_otp_window_after_min INTEGER NOT NULL DEFAULT 1,
   productivity_baseline REAL NOT NULL DEFAULT 1.8,
   deadhead_threshold_pct REAL NOT NULL DEFAULT 60.0,
   service_day_start TEXT NOT NULL DEFAULT '04:00',

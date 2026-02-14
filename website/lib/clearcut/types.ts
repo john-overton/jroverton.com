@@ -59,16 +59,23 @@ export interface TripRow {
 
 export interface RouteRow {
   route_id: string;
+  route_name: string | null;
   scheduled_start_time: string;
   scheduled_end_time: string;
   actual_start_time: string | null;
   actual_end_time: string | null;
+  break1: string | null;
+  break2: string | null;
 }
 
 export interface SettingsRow {
   id: 1;
   avg_ride_time_min: number;
   otp_target_pct: number;
+  pickup_otp_window_before_min: number;
+  pickup_otp_window_after_min: number;
+  dropoff_otp_window_before_min: number;
+  dropoff_otp_window_after_min: number;
   productivity_baseline: number;
   deadhead_threshold_pct: number;
   service_day_start: string;

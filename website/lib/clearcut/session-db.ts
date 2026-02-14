@@ -43,10 +43,13 @@ const TRIP_COLUMNS = [
 
 const ROUTE_COLUMNS = [
   'route_id',
+  'route_name',
   'scheduled_start_time',
   'scheduled_end_time',
   'actual_start_time',
   'actual_end_time',
+  'break1',
+  'break2',
 ] as const;
 
 function ensureSessionsDirectory(): void {
@@ -62,6 +65,41 @@ function ensureTripPassengerTypeColumn(db: Database.Database): void {
     db.exec(
       "ALTER TABLE trips ADD COLUMN passenger_type TEXT NOT NULL DEFAULT 'ambulatory' CHECK (passenger_type IN ('ambulatory', 'wheelchair', 'extra_large'));",
     );
+  }
+}
+
+function ensureSettingsOtpWindowColumns(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('settings')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('pickup_otp_window_before_min')) {
+    db.exec('ALTER TABLE settings ADD COLUMN pickup_otp_window_before_min INTEGER NOT NULL DEFAULT 15;');
+  }
+  if (!existing.has('pickup_otp_window_after_min')) {
+    db.exec('ALTER TABLE settings ADD COLUMN pickup_otp_window_after_min INTEGER NOT NULL DEFAULT 15;');
+  }
+  if (!existing.has('dropoff_otp_window_before_min')) {
+    db.exec('ALTER TABLE settings ADD COLUMN dropoff_otp_window_before_min INTEGER NOT NULL DEFAULT 30;');
+  }
+  if (!existing.has('dropoff_otp_window_after_min')) {
+    db.exec('ALTER TABLE settings ADD COLUMN dropoff_otp_window_after_min INTEGER NOT NULL DEFAULT 1;');
+  }
+}
+
+function ensureRouteColumns(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('routes')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('route_name')) {
+    db.exec('ALTER TABLE routes ADD COLUMN route_name TEXT;');
+  }
+  if (!existing.has('break1')) {
+    db.exec('ALTER TABLE routes ADD COLUMN break1 TEXT;');
+  }
+  if (!existing.has('break2')) {
+    db.exec('ALTER TABLE routes ADD COLUMN break2 TEXT;');
   }
 }
 
@@ -85,6 +123,8 @@ function openSessionDb(editToken: string): Database.Database {
   db.pragma('journal_mode = WAL');
   db.exec(SESSION_SCHEMA_SQL);
   ensureTripPassengerTypeColumn(db);
+  ensureSettingsOtpWindowColumns(db);
+  ensureRouteColumns(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
   db.prepare('INSERT OR IGNORE INTO optimization (id) VALUES (1)').run();
   return db;
@@ -222,6 +262,10 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
           `UPDATE settings
            SET avg_ride_time_min = COALESCE(@avg_ride_time_min, avg_ride_time_min),
                otp_target_pct = COALESCE(@otp_target_pct, otp_target_pct),
+               pickup_otp_window_before_min = COALESCE(@pickup_otp_window_before_min, pickup_otp_window_before_min),
+               pickup_otp_window_after_min = COALESCE(@pickup_otp_window_after_min, pickup_otp_window_after_min),
+               dropoff_otp_window_before_min = COALESCE(@dropoff_otp_window_before_min, dropoff_otp_window_before_min),
+               dropoff_otp_window_after_min = COALESCE(@dropoff_otp_window_after_min, dropoff_otp_window_after_min),
                productivity_baseline = COALESCE(@productivity_baseline, productivity_baseline),
                deadhead_threshold_pct = COALESCE(@deadhead_threshold_pct, deadhead_threshold_pct),
                service_day_start = COALESCE(@service_day_start, service_day_start),

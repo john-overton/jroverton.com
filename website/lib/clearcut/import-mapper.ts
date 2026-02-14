@@ -194,10 +194,13 @@ function coerceTripDefaults(value: Partial<TripRow>): TripRow {
 function coerceRouteDefaults(value: Partial<RouteRow>): RouteRow {
   return {
     route_id: value.route_id ?? '',
+    route_name: value.route_name ?? null,
     scheduled_start_time: value.scheduled_start_time ?? '1970-01-01 00:00:00',
     scheduled_end_time: value.scheduled_end_time ?? '1970-01-01 00:00:00',
     actual_start_time: value.actual_start_time ?? null,
     actual_end_time: value.actual_end_time ?? null,
+    break1: value.break1 ?? null,
+    break2: value.break2 ?? null,
   };
 }
 

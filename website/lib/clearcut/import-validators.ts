@@ -190,10 +190,13 @@ export function parseRoutesFile(fileBuffer: Buffer): RouteRow[] {
 
     return {
       route_id: routeId,
+      route_name: getCellValue(row, 'route_name'),
       scheduled_start_time: scheduledStart,
       scheduled_end_time: scheduledEnd,
       actual_start_time: getCellValue(row, 'actual_start_time'),
       actual_end_time: getCellValue(row, 'actual_end_time'),
+      break1: getCellValue(row, 'break1'),
+      break2: getCellValue(row, 'break2'),
     } satisfies RouteRow;
   });
 }
