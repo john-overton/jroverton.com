@@ -51,6 +51,7 @@ export interface TripRow {
   dropoff_lat: string | null;
   dropoff_lon: string | null;
   status: string;
+  passenger_type: 'ambulatory' | 'wheelchair' | 'extra_large';
   passenger_count: string | null;
   pick_odometer: string | null;
   drop_odometer: string | null;

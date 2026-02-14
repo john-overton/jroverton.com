@@ -104,6 +104,23 @@ function validateDatetime(value: string | null, field: string, rowIndex: number,
   }
 }
 
+function parsePassengerType(value: string | null): TripRow['passenger_type'] {
+  if (!value) {
+    return 'ambulatory';
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'ambulatory' || normalized === 'wheelchair' || normalized === 'extra_large') {
+    return normalized;
+  }
+
+  throw new ApiError(
+    400,
+    'invalid_passenger_type',
+    "passenger_type must be one of 'ambulatory', 'wheelchair', or 'extra_large'.",
+  );
+}
+
 export function parseTripsFile(fileBuffer: Buffer): TripRow[] {
   const rows = parseWorkbook(fileBuffer);
   assertColumnsExist(rows, TRIP_REQUIRED_COLUMNS);
@@ -143,6 +160,7 @@ export function parseTripsFile(fileBuffer: Buffer): TripRow[] {
       dropoff_lat: getCellValue(row, 'dropoff_lat'),
       dropoff_lon: getCellValue(row, 'dropoff_lon'),
       status,
+      passenger_type: parsePassengerType(getCellValue(row, 'passenger_type')),
       passenger_count: getCellValue(row, 'passenger_count'),
       pick_odometer: getCellValue(row, 'pick_odometer'),
       drop_odometer: getCellValue(row, 'drop_odometer'),

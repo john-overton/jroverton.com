@@ -13,6 +13,12 @@ import type {
   TripRow,
 } from './types';
 
+const PASSENGER_TYPES = new Set<TripRow['passenger_type']>([
+  'ambulatory',
+  'wheelchair',
+  'extra_large',
+]);
+
 const TRIP_COLUMNS = [
   'trip_id',
   'scheduled_pickup_time',
@@ -29,6 +35,7 @@ const TRIP_COLUMNS = [
   'dropoff_lat',
   'dropoff_lon',
   'status',
+  'passenger_type',
   'passenger_count',
   'pick_odometer',
   'drop_odometer',
@@ -46,11 +53,38 @@ function ensureSessionsDirectory(): void {
   fs.mkdirSync(getSessionsDirPath(), { recursive: true });
 }
 
+function ensureTripPassengerTypeColumn(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('trips')")
+    .all() as Array<{ name: string }>;
+  const hasPassengerType = columns.some((column) => column.name === 'passenger_type');
+  if (!hasPassengerType) {
+    db.exec(
+      "ALTER TABLE trips ADD COLUMN passenger_type TEXT NOT NULL DEFAULT 'ambulatory' CHECK (passenger_type IN ('ambulatory', 'wheelchair', 'extra_large'));",
+    );
+  }
+}
+
+function normalizePassengerType(value: string | null | undefined): TripRow['passenger_type'] {
+  if (value && PASSENGER_TYPES.has(value as TripRow['passenger_type'])) {
+    return value as TripRow['passenger_type'];
+  }
+  return 'ambulatory';
+}
+
+function normalizeTripRow(row: TripRow): TripRow {
+  return {
+    ...row,
+    passenger_type: normalizePassengerType(row.passenger_type),
+  };
+}
+
 function openSessionDb(editToken: string): Database.Database {
   ensureSessionsDirectory();
   const db = new Database(getSessionDbPath(editToken));
   db.pragma('journal_mode = WAL');
   db.exec(SESSION_SCHEMA_SQL);
+  ensureTripPassengerTypeColumn(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
   db.prepare('INSERT OR IGNORE INTO optimization (id) VALUES (1)').run();
   return db;
@@ -112,16 +146,18 @@ export function listTrips(editToken: string, limit?: number, offset?: number): T
   return withSessionDb(editToken, (db) => {
     const hasPagination = typeof limit === 'number' || typeof offset === 'number';
     if (!hasPagination) {
-      return db
+      const trips = db
         .prepare('SELECT * FROM trips ORDER BY scheduled_pickup_time, trip_id')
         .all() as TripRow[];
+      return trips.map(normalizeTripRow);
     }
 
     const resolvedLimit = typeof limit === 'number' ? Math.max(1, Math.min(limit, 5000)) : 500;
     const resolvedOffset = typeof offset === 'number' ? Math.max(0, offset) : 0;
-    return db
+    const trips = db
       .prepare('SELECT * FROM trips ORDER BY scheduled_pickup_time, trip_id LIMIT ? OFFSET ?')
       .all(resolvedLimit, resolvedOffset) as TripRow[];
+    return trips.map(normalizeTripRow);
   });
 }
 
@@ -154,7 +190,8 @@ export function replaceTrips(editToken: string, trips: TripRow[]): void {
     const transaction = db.transaction((rows: TripRow[]) => {
       db.prepare('DELETE FROM trips').run();
       for (const row of rows) {
-        insertTrip.run(...TRIP_COLUMNS.map((column) => row[column]));
+        const normalized = normalizeTripRow(row);
+        insertTrip.run(...TRIP_COLUMNS.map((column) => normalized[column]));
       }
     });
     transaction(trips);
@@ -215,7 +252,8 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
         );
         db.prepare('DELETE FROM trips').run();
         for (const row of input.trips) {
-          insertTrip.run(...TRIP_COLUMNS.map((column) => row[column]));
+          const normalized = normalizeTripRow(row);
+          insertTrip.run(...TRIP_COLUMNS.map((column) => normalized[column]));
         }
       }
 
