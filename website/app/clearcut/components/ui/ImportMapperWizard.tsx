@@ -56,9 +56,13 @@ const ROUTE_FIELD_OPTIONS: Array<keyof RouteRow> = [
 
 interface Props {
   readonlyView: boolean;
-  onPreview: (file: File) => Promise<ImportPreviewResponse>;
+  onPreview: (file: File, sheetName?: string) => Promise<ImportPreviewResponse>;
   onValidate: (preview: ImportPreviewResponse, config: ImportMappingConfig) => Promise<ImportValidateResponse>;
-  onApply: (file: File, config: ImportMappingConfig) => Promise<ImportApplyResponse & { trip_count: number; route_count: number }>;
+  onApply: (
+    file: File,
+    config: ImportMappingConfig,
+    sheetName?: string,
+  ) => Promise<ImportApplyResponse & { trip_count: number; route_count: number }>;
   onListTemplates: () => Promise<{ items: ImportTemplateRecord[]; count: number }>;
   onCreateTemplate: (input: {
     templateName: string;
@@ -85,6 +89,8 @@ function emptyConfig(): ImportMappingConfig {
 
 export default function ImportMapperWizard(props: Props) {
   const [file, setFile] = useState<File | null>(null);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [selectedSheetName, setSelectedSheetName] = useState('');
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [config, setConfig] = useState<ImportMappingConfig>(emptyConfig());
   const [validateResult, setValidateResult] = useState<ImportValidateResponse | null>(null);
@@ -107,21 +113,38 @@ export default function ImportMapperWizard(props: Props) {
     return Array.from(values).slice(0, 30);
   }, [preview, config.event_column]);
 
-  async function handlePreview() {
+  async function loadPreview(targetSheetName?: string) {
     if (!file) return;
     setStatus('Reading preview...');
     setError(null);
     try {
-      const nextPreview = await props.onPreview(file);
+      const nextPreview = await props.onPreview(file, targetSheetName);
       setPreview(nextPreview);
+      setValidateResult(null);
+      setApplyResult(null);
+      setSheetNames(nextPreview.sheet_names);
+      setSelectedSheetName(nextPreview.selected_sheet ?? '');
       setConfig((prev) => ({
         ...prev,
-        event_column: prev.event_column || nextPreview.headers[0] || '',
+        event_column: includesHeader(nextPreview.headers, prev.event_column) ? prev.event_column : nextPreview.headers[0] || '',
       }));
-      setStatus(`Loaded ${nextPreview.sample_count} sample rows from ${nextPreview.row_count} total rows.`);
+      const sheetSuffix =
+        nextPreview.sheet_names.length > 1 && nextPreview.selected_sheet
+          ? ` from sheet '${nextPreview.selected_sheet}'`
+          : '';
+      setStatus(`Loaded ${nextPreview.sample_count} sample rows from ${nextPreview.row_count} total rows${sheetSuffix}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to preview file.');
     }
+  }
+
+  async function handlePreview() {
+    await loadPreview(selectedSheetName || undefined);
+  }
+
+  async function handleSheetChange(nextSheetName: string) {
+    setSelectedSheetName(nextSheetName);
+    await loadPreview(nextSheetName);
   }
 
   async function handleValidate() {
@@ -142,7 +165,7 @@ export default function ImportMapperWizard(props: Props) {
     setStatus('Applying import...');
     setError(null);
     try {
-      const result = await props.onApply(file, config);
+      const result = await props.onApply(file, config, selectedSheetName || undefined);
       setApplyResult(result);
       setStatus('Import apply complete.');
     } catch (err) {
@@ -209,7 +232,14 @@ export default function ImportMapperWizard(props: Props) {
             className="form-control"
             type="file"
             accept=".csv,.xlsx,.xls"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              setSheetNames([]);
+              setSelectedSheetName('');
+              setPreview(null);
+              setValidateResult(null);
+              setApplyResult(null);
+            }}
             disabled={props.readonlyView}
           />
         </div>
@@ -222,6 +252,37 @@ export default function ImportMapperWizard(props: Props) {
 
       {preview && (
         <>
+          {sheetNames.length > 1 && (
+            <div
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                padding: '0.75rem',
+                marginBottom: '0.8rem',
+                background: '#f8fafc',
+              }}
+            >
+              <label className="form-label" style={{ fontWeight: 600 }}>
+                Workbook Sheet
+              </label>
+              <select
+                className="form-select"
+                value={selectedSheetName}
+                onChange={(event) => {
+                  void handleSheetChange(event.target.value);
+                }}
+              >
+                {sheetNames.map((sheetName) => (
+                  <option key={sheetName} value={sheetName}>
+                    {sheetName}
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                This workbook has multiple sheets. Choose the sheet to preview and import.
+              </div>
+            </div>
+          )}
           <FilePreviewTable preview={preview} />
           <EventValueMapper
             headers={previewHeaders}
@@ -755,4 +816,12 @@ function findValueByHeader(row: Record<string, string | null>, header: string): 
     }
   }
   return null;
+}
+
+function includesHeader(headers: string[], candidate: string): boolean {
+  const normalizedCandidate = candidate.trim().toLowerCase();
+  if (!normalizedCandidate) {
+    return false;
+  }
+  return headers.some((header) => header.trim().toLowerCase() === normalizedCandidate);
 }

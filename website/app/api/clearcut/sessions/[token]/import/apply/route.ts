@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 
 async function readApplyPayload(
   request: NextRequest,
-): Promise<{ fileBuffer: Buffer; config: ImportMappingConfig }> {
+): Promise<{ fileBuffer: Buffer; config: ImportMappingConfig; selectedSheetName?: string }> {
   const formData = await request.formData();
   const file = formData.get('file');
   if (!(file instanceof File)) {
@@ -26,9 +26,12 @@ async function readApplyPayload(
     throw new ApiError(400, 'missing_config', 'Multipart form must include config as JSON string.');
   }
   const config = JSON.parse(configRaw) as ImportMappingConfig;
+  const sheetNameRaw = formData.get('sheet_name');
+  const selectedSheetName = typeof sheetNameRaw === 'string' && sheetNameRaw.trim() ? sheetNameRaw : undefined;
   return {
     fileBuffer: Buffer.from(await file.arrayBuffer()),
     config,
+    selectedSheetName,
   };
 }
 
@@ -42,12 +45,13 @@ export async function POST(
     const session = requireSessionByEditToken(token);
     requireAuthorizedSessionAccess(request, session, 'edit');
 
-    const { fileBuffer, config } = await readApplyPayload(request);
+    const { fileBuffer, config, selectedSheetName } = await readApplyPayload(request);
     const existingTrips = listTrips(token);
     const existingRoutes = listRoutes(token);
     const applied = applyImportMapping({
       fileBuffer,
       config,
+      selectedSheetName,
       existingTrips,
       existingRoutes,
     });

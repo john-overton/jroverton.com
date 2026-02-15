@@ -214,8 +214,8 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
   );
 
   const previewImport = useCallback(
-    async (file: File): Promise<ImportPreviewResponse> =>
-      withEditJwt((jwt) => previewImportFile(token, jwt, file)),
+    async (file: File, sheetName?: string): Promise<ImportPreviewResponse> =>
+      withEditJwt((jwt) => previewImportFile(token, jwt, file, sheetName)),
     [token, withEditJwt],
   );
 
@@ -226,9 +226,9 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
   );
 
   const applyImport = useCallback(
-    async (file: File, config: ImportMappingConfig) =>
+    async (file: File, config: ImportMappingConfig, sheetName?: string) =>
       withEditJwt(async (jwt) => {
-        const result = await applyImportMappingConfig(token, jwt, file, config);
+        const result = await applyImportMappingConfig(token, jwt, file, config, sheetName);
         await loadSession();
         return result;
       }),

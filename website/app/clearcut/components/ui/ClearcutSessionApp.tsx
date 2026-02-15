@@ -2,7 +2,18 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from 'react';
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Bar,
+  BarChart,
+  Cell,
+  CartesianGrid,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
 import { ClearcutClientError } from '@/lib/clearcut/client';
@@ -43,6 +54,18 @@ const CLEARCUT_FONT_STACK =
   '"Inter", "SF Pro Text", "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif';
 const TRIP_DATA_PAGE_SIZE = 10;
 const ROUTE_DATA_PAGE_SIZE = 10;
+const DEMAND_BLOCK_MINUTES = 15;
+const WEEKDAY_DAY_IDS = [1, 2, 3, 4, 5] as const;
+const WEEKEND_DAY_IDS = [0, 6] as const;
+const DAY_LABELS: Record<number, string> = {
+  0: 'Sun',
+  1: 'Mon',
+  2: 'Tue',
+  3: 'Wed',
+  4: 'Thu',
+  5: 'Fri',
+  6: 'Sat',
+};
 const TRIP_DATA_COLUMNS: Array<{
   key: TripDataColumnKey;
   label: string;
@@ -86,6 +109,89 @@ const ROUTE_DATA_COLUMNS: Array<{
   { key: 'break2', label: 'Break 2', getValue: (route) => route.break2 ?? '-' },
 ];
 
+function parseClockToMinutes(value: string | null | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const [hoursRaw, minutesRaw] = value.split(':');
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return fallback;
+  }
+  return hours * 60 + minutes;
+}
+
+function formatMinutesToClock(minutes: number): string {
+  const safe = Math.max(0, minutes);
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  return `${`${hours}`.padStart(2, '0')}:${`${mins}`.padStart(2, '0')}`;
+}
+
+function formatMinutesToLabel(minutes: number): string {
+  const hours24 = Math.floor(minutes / 60) % 24;
+  const mins = minutes % 60;
+  const period = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  return `${hours12}:${`${mins}`.padStart(2, '0')} ${period}`;
+}
+
+function parseDateTime(value: string | null | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function deriveSliderBoundsFromTrips(params: {
+  trips: TripRow[];
+  fallbackStartMinutes: number;
+  fallbackEndMinutes: number;
+}): { startMinutes: number; endMinutes: number } {
+  let earliest: Date | null = null;
+  let latest: Date | null = null;
+
+  for (const trip of params.trips) {
+    const pickup =
+      parseDateTime(trip.pickup_arrive_time) ??
+      parseDateTime(trip.pickup_leave_time) ??
+      parseDateTime(trip.scheduled_pickup_time);
+    const dropoff =
+      parseDateTime(trip.dropoff_leave_time) ??
+      parseDateTime(trip.dropoff_arrive_time) ??
+      parseDateTime(trip.scheduled_appointment_time);
+    if (pickup && (!earliest || pickup.getTime() < earliest.getTime())) {
+      earliest = pickup;
+    }
+    if (dropoff && (!latest || dropoff.getTime() > latest.getTime())) {
+      latest = dropoff;
+    }
+  }
+
+  if (!earliest || !latest) {
+    return {
+      startMinutes: params.fallbackStartMinutes,
+      endMinutes: params.fallbackEndMinutes,
+    };
+  }
+
+  if (earliest.toDateString() !== latest.toDateString()) {
+    return {
+      startMinutes: 0,
+      endMinutes: 24 * 60,
+    };
+  }
+
+  const earliestMinutes = earliest.getHours() * 60 + earliest.getMinutes();
+  const latestMinutes = latest.getHours() * 60 + latest.getMinutes();
+  const derivedStart = Math.max(0, earliestMinutes - 60);
+  const derivedEnd = Math.min(24 * 60, Math.max(derivedStart + 60, latestMinutes + 60));
+  return { startMinutes: derivedStart, endMinutes: derivedEnd };
+}
+
 interface Props {
   token: string;
   mode: ClearcutMode;
@@ -115,33 +221,119 @@ function MetricCard({
 
 function MiniBars({ values, max }: { values: number[]; max?: number }) {
   const resolvedMax = max ?? Math.max(...values, 1);
+  const data = values.map((value, index) => ({
+    idx: index,
+    value: Math.round(value * 100) / 100,
+  }));
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${values.length}, 1fr)`, gap: 3, height: 88 }}>
-      {values.map((value, index) => {
-        const height = Math.max(4, (value / resolvedMax) * 100);
-        return (
-          <div key={`bar-${index}`} style={{ display: 'flex', alignItems: 'end' }}>
-            <div
-              title={String(Math.round(value * 100) / 100)}
-              style={{ width: '100%', height: `${height}%`, background: '#4f46e5', borderRadius: 4 }}
-            />
-          </div>
-        );
-      })}
+    <div style={{ height: 100 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: 2 }}>
+          <XAxis dataKey="idx" hide />
+          <YAxis hide domain={[0, resolvedMax]} />
+          <Tooltip
+            formatter={(value: number | string | undefined) => [Number(value ?? 0), 'Value']}
+            labelFormatter={(label) => `Block ${Number(label) + 1}`}
+            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+          />
+          <Bar dataKey="value" fill="#4f46e5" radius={[3, 3, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
-function HeatStrip({ values }: { values: number[] }) {
+function HeatStrip({ values, blocks }: { values: number[]; blocks?: Array<{ label: string }> }) {
   const max = Math.max(...values, 1);
+  const data = values.map((value, index) => ({
+    idx: index,
+    value: Math.round(value * 10) / 10,
+    unit: 1,
+    label: blocks?.[index]?.label ?? `Block ${index + 1}`,
+  }));
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${values.length}, 1fr)`, gap: 4 }}>
-      {values.map((value, index) => {
-        const ratio = value / max;
-        const color =
-          ratio >= 0.67 ? '#dc2626' : ratio >= 0.33 ? '#f59e0b' : ratio > 0 ? '#3b82f6' : '#e5e7eb';
-        return <div key={`heat-${index}`} style={{ height: 18, borderRadius: 5, background: color }} />;
-      })}
+    <div style={{ height: 42, borderRadius: 6, overflow: 'hidden', border: '1px solid #dbe3ef' }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barCategoryGap={0}>
+          <XAxis dataKey="idx" hide />
+          <YAxis hide domain={[0, 1]} />
+          <Tooltip
+            formatter={(_value: number | string | undefined, _name, item) => {
+              const payload = item?.payload as { value?: number; label?: string } | undefined;
+              return [`${payload?.value ?? 0}%`, 'Empty-time'];
+            }}
+            labelFormatter={(_label, payload) => {
+              const first = payload?.[0]?.payload as { label?: string } | undefined;
+              return first?.label ?? '';
+            }}
+            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+          />
+          <Bar dataKey="unit" isAnimationActive={false}>
+            {data.map((entry, index) => {
+              const ratio = max > 0 ? entry.value / max : 0;
+              const intensity = Math.round(220 - ratio * 140);
+              const color = entry.value <= 0 ? '#eef2f7' : `rgb(${intensity}, ${intensity + 8}, 255)`;
+              return <Cell key={`heat-cell-${index}`} fill={color} />;
+            })}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function DemandCompositeChart({
+  pickups,
+  onBoard,
+  vehicles,
+  blocks,
+}: {
+  pickups: number[];
+  onBoard: number[];
+  vehicles: number[];
+  blocks: Array<{ label: string }>;
+}) {
+  const data = useMemo(
+    () =>
+      blocks.map((block, index) => ({
+        label: block.label,
+        pickups: Math.round((pickups[index] ?? 0) * 10) / 10,
+        onBoard: Math.round((onBoard[index] ?? 0) * 10) / 10,
+        vehicles: Math.round((vehicles[index] ?? 0) * 10) / 10,
+      })),
+    [blocks, onBoard, pickups, vehicles],
+  );
+
+  return (
+    <div style={{ height: 230 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+          <XAxis dataKey="label" hide />
+          <YAxis allowDecimals={false} width={38} />
+          <Tooltip
+            formatter={(value: number | string | undefined, name: string | undefined) => {
+              const normalizedValue = typeof value === 'number' ? value : Number(value ?? 0);
+              if (name === 'vehicles') return [normalizedValue, 'Routes On Road'];
+              if (name === 'onBoard') return [normalizedValue, 'On Board'];
+              return [normalizedValue, 'Pickups'];
+            }}
+            labelFormatter={(label) => `Time: ${label}`}
+            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+          />
+          <Bar dataKey="onBoard" fill="rgba(99, 102, 241, 0.25)" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="pickups" fill="#4f46e5" radius={[3, 3, 0, 0]} />
+          <Line
+            type="monotone"
+            dataKey="vehicles"
+            stroke="#0d9488"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+            name="vehicles"
+          />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -158,6 +350,8 @@ function SectionCard({ title, children }: { title: string; children: ReactNode }
 export default function ClearcutSessionApp({ token, mode }: Props) {
   const router = useRouter();
   const session = useClearcutSession(token, mode);
+  const filterStateInitialized = useRef(false);
+  const timeRangeTrackRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<TabKey>('import');
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -185,13 +379,60 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     break1: true,
     break2: true,
   });
+  const [selectedWeekdayDays, setSelectedWeekdayDays] = useState<number[]>([]);
+  const [selectedWeekendDays, setSelectedWeekendDays] = useState<number[]>([]);
+  const [timeStartIndex, setTimeStartIndex] = useState(0);
+  const [timeEndIndex, setTimeEndIndex] = useState(0);
+  const [draggingTimeHandle, setDraggingTimeHandle] = useState<'start' | 'end' | null>(null);
 
   const readonlyView = mode === 'readonly';
 
   const ready = session.loadState.status === 'ready' ? session.loadState : null;
+  const fallbackServiceStartMinutes = parseClockToMinutes(ready?.state.settings.service_day_start, 4 * 60);
+  const fallbackServiceEndMinutes = parseClockToMinutes(ready?.state.settings.service_day_end, 21 * 60);
+  const sliderBounds = useMemo(
+    () =>
+      deriveSliderBoundsFromTrips({
+        trips: ready?.state.trips ?? [],
+        fallbackStartMinutes: fallbackServiceStartMinutes,
+        fallbackEndMinutes: fallbackServiceEndMinutes,
+      }),
+    [fallbackServiceEndMinutes, fallbackServiceStartMinutes, ready?.state.trips],
+  );
+  const serviceStartMinutes = sliderBounds.startMinutes;
+  const serviceEndMinutes = sliderBounds.endMinutes;
+  const allTimeBlocks = useMemo(() => {
+    const output: Array<{ index: number; minutes: number; label: string }> = [];
+    for (
+      let minutes = serviceStartMinutes, index = 0;
+      minutes <= serviceEndMinutes;
+      minutes += DEMAND_BLOCK_MINUTES, index += 1
+    ) {
+      output.push({ index, minutes, label: formatMinutesToLabel(minutes) });
+    }
+    return output;
+  }, [serviceStartMinutes, serviceEndMinutes]);
+  const selectedDayIds = useMemo(
+    () => [...selectedWeekdayDays, ...selectedWeekendDays].sort((a, b) => a - b),
+    [selectedWeekdayDays, selectedWeekendDays],
+  );
+  const minGapBlocks = Math.ceil(60 / DEMAND_BLOCK_MINUTES);
+  const rangeStartClock = allTimeBlocks[timeStartIndex]
+    ? formatMinutesToClock(allTimeBlocks[timeStartIndex].minutes)
+    : null;
+  const rangeEndClock = allTimeBlocks[timeEndIndex]
+    ? formatMinutesToClock(allTimeBlocks[timeEndIndex].minutes)
+    : null;
   const metrics = useMemo(
-    () => (ready ? computeClearcutMetrics(ready.state) : null),
-    [ready],
+    () =>
+      ready
+        ? computeClearcutMetrics(ready.state, {
+            selectedDays: selectedDayIds,
+            timeRangeStart: rangeStartClock,
+            timeRangeEnd: rangeEndClock,
+          })
+        : null,
+    [rangeEndClock, rangeStartClock, ready, selectedDayIds],
   );
   const activeTripColumns = TRIP_DATA_COLUMNS.filter((column) => tripVisibleColumns[column.key]);
   const activeRouteColumns = ROUTE_DATA_COLUMNS.filter((column) => routeVisibleColumns[column.key]);
@@ -213,6 +454,146 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   );
   const hasData = ready ? ready.state.session.trip_count > 0 || ready.state.session.route_count > 0 : false;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  useEffect(() => {
+    if (!ready || filterStateInitialized.current) {
+      return;
+    }
+    const dayType = ready.state.settings.day_type;
+    if (dayType === 'weekday') {
+      setSelectedWeekdayDays([...WEEKDAY_DAY_IDS]);
+      setSelectedWeekendDays([]);
+    } else if (dayType === 'weekend') {
+      setSelectedWeekdayDays([]);
+      setSelectedWeekendDays([...WEEKEND_DAY_IDS]);
+    } else {
+      setSelectedWeekdayDays([...WEEKDAY_DAY_IDS]);
+      setSelectedWeekendDays([...WEEKEND_DAY_IDS]);
+    }
+
+    const start = parseClockToMinutes(ready.state.settings.time_range_start, serviceStartMinutes);
+    const end = parseClockToMinutes(ready.state.settings.time_range_end, serviceEndMinutes);
+    const initialStartIndex = Math.max(
+      0,
+      Math.min(allTimeBlocks.length - 1, Math.round((start - serviceStartMinutes) / DEMAND_BLOCK_MINUTES)),
+    );
+    const initialEndIndex = Math.max(
+      0,
+      Math.min(allTimeBlocks.length - 1, Math.round((end - serviceStartMinutes) / DEMAND_BLOCK_MINUTES)),
+    );
+    const minGap = Math.ceil(60 / DEMAND_BLOCK_MINUTES);
+    if (initialEndIndex - initialStartIndex >= minGap) {
+      setTimeStartIndex(initialStartIndex);
+      setTimeEndIndex(initialEndIndex);
+    } else {
+      setTimeStartIndex(0);
+      setTimeEndIndex(Math.min(allTimeBlocks.length - 1, Math.max(minGap, allTimeBlocks.length - 1)));
+    }
+    filterStateInitialized.current = true;
+  }, [allTimeBlocks.length, ready, serviceEndMinutes, serviceStartMinutes]);
+
+  useEffect(() => {
+    if (allTimeBlocks.length === 0) {
+      return;
+    }
+    const maxIndex = allTimeBlocks.length - 1;
+    setTimeStartIndex((prev) => Math.max(0, Math.min(prev, Math.max(0, maxIndex - minGapBlocks))));
+    setTimeEndIndex((prev) => Math.max(minGapBlocks, Math.min(prev, maxIndex)));
+  }, [allTimeBlocks.length, minGapBlocks]);
+
+  const updateTimeHandleFromClientX = useCallback(
+    (clientX: number, handle: 'start' | 'end') => {
+      const track = timeRangeTrackRef.current;
+      if (!track || allTimeBlocks.length <= 1) {
+        return;
+      }
+      const rect = track.getBoundingClientRect();
+      const rawRatio = (clientX - rect.left) / rect.width;
+      const ratio = Math.max(0, Math.min(1, rawRatio));
+      const rawIndex = Math.round(ratio * (allTimeBlocks.length - 1));
+      if (handle === 'start') {
+        const capped = Math.min(rawIndex, Math.max(0, timeEndIndex - minGapBlocks));
+        setTimeStartIndex(Math.max(0, capped));
+      } else {
+        const floored = Math.max(rawIndex, Math.min(allTimeBlocks.length - 1, timeStartIndex + minGapBlocks));
+        setTimeEndIndex(Math.min(allTimeBlocks.length - 1, floored));
+      }
+    },
+    [allTimeBlocks.length, minGapBlocks, timeEndIndex, timeStartIndex],
+  );
+
+  useEffect(() => {
+    if (!draggingTimeHandle) {
+      return;
+    }
+    const activeHandle = draggingTimeHandle;
+    function onMouseMove(event: MouseEvent) {
+      event.preventDefault();
+      updateTimeHandleFromClientX(event.clientX, activeHandle);
+    }
+    function onMouseUp() {
+      setDraggingTimeHandle(null);
+    }
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [draggingTimeHandle, updateTimeHandleFromClientX]);
+
+  useEffect(() => {
+    if (!ready || readonlyView || !filterStateInitialized.current || allTimeBlocks.length === 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const dayType =
+        selectedWeekdayDays.length > 0 && selectedWeekendDays.length === 0
+          ? 'weekday'
+          : selectedWeekendDays.length > 0 && selectedWeekdayDays.length === 0
+            ? 'weekend'
+            : 'custom';
+      const currentSettings = ready.state.settings;
+      if (
+        currentSettings.day_type === dayType &&
+        (currentSettings.time_range_start ?? null) === (rangeStartClock ?? null) &&
+        (currentSettings.time_range_end ?? null) === (rangeEndClock ?? null)
+      ) {
+        return;
+      }
+      const nextSettings = {
+        ...currentSettings,
+        day_type: dayType,
+        time_range_start: rangeStartClock,
+        time_range_end: rangeEndClock,
+      };
+      session.saveState({ settings: nextSettings }).catch((saveError) => {
+        setError(saveError instanceof Error ? saveError.message : 'Failed to persist demand filters.');
+      });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [
+    allTimeBlocks.length,
+    rangeEndClock,
+    rangeStartClock,
+    ready,
+    readonlyView,
+    selectedWeekdayDays,
+    selectedWeekendDays,
+    session,
+  ]);
+
+  function toggleWeekday(day: number) {
+    setSelectedWeekdayDays((prev) =>
+      prev.includes(day) ? prev.filter((value) => value !== day) : [...prev, day].sort((a, b) => a - b),
+    );
+  }
+
+  function toggleWeekend(day: number) {
+    setSelectedWeekendDays((prev) =>
+      prev.includes(day) ? prev.filter((value) => value !== day) : [...prev, day].sort((a, b) => a - b),
+    );
+  }
 
   async function onUpload(type: 'trips' | 'routes', file: File) {
     if (readonlyView) {
@@ -569,6 +950,183 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           </button>
         </div>
       </header>
+
+      {hasData && allTimeBlocks.length > 0 && (
+        <section
+          style={{
+            marginTop: '0.8rem',
+            marginBottom: '0.4rem',
+            border: '1px solid #dee5f0',
+            borderRadius: 10,
+            background: '#fff',
+            padding: '0.75rem',
+          }}
+        >
+          <div className="row g-3 align-items-center">
+            <div className="col-lg-4">
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Weekday</div>
+              <div className="d-flex flex-wrap align-items-center gap-2">
+                <button
+                  className={`btn btn-sm ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  type="button"
+                  disabled={readonlyView}
+                  onClick={() =>
+                    setSelectedWeekdayDays((prev) =>
+                      prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
+                    )
+                  }
+                >
+                  Weekday
+                </button>
+                {WEEKDAY_DAY_IDS.map((day) => (
+                  <button
+                    key={`weekday-pill-${day}`}
+                    type="button"
+                    className={`btn btn-sm ${selectedWeekdayDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    disabled={readonlyView}
+                    onClick={() => toggleWeekday(day)}
+                  >
+                    {DAY_LABELS[day]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="col-lg-3">
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Weekend</div>
+              <div className="d-flex flex-wrap align-items-center gap-2">
+                <button
+                  className={`btn btn-sm ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  type="button"
+                  disabled={readonlyView}
+                  onClick={() =>
+                    setSelectedWeekendDays((prev) =>
+                      prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
+                    )
+                  }
+                >
+                  Weekend
+                </button>
+                {WEEKEND_DAY_IDS.map((day) => (
+                  <button
+                    key={`weekend-pill-${day}`}
+                    type="button"
+                    className={`btn btn-sm ${selectedWeekendDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    disabled={readonlyView}
+                    onClick={() => toggleWeekend(day)}
+                  >
+                    {DAY_LABELS[day]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="col-lg-5">
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Service Hour Time Selector</div>
+              <div
+                ref={timeRangeTrackRef}
+                style={{ position: 'relative', height: 30 }}
+                onMouseDown={(event) => {
+                  if (readonlyView || allTimeBlocks.length <= 1) {
+                    return;
+                  }
+                  const track = timeRangeTrackRef.current;
+                  if (!track) {
+                    return;
+                  }
+                  const rect = track.getBoundingClientRect();
+                  const startX = (timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * rect.width;
+                  const endX = (timeEndIndex / Math.max(1, allTimeBlocks.length - 1)) * rect.width;
+                  const cursorX = event.clientX - rect.left;
+                  const handle = Math.abs(cursorX - startX) <= Math.abs(cursorX - endX) ? 'start' : 'end';
+                  setDraggingTimeHandle(handle);
+                  updateTimeHandleFromClientX(event.clientX, handle);
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: '50%',
+                    height: 4,
+                    transform: 'translateY(-50%)',
+                    borderRadius: 4,
+                    background: '#e5e7eb',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    height: 4,
+                    transform: 'translateY(-50%)',
+                    borderRadius: 4,
+                    background: '#2563eb',
+                    left: `${(timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
+                    width: `${((timeEndIndex - timeStartIndex) / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${(timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
+                    top: '50%',
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    background: '#2563eb',
+                    border: '2px solid #fff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                    transform: 'translate(-50%, -50%)',
+                    pointerEvents: readonlyView ? 'none' : 'auto',
+                    cursor: readonlyView ? 'default' : 'ew-resize',
+                    zIndex: 4,
+                  }}
+                  onMouseDown={(event) => {
+                    event.stopPropagation();
+                    if (readonlyView) {
+                      return;
+                    }
+                    setDraggingTimeHandle('start');
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${(timeEndIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
+                    top: '50%',
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    background: '#2563eb',
+                    border: '2px solid #fff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                    transform: 'translate(-50%, -50%)',
+                    pointerEvents: readonlyView ? 'none' : 'auto',
+                    cursor: readonlyView ? 'default' : 'ew-resize',
+                    zIndex: 4,
+                  }}
+                  onMouseDown={(event) => {
+                    event.stopPropagation();
+                    if (readonlyView) {
+                      return;
+                    }
+                    setDraggingTimeHandle('end');
+                  }}
+                />
+              </div>
+              <div className="d-flex justify-content-between" style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>
+                <span>Start: {allTimeBlocks[timeStartIndex]?.label ?? '--'}</span>
+                <span>End: {allTimeBlocks[timeEndIndex]?.label ?? '--'}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#2563eb' }}>
+                {allTimeBlocks[timeStartIndex]?.label} - {allTimeBlocks[timeEndIndex]?.label}
+                {' • '}
+                {selectedDayIds.length > 0 ? `${selectedDayIds.length} day(s) selected` : 'No days selected'}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div style={{ marginTop: '0.9rem', marginBottom: '0.5rem' }}>
         <ul className="nav nav-tabs">
@@ -1005,11 +1563,22 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             <MetricCard label="Peak Vehicles" value={`${metrics.peakVehicles}`} />
             <MetricCard label="Total Trips" value={`${metrics.totalTrips}`} />
           </div>
-          <SectionCard title="Demand by Time Block">
-            <MiniBars values={metrics.pickupsByBlock} />
+          <SectionCard title="Demand and Active Vehicles (15-min)">
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+              Pickups and onboard demand are shown by 15-minute block with vehicles on road as a line overlay.
+            </div>
+            <DemandCompositeChart
+              pickups={metrics.pickupsByBlock}
+              onBoard={metrics.onBoardByBlock}
+              vehicles={metrics.vehiclesByBlock}
+              blocks={metrics.blocks}
+            />
           </SectionCard>
-          <SectionCard title="Deadhead Intensity">
-            <HeatStrip values={metrics.deadheadByBlock} />
+          <SectionCard title="Deadhead Intensity (empty-time heatmap)">
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+              Darker cells indicate a higher share of active vehicle time with no passengers on board.
+            </div>
+            <HeatStrip values={metrics.deadheadByBlock} blocks={metrics.blocks} />
           </SectionCard>
         </>
       )}
@@ -1174,12 +1743,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
         <>
           <div className="row">
             <MetricCard label="Avg Trip Miles" value={`${metrics.avgTripMiles}`} />
-            <MetricCard label="Avg DH Miles (Start)" value={`${metrics.avgDeadheadStartMiles}`} />
-            <MetricCard label="Avg DH Miles (End)" value={`${metrics.avgDeadheadEndMiles}`} />
+            <MetricCard label="Avg Empty-Time % (Start)" value={`${metrics.avgDeadheadStartMiles}%`} />
+            <MetricCard label="Avg Empty-Time % (End)" value={`${metrics.avgDeadheadEndMiles}%`} />
             <MetricCard label="Total Trips" value={`${metrics.totalTrips}`} />
           </div>
-          <SectionCard title="Deadhead Ratio by Block">
-            <HeatStrip values={metrics.deadheadByBlock} />
+          <SectionCard title="Deadhead Ratio by 15-min Block">
+            <HeatStrip values={metrics.deadheadByBlock} blocks={metrics.blocks} />
           </SectionCard>
           <SectionCard title="High Deadhead Trips">
             <div className="row">

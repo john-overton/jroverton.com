@@ -26,21 +26,30 @@ function normalizeValue(value: unknown): string | null {
   return stringValue.length > 0 ? stringValue : null;
 }
 
-function readRows(fileBuffer: Buffer): RawRow[] {
+function readRows(
+  fileBuffer: Buffer,
+  selectedSheetName?: string,
+): { rows: RawRow[]; sheetNames: string[]; selectedSheet: string } {
   const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) {
+  const sheetNames = workbook.SheetNames;
+  const firstSheetName = sheetNames[0];
+  if (!firstSheetName || sheetNames.length === 0) {
     throw new ApiError(400, 'empty_file', 'Uploaded file has no sheets.');
   }
-  const worksheet = workbook.Sheets[firstSheetName];
+  const selectedSheet = selectedSheetName?.trim() || firstSheetName;
+  if (!sheetNames.includes(selectedSheet)) {
+    throw new ApiError(400, 'invalid_sheet', `Sheet '${selectedSheet}' is not present in the uploaded file.`);
+  }
+
+  const worksheet = workbook.Sheets[selectedSheet];
   const rows = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
     defval: '',
     raw: false,
   });
   if (rows.length === 0) {
-    throw new ApiError(400, 'empty_file', 'Uploaded file has no data rows.');
+    throw new ApiError(400, 'empty_file', `Sheet '${selectedSheet}' has no data rows.`);
   }
-  return rows;
+  return { rows, sheetNames, selectedSheet };
 }
 
 function flattenRow(row: RawRow): FlatRow {
@@ -70,8 +79,8 @@ function detectHeaders(rows: RawRow[]): string[] {
   return Array.from(headerSet);
 }
 
-export function buildImportPreview(fileBuffer: Buffer): ImportPreviewResponse {
-  const rows = readRows(fileBuffer);
+export function buildImportPreview(fileBuffer: Buffer, selectedSheetName?: string): ImportPreviewResponse {
+  const { rows, sheetNames, selectedSheet } = readRows(fileBuffer, selectedSheetName);
   const headers = detectHeaders(rows);
   const sampleRows = rows.slice(0, 100).map(flattenRow);
   return {
@@ -79,6 +88,8 @@ export function buildImportPreview(fileBuffer: Buffer): ImportPreviewResponse {
     rows: sampleRows,
     row_count: rows.length,
     sample_count: sampleRows.length,
+    sheet_names: sheetNames,
+    selected_sheet: selectedSheet,
   };
 }
 
@@ -207,6 +218,7 @@ function coerceRouteDefaults(value: Partial<RouteRow>): RouteRow {
 export function applyImportMapping(params: {
   fileBuffer: Buffer;
   config: ImportMappingConfig;
+  selectedSheetName?: string;
   existingTrips: TripRow[];
   existingRoutes: RouteRow[];
 }): {
@@ -214,7 +226,7 @@ export function applyImportMapping(params: {
   routes: RouteRow[];
   result: ImportApplyResponse;
 } {
-  const rows = readRows(params.fileBuffer).map(flattenRow);
+  const rows = readRows(params.fileBuffer, params.selectedSheetName).rows.map(flattenRow);
   const tripKeys = (params.config.match_rules.trip_keys.length > 0
     ? params.config.match_rules.trip_keys
     : DEFAULT_TRIP_KEYS) as string[];

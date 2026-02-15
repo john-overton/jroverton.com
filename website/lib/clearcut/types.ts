@@ -132,6 +132,8 @@ export interface ImportPreviewResponse {
   rows: Array<Record<string, string | null>>;
   row_count: number;
   sample_count: number;
+  sheet_names: string[];
+  selected_sheet: string | null;
 }
 
 export interface ImportFieldMapping {

@@ -281,9 +281,13 @@ export async function previewImportFile(
   token: string,
   jwt: string,
   file: File,
+  sheetName?: string,
 ): Promise<ImportPreviewResponse> {
   const formData = new FormData();
   formData.set('file', file);
+  if (sheetName) {
+    formData.set('sheet_name', sheetName);
+  }
   return request<ImportPreviewResponse>(`/api/clearcut/sessions/${token}/import/preview`, {
     method: 'POST',
     jwt,
@@ -309,10 +313,14 @@ export async function applyImportMappingConfig(
   jwt: string,
   file: File,
   config: ImportMappingConfig,
+  sheetName?: string,
 ): Promise<ImportApplyResponse & { trip_count: number; route_count: number }> {
   const formData = new FormData();
   formData.set('file', file);
   formData.set('config', JSON.stringify(config));
+  if (sheetName) {
+    formData.set('sheet_name', sheetName);
+  }
   return request<ImportApplyResponse & { trip_count: number; route_count: number }>(
     `/api/clearcut/sessions/${token}/import/apply`,
     {
