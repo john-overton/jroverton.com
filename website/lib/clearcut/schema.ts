@@ -33,6 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_import_templates_edit_token ON import_templates(e
 export const SESSION_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS trips (
   trip_id TEXT NOT NULL PRIMARY KEY,
+  trip_date TEXT,
   scheduled_pickup_time TEXT NOT NULL,
   scheduled_appointment_time TEXT NOT NULL,
   pickup_arrive_time TEXT,
@@ -58,6 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_trips_pickup_time ON trips(scheduled_pickup_time)
 
 CREATE TABLE IF NOT EXISTS routes (
   route_id TEXT NOT NULL PRIMARY KEY,
+  route_date TEXT,
   route_name TEXT,
   scheduled_start_time TEXT NOT NULL,
   scheduled_end_time TEXT NOT NULL,

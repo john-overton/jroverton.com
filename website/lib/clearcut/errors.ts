@@ -43,6 +43,16 @@ export function handleRouteError(err: unknown): NextResponse<ApiErrorResponse> {
     });
   }
 
+  if (err instanceof Error) {
+    console.error('[clearcut.route] unhandled_error', {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    });
+  } else {
+    console.error('[clearcut.route] unhandled_error', { value: String(err) });
+  }
+
   return errorResponse(500, {
     code: 'internal_error',
     message: 'Unexpected server error.',

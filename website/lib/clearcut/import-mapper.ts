@@ -15,8 +15,11 @@ const CANONICAL_EVENTS = new Set(['pullout', 'pullin', 'pickup', 'dropoff', 'bre
 type RawRow = Record<string, unknown>;
 type FlatRow = Record<string, string | null>;
 
-const DEFAULT_TRIP_KEYS: Array<keyof TripRow> = ['trip_id', 'route_id', 'scheduled_pickup_time'];
-const DEFAULT_ROUTE_KEYS: Array<keyof RouteRow> = ['route_id', 'scheduled_start_time'];
+const DEFAULT_TRIP_GROUPING_KEYS: Array<keyof TripRow> = ['trip_date', 'route_id'];
+const DEFAULT_TRIP_JOIN_COLUMNS: Array<{ trip_field: keyof TripRow; route_field: keyof RouteRow }> = [
+  { trip_field: 'trip_date', route_field: 'route_date' },
+  { trip_field: 'route_id', route_field: 'route_id' },
+];
 
 function normalizeValue(value: unknown): string | null {
   if (value === null || value === undefined) {
@@ -125,6 +128,19 @@ export function validateImportMapping(
     }
   }
 
+  const tripGrouping = resolveTripGrouping(config.match_rules.trip_grouping);
+  if (tripGrouping.keys.length === 0) {
+    errors.push('Trip grouping must include at least one key.');
+  }
+  if (!tripGrouping.pickupKeyField || !tripGrouping.dropoffKeyField) {
+    errors.push('Trip grouping requires pickup and dropoff key fields.');
+  }
+
+  const tripRouteJoin = resolveTripRouteJoin(config.match_rules.trip_route_join);
+  if (tripRouteJoin.joinColumns.length === 0) {
+    errors.push('Trip-route join must include at least one join column.');
+  }
+
   const observedCanonicalEvents = new Set<string>();
   for (const row of preview.rows) {
     const rawEvent = getValueByHeader(row, config.event_column) ?? '';
@@ -163,25 +179,122 @@ function rowMatchKey(
   return parts.join('|');
 }
 
-function buildLookupByKeys<T extends Record<string, string | null>>(
+function existingRowKey<T extends object>(row: T, keys: string[]): string | null {
+  const rowMap = row as Record<string, string | null | undefined>;
+  const parts: string[] = [];
+  for (const key of keys) {
+    const value = rowMap[key];
+    if (!value) {
+      return null;
+    }
+    parts.push(value);
+  }
+  return parts.join('|');
+}
+
+function pickDateFromDateTime(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.slice(0, 10);
+}
+
+function resolveTripGrouping(config: ImportMappingConfig['match_rules']['trip_grouping']) {
+  const safeConfig = config ?? {
+    keys: DEFAULT_TRIP_GROUPING_KEYS,
+    pickup_key_field: 'trip_id',
+    dropoff_key_field: 'trip_id',
+  };
+  return {
+    keys: safeConfig.keys.length > 0 ? safeConfig.keys : DEFAULT_TRIP_GROUPING_KEYS,
+    pickupKeyField: safeConfig.pickup_key_field,
+    dropoffKeyField: safeConfig.dropoff_key_field,
+  };
+}
+
+function resolveTripRouteJoin(config: ImportMappingConfig['match_rules']['trip_route_join']) {
+  const safeConfig = config ?? {
+    join_columns: DEFAULT_TRIP_JOIN_COLUMNS,
+  };
+  return {
+    joinColumns: safeConfig.join_columns.length > 0 ? safeConfig.join_columns : DEFAULT_TRIP_JOIN_COLUMNS,
+  };
+}
+
+function findExistingByKey<T extends object>(
   rows: T[],
   keys: string[],
-): Map<string, T> {
-  const lookup = new Map<string, T>();
-  for (const row of rows) {
-    const parts = keys.map((key) => row[key] ?? '');
-    if (parts.some((part) => !part)) {
-      continue;
-    }
-    lookup.set(parts.join('|'), row);
+  incomingKey: string | null,
+): T | undefined {
+  if (!incomingKey) {
+    return undefined;
   }
-  return lookup;
+  return rows.find((row) => existingRowKey(row, keys) === incomingKey);
+}
+
+function incrementDateCount(bucket: Map<string, number>, value: string | null | undefined): void {
+  const key = value && value.trim().length > 0 ? value.trim() : '(no date)';
+  bucket.set(key, (bucket.get(key) ?? 0) + 1);
+}
+
+function dateCountList(bucket: Map<string, number>): Array<{ date: string; count: number }> {
+  return Array.from(bucket.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function mergeNonNullFields<T extends object>(target: T, patch: Partial<T>): void {
+  for (const [key, value] of Object.entries(patch) as Array<[keyof T, T[keyof T] | undefined]>) {
+    if (value !== null && value !== undefined) {
+      target[key] = value;
+    }
+  }
+}
+
+function normalizeRouteIdPart(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function deriveRouteIdFromPartials(
+  tripPartial: Partial<TripRow>,
+  routePartial: Partial<RouteRow>,
+): string | null {
+  const explicitRouteId = (routePartial.route_id ?? tripPartial.route_id ?? '').trim();
+  if (explicitRouteId) {
+    return explicitRouteId;
+  }
+
+  const candidateDate =
+    (routePartial.route_date ?? tripPartial.trip_date ?? '').trim() ||
+    pickDateFromDateTime(routePartial.scheduled_start_time) ||
+    pickDateFromDateTime(tripPartial.scheduled_pickup_time);
+  const candidateName = (routePartial.route_name ?? '').trim();
+  const normalizedName = candidateName ? normalizeRouteIdPart(candidateName) : '';
+
+  if (candidateDate && normalizedName) {
+    return `${candidateDate}__${normalizedName}`;
+  }
+  if (normalizedName) {
+    return normalizedName;
+  }
+
+  return null;
 }
 
 function coerceTripDefaults(value: Partial<TripRow>): TripRow {
+  const resolvedPickup = value.scheduled_pickup_time ?? '1970-01-01 00:00:00';
   return {
     trip_id: value.trip_id ?? '',
-    scheduled_pickup_time: value.scheduled_pickup_time ?? '1970-01-01 00:00:00',
+    trip_date: value.trip_date ?? pickDateFromDateTime(resolvedPickup) ?? null,
+    scheduled_pickup_time: resolvedPickup,
     scheduled_appointment_time: value.scheduled_appointment_time ?? '1970-01-01 00:00:00',
     pickup_arrive_time: value.pickup_arrive_time ?? null,
     pickup_leave_time: value.pickup_leave_time ?? null,
@@ -203,10 +316,12 @@ function coerceTripDefaults(value: Partial<TripRow>): TripRow {
 }
 
 function coerceRouteDefaults(value: Partial<RouteRow>): RouteRow {
+  const resolvedStart = value.scheduled_start_time ?? '1970-01-01 00:00:00';
   return {
     route_id: value.route_id ?? '',
+    route_date: value.route_date ?? pickDateFromDateTime(resolvedStart) ?? null,
     route_name: value.route_name ?? null,
-    scheduled_start_time: value.scheduled_start_time ?? '1970-01-01 00:00:00',
+    scheduled_start_time: resolvedStart,
     scheduled_end_time: value.scheduled_end_time ?? '1970-01-01 00:00:00',
     actual_start_time: value.actual_start_time ?? null,
     actual_end_time: value.actual_end_time ?? null,
@@ -227,18 +342,11 @@ export function applyImportMapping(params: {
   result: ImportApplyResponse;
 } {
   const rows = readRows(params.fileBuffer, params.selectedSheetName).rows.map(flattenRow);
-  const tripKeys = (params.config.match_rules.trip_keys.length > 0
-    ? params.config.match_rules.trip_keys
-    : DEFAULT_TRIP_KEYS) as string[];
-  const routeKeys = (params.config.match_rules.route_keys.length > 0
-    ? params.config.match_rules.route_keys
-    : DEFAULT_ROUTE_KEYS) as string[];
+  const tripGrouping = resolveTripGrouping(params.config.match_rules.trip_grouping);
+  const tripJoin = resolveTripRouteJoin(params.config.match_rules.trip_route_join);
 
   const nextTrips = [...params.existingTrips];
   const nextRoutes = [...params.existingRoutes];
-
-  const tripLookup = buildLookupByKeys(nextTrips, tripKeys);
-  const routeLookup = buildLookupByKeys(nextRoutes, routeKeys);
 
   let createdTrips = 0;
   let updatedTrips = 0;
@@ -246,6 +354,8 @@ export function applyImportMapping(params: {
   let updatedRoutes = 0;
   let skippedRows = 0;
   const errors: Array<{ row: number; reason: string }> = [];
+  const insertedTripDates = new Map<string, number>();
+  const insertedRouteDates = new Map<string, number>();
 
   for (let index = 0; index < rows.length; index += 1) {
     const rowNumber = index + 2;
@@ -265,6 +375,15 @@ export function applyImportMapping(params: {
       if (!source) continue;
       (routePartial as Record<string, string | null>)[target] = getValueByHeader(row, source);
     }
+    const derivedRouteId = deriveRouteIdFromPartials(tripPartial, routePartial);
+    if (derivedRouteId) {
+      if (!tripPartial.route_id) {
+        tripPartial.route_id = derivedRouteId;
+      }
+      if (!routePartial.route_id) {
+        routePartial.route_id = derivedRouteId;
+      }
+    }
 
     const appliesTrip = canonicalEvent === 'pickup' || canonicalEvent === 'dropoff' || canonicalEvent === 'other';
     const appliesRoute = canonicalEvent === 'pullout' || canonicalEvent === 'pullin' || canonicalEvent === 'break' || canonicalEvent === 'other';
@@ -272,18 +391,32 @@ export function applyImportMapping(params: {
     let rowUsed = false;
 
     if (appliesTrip) {
-      const key = rowMatchKey(row, params.config.field_mapping.trip as Record<string, string>, tripKeys);
-      const existing = key ? tripLookup.get(key) : undefined;
+      const eventSpecificKey =
+        canonicalEvent === 'pickup'
+          ? tripGrouping.pickupKeyField
+          : canonicalEvent === 'dropoff'
+            ? tripGrouping.dropoffKeyField
+            : null;
+      const effectiveTripKeys = Array.from(
+        new Set([...(tripGrouping.keys as string[]), ...(eventSpecificKey ? [eventSpecificKey] : [])]),
+      );
+      const key = rowMatchKey(row, params.config.field_mapping.trip as Record<string, string>, effectiveTripKeys);
+      const existing = findExistingByKey(
+        nextTrips,
+        effectiveTripKeys,
+        key,
+      );
       if (existing) {
-        Object.assign(existing, tripPartial);
+        mergeNonNullFields(existing, tripPartial);
         updatedTrips += 1;
         rowUsed = true;
-      } else if (params.config.match_rules.create_missing_trip) {
+      } else {
         const created = coerceTripDefaults(tripPartial);
         if (!created.trip_id || !created.route_id) {
           errors.push({ row: rowNumber, reason: 'Trip create is missing required trip_id/route_id.' });
         } else {
           nextTrips.push(created);
+          incrementDateCount(insertedTripDates, created.trip_date);
           createdTrips += 1;
           rowUsed = true;
         }
@@ -291,18 +424,27 @@ export function applyImportMapping(params: {
     }
 
     if (appliesRoute) {
-      const key = rowMatchKey(row, params.config.field_mapping.route as Record<string, string>, routeKeys);
-      const existing = key ? routeLookup.get(key) : undefined;
+      const routeId = (routePartial.route_id ?? tripPartial.route_id ?? '').trim();
+      const existing = routeId
+        ? nextRoutes.find((route) => (route.route_id ?? '').trim() === routeId)
+        : undefined;
       if (existing) {
-        Object.assign(existing, routePartial);
+        if (!routePartial.route_id && routeId) {
+          routePartial.route_id = routeId;
+        }
+        mergeNonNullFields(existing, routePartial);
         updatedRoutes += 1;
         rowUsed = true;
-      } else if (params.config.match_rules.create_missing_route) {
+      } else {
+        if (!routePartial.route_id && routeId) {
+          routePartial.route_id = routeId;
+        }
         const created = coerceRouteDefaults(routePartial);
         if (!created.route_id) {
           errors.push({ row: rowNumber, reason: 'Route create is missing required route_id.' });
         } else {
           nextRoutes.push(created);
+          incrementDateCount(insertedRouteDates, created.route_date);
           createdRoutes += 1;
           rowUsed = true;
         }
@@ -329,6 +471,10 @@ export function applyImportMapping(params: {
         errors: errors.length,
       },
       errors,
+      inserted_by_date: {
+        trips: dateCountList(insertedTripDates),
+        routes: dateCountList(insertedRouteDates),
+      },
     },
   };
 }

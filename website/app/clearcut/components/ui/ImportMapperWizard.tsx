@@ -23,6 +23,7 @@ const CANONICAL_EVENTS: Array<ImportMappingConfig['event_values'][string]> = [
 
 const TRIP_FIELD_OPTIONS: Array<keyof TripRow> = [
   'trip_id',
+  'trip_date',
   'route_id',
   'scheduled_pickup_time',
   'scheduled_appointment_time',
@@ -45,6 +46,7 @@ const TRIP_FIELD_OPTIONS: Array<keyof TripRow> = [
 
 const ROUTE_FIELD_OPTIONS: Array<keyof RouteRow> = [
   'route_id',
+  'route_date',
   'route_name',
   'scheduled_start_time',
   'scheduled_end_time',
@@ -79,10 +81,17 @@ function emptyConfig(): ImportMappingConfig {
     event_values: {},
     field_mapping: { trip: {}, route: {} },
     match_rules: {
-      trip_keys: ['trip_id', 'route_id'],
-      route_keys: ['route_id'],
-      create_missing_trip: false,
-      create_missing_route: false,
+      trip_grouping: {
+        keys: ['trip_date', 'route_id'],
+        pickup_key_field: 'trip_id',
+        dropoff_key_field: 'trip_id',
+      },
+      trip_route_join: {
+        join_columns: [
+          { trip_field: 'trip_date', route_field: 'route_date' },
+          { trip_field: 'route_id', route_field: 'route_id' },
+        ],
+      },
     },
   };
 }
@@ -101,6 +110,12 @@ export default function ImportMapperWizard(props: Props) {
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importRunning, setImportRunning] = useState(false);
+  const [importLogLines, setImportLogLines] = useState<string[]>([]);
+  const [importErrors, setImportErrors] = useState<Array<{ row: number; reason: string }>>([]);
+  const [importResult, setImportResult] = useState<(ImportApplyResponse & { trip_count: number; route_count: number }) | null>(null);
 
   const previewHeaders = preview?.headers ?? [];
   const eventValues = useMemo(() => {
@@ -164,12 +179,37 @@ export default function ImportMapperWizard(props: Props) {
     if (!preview || !file || props.readonlyView) return;
     setStatus('Applying import...');
     setError(null);
+    setShowImportModal(true);
+    setImportRunning(true);
+    setImportProgress(8);
+    setImportLogLines(['Preparing import payload...']);
+    setImportErrors([]);
+    setImportResult(null);
+
+    const progressTimer = window.setInterval(() => {
+      setImportProgress((prev) => (prev < 88 ? prev + 4 : prev));
+    }, 280);
+
     try {
+      setImportLogLines((prev) => [...prev, 'Uploading file and mapping configuration...']);
       const result = await props.onApply(file, config, selectedSheetName || undefined);
       setApplyResult(result);
+      setImportResult(result);
+      setImportErrors(result.errors);
+      setImportLogLines((prev) => [
+        ...prev,
+        `Import complete: ${result.summary.created_trips + result.summary.updated_trips} trip updates, ${result.summary.created_routes + result.summary.updated_routes} route updates.`,
+        result.errors.length > 0 ? `${result.errors.length} row error(s) detected.` : 'No row errors detected.',
+      ]);
       setStatus('Import apply complete.');
+      setImportProgress(100);
     } catch (err) {
+      setImportLogLines((prev) => [...prev, 'Import failed.']);
+      setImportProgress(100);
       setError(err instanceof Error ? err.message : 'Import apply failed.');
+    } finally {
+      window.clearInterval(progressTimer);
+      setImportRunning(false);
     }
   }
 
@@ -210,12 +250,12 @@ export default function ImportMapperWizard(props: Props) {
         event_values?: Record<string, ImportMappingConfig['event_values'][string]>;
       };
       const fieldMapping = JSON.parse(template.field_mapping_json) as ImportMappingConfig['field_mapping'];
-      const matchRules = JSON.parse(template.match_rules_json) as ImportMappingConfig['match_rules'];
+      const matchRules = parseMatchRules(template.match_rules_json);
       setConfig({
         event_column: eventData.event_column ?? '',
         event_values: eventData.event_values ?? {},
         field_mapping: fieldMapping ?? { trip: {}, route: {} },
-        match_rules: matchRules ?? emptyConfig().match_rules,
+        match_rules: matchRules,
       });
       setStatus(`Loaded template '${template.template_name}'.`);
     } catch {
@@ -350,12 +390,137 @@ export default function ImportMapperWizard(props: Props) {
 
       {status && <p style={{ color: '#065f46', marginTop: '0.6rem' }}>{status}</p>}
       {error && <p style={{ color: '#b91c1c', marginTop: '0.6rem' }}>{error}</p>}
+      <ImportStatusModal
+        show={showImportModal}
+        running={importRunning}
+        progress={importProgress}
+        logs={importLogLines}
+        errors={importErrors}
+        result={importResult}
+        onClose={() => {
+          if (!importRunning) {
+            setShowImportModal(false);
+          }
+        }}
+      />
     </div>
   );
 }
 
 function SectionTitle({ title }: { title: string }) {
   return <h3 style={{ fontSize: 17, marginBottom: '0.75rem' }}>{title}</h3>;
+}
+
+function ImportStatusModal(props: {
+  show: boolean;
+  running: boolean;
+  progress: number;
+  logs: string[];
+  errors: Array<{ row: number; reason: string }>;
+  result: (ImportApplyResponse & { trip_count: number; route_count: number }) | null;
+  onClose: () => void;
+}) {
+  if (!props.show) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.45)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1050,
+        padding: '1rem',
+      }}
+    >
+      <div style={{ background: '#fff', borderRadius: 10, width: '100%', maxWidth: 760, maxHeight: '90vh', overflow: 'auto' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: '1px solid #e5e7eb',
+            padding: '0.75rem 1rem',
+          }}
+        >
+          <h4 style={{ margin: 0, fontSize: 17 }}>Import Status</h4>
+          <button className="btn btn-sm btn-outline-secondary" type="button" onClick={props.onClose} disabled={props.running}>
+            Close
+          </button>
+        </div>
+        <div style={{ padding: '0.9rem 1rem' }}>
+          <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 6 }}>
+            {props.running ? 'Import is in progress...' : 'Import finished.'}
+          </div>
+          <div className="progress mb-3" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={props.progress}>
+            <div className={`progress-bar ${props.running ? 'progress-bar-striped progress-bar-animated' : ''}`} style={{ width: `${props.progress}%` }}>
+              {props.progress}%
+            </div>
+          </div>
+
+          {props.result && (
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.7rem', marginBottom: '0.75rem' }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Inserted Summary</div>
+              <div style={{ fontSize: 13 }}>
+                Trips inserted: <strong>{props.result.summary.created_trips}</strong>
+              </div>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>
+                Routes inserted: <strong>{props.result.summary.created_routes}</strong>
+              </div>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>Trip dates inserted:</div>
+              <ul style={{ marginBottom: 8 }}>
+                {props.result.inserted_by_date.trips.length === 0 && <li>None</li>}
+                {props.result.inserted_by_date.trips.map((item) => (
+                  <li key={`trip-date-${item.date}`}>
+                    <code>{item.date}</code>: {item.count}
+                  </li>
+                ))}
+              </ul>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>Route dates inserted:</div>
+              <ul style={{ marginBottom: 0 }}>
+                {props.result.inserted_by_date.routes.length === 0 && <li>None</li>}
+                {props.result.inserted_by_date.routes.map((item) => (
+                  <li key={`route-date-${item.date}`}>
+                    <code>{item.date}</code>: {item.count}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.7rem', marginBottom: '0.75rem' }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Import Log</div>
+            <ul style={{ marginBottom: 0 }}>
+              {props.logs.map((line, index) => (
+                <li key={`import-log-${index}`} style={{ fontSize: 13 }}>
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {props.errors.length > 0 && (
+            <div style={{ border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 8, padding: '0.7rem' }}>
+              <div style={{ fontWeight: 600, marginBottom: 6, color: '#991b1b' }}>
+                Import Errors ({props.errors.length})
+              </div>
+              <ul style={{ marginBottom: 0, maxHeight: 220, overflow: 'auto' }}>
+                {props.errors.map((err, idx) => (
+                  <li key={`import-error-${idx}`} style={{ fontSize: 13, color: '#7f1d1d' }}>
+                    Row {err.row}: {err.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function FilePreviewTable({ preview }: { preview: ImportPreviewResponse }) {
@@ -481,64 +646,91 @@ function MatchRulesBuilder(props: {
   matchRules: ImportMappingConfig['match_rules'];
   onMatchRulesChange: (next: ImportMappingConfig['match_rules']) => void;
 }) {
-  const tripKeys = props.matchRules.trip_keys;
-  const routeKeys = props.matchRules.route_keys;
+  const tripGrouping = props.matchRules.trip_grouping;
+  const tripRouteJoin = props.matchRules.trip_route_join;
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Match Rules</div>
-      <div className="row">
-        <div className="col-md-6">
-          <div className="mb-2">Trip match keys</div>
-          {TRIP_FIELD_OPTIONS.map((key) => (
-            <CheckField
-              key={`trip-key-${key}`}
-              label={key}
-              checked={tripKeys.includes(key)}
-              onChange={(checked) =>
-                props.onMatchRulesChange({
-                  ...props.matchRules,
-                  trip_keys: checked
-                    ? [...tripKeys, key]
-                    : tripKeys.filter((current) => current !== key),
-                })
-              }
-            />
-          ))}
-        </div>
-        <div className="col-md-6">
-          <div className="mb-2">Route match keys</div>
-          {ROUTE_FIELD_OPTIONS.map((key) => (
-            <CheckField
-              key={`route-key-${key}`}
-              label={key}
-              checked={routeKeys.includes(key)}
-              onChange={(checked) =>
-                props.onMatchRulesChange({
-                  ...props.matchRules,
-                  route_keys: checked
-                    ? [...routeKeys, key]
-                    : routeKeys.filter((current) => current !== key),
-                })
-              }
-            />
-          ))}
-        </div>
+    <>
+      <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>Trip Grouping</div>
+        <div className="mb-2">Grouping keys (supports one or multiple columns)</div>
+        {TRIP_FIELD_OPTIONS.map((key) => (
+          <CheckField
+            key={`trip-key-${key}`}
+            label={key}
+            checked={tripGrouping.keys.includes(key)}
+            onChange={(checked) =>
+              props.onMatchRulesChange({
+                ...props.matchRules,
+                trip_grouping: {
+                  ...tripGrouping,
+                  keys: checked
+                    ? [...tripGrouping.keys, key]
+                    : tripGrouping.keys.filter((current) => current !== key),
+                },
+              })
+            }
+          />
+        ))}
+        <SelectField
+          label="Pickup Key Field"
+          value={tripGrouping.pickup_key_field}
+          options={TRIP_FIELD_OPTIONS}
+          onChange={(value) =>
+            props.onMatchRulesChange({
+              ...props.matchRules,
+              trip_grouping: { ...tripGrouping, pickup_key_field: value as keyof TripRow },
+            })
+          }
+        />
+        <SelectField
+          label="Dropoff Key Field"
+          value={tripGrouping.dropoff_key_field}
+          options={TRIP_FIELD_OPTIONS}
+          onChange={(value) =>
+            props.onMatchRulesChange({
+              ...props.matchRules,
+              trip_grouping: { ...tripGrouping, dropoff_key_field: value as keyof TripRow },
+            })
+          }
+        />
       </div>
-      <CheckField
-        label="Create missing trips"
-        checked={Boolean(props.matchRules.create_missing_trip)}
-        onChange={(checked) =>
-          props.onMatchRulesChange({ ...props.matchRules, create_missing_trip: checked })
-        }
-      />
-      <CheckField
-        label="Create missing routes"
-        checked={Boolean(props.matchRules.create_missing_route)}
-        onChange={(checked) =>
-          props.onMatchRulesChange({ ...props.matchRules, create_missing_route: checked })
-        }
-      />
-    </div>
+      <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>Trip / Route Join</div>
+        <div className="mb-2">Join columns (default: date + route_id)</div>
+        {[
+          { trip_field: 'trip_date' as keyof TripRow, route_field: 'route_date' as keyof RouteRow, label: 'Date' },
+          { trip_field: 'route_id' as keyof TripRow, route_field: 'route_id' as keyof RouteRow, label: 'Route ID' },
+          { trip_field: 'trip_id' as keyof TripRow, route_field: 'route_name' as keyof RouteRow, label: 'Trip ID -> Route Name' },
+        ].map((joinOption) => (
+          <CheckField
+            key={`join-col-${joinOption.trip_field}-${joinOption.route_field}`}
+            label={joinOption.label}
+            checked={tripRouteJoin.join_columns.some(
+              (column) =>
+                column.trip_field === joinOption.trip_field && column.route_field === joinOption.route_field,
+            )}
+            onChange={(checked) => {
+              const nextJoinColumns = checked
+                ? [...tripRouteJoin.join_columns, { trip_field: joinOption.trip_field, route_field: joinOption.route_field }]
+                : tripRouteJoin.join_columns.filter(
+                    (column) =>
+                      !(
+                        column.trip_field === joinOption.trip_field &&
+                        column.route_field === joinOption.route_field
+                      ),
+                  );
+              props.onMatchRulesChange({
+                ...props.matchRules,
+                trip_route_join: {
+                  ...tripRouteJoin,
+                  join_columns: nextJoinColumns,
+                },
+              });
+            }}
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -824,4 +1016,62 @@ function includesHeader(headers: string[], candidate: string): boolean {
     return false;
   }
   return headers.some((header) => header.trim().toLowerCase() === normalizedCandidate);
+}
+
+function parseMatchRules(rawJson: string): ImportMappingConfig['match_rules'] {
+  const defaults = emptyConfig().match_rules;
+  const parsed = JSON.parse(rawJson) as
+    | ImportMappingConfig['match_rules']
+    | {
+        trip_keys?: string[];
+        route_keys?: string[];
+      };
+
+  const maybeNewShape = parsed as ImportMappingConfig['match_rules'];
+  if (maybeNewShape?.trip_grouping && maybeNewShape?.trip_route_join) {
+    return {
+      trip_grouping: {
+        keys: maybeNewShape.trip_grouping.keys?.length
+          ? maybeNewShape.trip_grouping.keys
+          : defaults.trip_grouping.keys,
+        pickup_key_field:
+          maybeNewShape.trip_grouping.pickup_key_field ?? defaults.trip_grouping.pickup_key_field,
+        dropoff_key_field:
+          maybeNewShape.trip_grouping.dropoff_key_field ?? defaults.trip_grouping.dropoff_key_field,
+      },
+      trip_route_join: {
+        join_columns: maybeNewShape.trip_route_join.join_columns?.length
+          ? maybeNewShape.trip_route_join.join_columns
+          : defaults.trip_route_join.join_columns,
+      },
+    };
+  }
+
+  const legacy = parsed as {
+    trip_keys?: string[];
+    route_keys?: string[];
+  };
+  const legacyTripKeys = (legacy.trip_keys ?? []).filter((key): key is keyof TripRow =>
+    (TRIP_FIELD_OPTIONS as string[]).includes(key),
+  );
+  const legacyRouteKeys = new Set(legacy.route_keys ?? []);
+
+  const joinColumns: Array<{ trip_field: keyof TripRow; route_field: keyof RouteRow }> = [];
+  if (legacyRouteKeys.has('route_id')) {
+    joinColumns.push({ trip_field: 'route_id', route_field: 'route_id' });
+  }
+  if (legacyRouteKeys.has('route_date') || legacyRouteKeys.has('scheduled_start_time')) {
+    joinColumns.push({ trip_field: 'trip_date', route_field: 'route_date' });
+  }
+
+  return {
+    trip_grouping: {
+      keys: legacyTripKeys.length > 0 ? legacyTripKeys : defaults.trip_grouping.keys,
+      pickup_key_field: 'trip_id',
+      dropoff_key_field: 'trip_id',
+    },
+    trip_route_join: {
+      join_columns: joinColumns.length > 0 ? joinColumns : defaults.trip_route_join.join_columns,
+    },
+  };
 }

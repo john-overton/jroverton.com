@@ -37,6 +37,7 @@ export interface ClearCutJwtClaims {
 
 export interface TripRow {
   trip_id: string;
+  trip_date?: string | null;
   scheduled_pickup_time: string;
   scheduled_appointment_time: string;
   pickup_arrive_time: string | null;
@@ -59,6 +60,7 @@ export interface TripRow {
 
 export interface RouteRow {
   route_id: string;
+  route_date?: string | null;
   route_name: string | null;
   scheduled_start_time: string;
   scheduled_end_time: string;
@@ -142,10 +144,14 @@ export interface ImportFieldMapping {
 }
 
 export interface ImportMatchRules {
-  trip_keys: Array<keyof TripRow>;
-  route_keys: Array<keyof RouteRow>;
-  create_missing_trip?: boolean;
-  create_missing_route?: boolean;
+  trip_grouping: {
+    keys: Array<keyof TripRow>;
+    pickup_key_field: keyof TripRow;
+    dropoff_key_field: keyof TripRow;
+  };
+  trip_route_join: {
+    join_columns: Array<{ trip_field: keyof TripRow; route_field: keyof RouteRow }>;
+  };
 }
 
 export interface ImportMappingConfig {
@@ -177,6 +183,10 @@ export interface ImportApplyResponse {
     errors: number;
   };
   errors: Array<{ row: number; reason: string }>;
+  inserted_by_date: {
+    trips: Array<{ date: string; count: number }>;
+    routes: Array<{ date: string; count: number }>;
+  };
 }
 
 export interface ImportTemplateRecord {

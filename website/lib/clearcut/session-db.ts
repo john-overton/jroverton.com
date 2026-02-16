@@ -21,6 +21,7 @@ const PASSENGER_TYPES = new Set<TripRow['passenger_type']>([
 
 const TRIP_COLUMNS = [
   'trip_id',
+  'trip_date',
   'scheduled_pickup_time',
   'scheduled_appointment_time',
   'pickup_arrive_time',
@@ -43,6 +44,7 @@ const TRIP_COLUMNS = [
 
 const ROUTE_COLUMNS = [
   'route_id',
+  'route_date',
   'route_name',
   'scheduled_start_time',
   'scheduled_end_time',
@@ -101,6 +103,19 @@ function ensureRouteColumns(db: Database.Database): void {
   if (!existing.has('break2')) {
     db.exec('ALTER TABLE routes ADD COLUMN break2 TEXT;');
   }
+  if (!existing.has('route_date')) {
+    db.exec('ALTER TABLE routes ADD COLUMN route_date TEXT;');
+  }
+}
+
+function ensureTripColumns(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('trips')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('trip_date')) {
+    db.exec('ALTER TABLE trips ADD COLUMN trip_date TEXT;');
+  }
 }
 
 function normalizePassengerType(value: string | null | undefined): TripRow['passenger_type'] {
@@ -113,6 +128,7 @@ function normalizePassengerType(value: string | null | undefined): TripRow['pass
 function normalizeTripRow(row: TripRow): TripRow {
   return {
     ...row,
+    trip_date: row.trip_date ?? null,
     passenger_type: normalizePassengerType(row.passenger_type),
   };
 }
@@ -122,6 +138,7 @@ function openSessionDb(editToken: string): Database.Database {
   const db = new Database(getSessionDbPath(editToken));
   db.pragma('journal_mode = WAL');
   db.exec(SESSION_SCHEMA_SQL);
+  ensureTripColumns(db);
   ensureTripPassengerTypeColumn(db);
   ensureSettingsOtpWindowColumns(db);
   ensureRouteColumns(db);
