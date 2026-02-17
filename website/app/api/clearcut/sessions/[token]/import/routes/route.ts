@@ -33,7 +33,7 @@ export async function POST(
     requireAuthorizedSessionAccess(request, session, 'edit');
 
     const fileBuffer = await readUploadedFile(request);
-    const routes = parseRoutesFile(fileBuffer);
+    const { rows: routes, skipped } = parseRoutesFile(fileBuffer);
     replaceRoutes(token, routes);
 
     const tripCount = countTrips(token);
@@ -45,6 +45,7 @@ export async function POST(
       type: 'routes',
       trip_count: tripCount,
       route_count: routeCount,
+      skipped_rows: skipped,
     });
   } catch (err) {
     return handleRouteError(err);

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -593,25 +593,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     setSelectedWeekendDays((prev) =>
       prev.includes(day) ? prev.filter((value) => value !== day) : [...prev, day].sort((a, b) => a - b),
     );
-  }
-
-  async function onUpload(type: 'trips' | 'routes', file: File) {
-    if (readonlyView) {
-      return;
-    }
-    setStatus(`Uploading ${type}...`);
-    setError(null);
-    try {
-      if (type === 'trips') {
-        await session.uploadTrips(file);
-      } else {
-        await session.uploadRoutes(file);
-      }
-      setStatus(`${type === 'trips' ? 'Trips' : 'Routes'} imported.`);
-    } catch (uploadError) {
-      setStatus(null);
-      setError(uploadError instanceof Error ? uploadError.message : 'Import failed.');
-    }
   }
 
   async function onLoadDemo() {
@@ -1215,53 +1196,43 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             )}
 
             {importViewMode === 'flat' && (
-              <div className="mt-2">
-                <button
-                  className="btn btn-sm btn-outline-secondary mb-3"
-                  type="button"
-                  onClick={() => {
-                    setImportViewMode('main');
+              <FlatFileImport
+                readonlyView={readonlyView}
+                onBack={() => {
+                  setImportViewMode('main');
+                  setStatus(null);
+                  setError(null);
+                }}
+                onDownloadSample={downloadSampleCsv}
+                onImport={async (tripFile, routeFile) => {
+                  if (readonlyView) return;
+                  setStatus('Importing routes and trips...');
+                  setError(null);
+                  try {
+                    const skippedMessages: string[] = [];
+                    if (routeFile) {
+                      const routeResult = await session.uploadRoutes(routeFile);
+                      if (routeResult?.skipped_rows?.length) {
+                        skippedMessages.push(`${routeResult.skipped_rows.length} route row(s) skipped.`);
+                      }
+                    }
+                    if (tripFile) {
+                      const tripResult = await session.uploadTrips(tripFile);
+                      if (tripResult?.skipped_rows?.length) {
+                        skippedMessages.push(`${tripResult.skipped_rows.length} trip row(s) skipped.`);
+                      }
+                    }
+                    const statusParts = ['Import complete.'];
+                    if (skippedMessages.length > 0) {
+                      statusParts.push(skippedMessages.join(' '));
+                    }
+                    setStatus(statusParts.join(' '));
+                  } catch (uploadError) {
                     setStatus(null);
-                    setError(null);
-                  }}
-                >
-                  Back to Import Options
-                </button>
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <div className="d-flex gap-2 mb-2">
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        type="button"
-                        onClick={() => downloadSampleCsv('trips')}
-                      >
-                        Download Trip Sample CSV
-                      </button>
-                    </div>
-                    <UploadCard
-                      label="Flat Trip Import (CSV/XLSX)"
-                      disabled={readonlyView}
-                      onUpload={(file) => onUpload('trips', file)}
-                    />
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <div className="d-flex gap-2 mb-2">
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        type="button"
-                        onClick={() => downloadSampleCsv('routes')}
-                      >
-                        Download Route Sample CSV
-                      </button>
-                    </div>
-                    <UploadCard
-                      label="Flat Route Import (CSV/XLSX)"
-                      disabled={readonlyView}
-                      onUpload={(file) => onUpload('routes', file)}
-                    />
-                  </div>
-                </div>
-              </div>
+                    setError(uploadError instanceof Error ? uploadError.message : 'Import failed.');
+                  }
+                }}
+              />
             )}
             {!readonlyView && (
               <button className="btn btn-outline-primary mt-3" onClick={onLoadDemo} type="button">
@@ -1799,54 +1770,131 @@ function PasswordPrompt({ onSubmit }: { onSubmit: (password: string) => Promise<
   );
 }
 
-function UploadCard({
-  label,
-  disabled,
-  onUpload,
+function FlatFileImport({
+  readonlyView,
+  onBack,
+  onDownloadSample,
+  onImport,
 }: {
-  label: string;
-  disabled: boolean;
-  onUpload: (file: File) => void;
+  readonlyView: boolean;
+  onBack: () => void;
+  onDownloadSample: (kind: 'trips' | 'routes') => void;
+  onImport: (tripFile: File | null, routeFile: File | null) => Promise<void>;
 }) {
-  function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file) {
-      onUpload(file);
-    }
-    event.target.value = '';
-  }
+  const [tripFile, setTripFile] = useState<File | null>(null);
+  const [routeFile, setRouteFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
 
-  function onDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    if (disabled) {
-      return;
-    }
-    const file = event.dataTransfer.files?.[0];
-    if (file) {
-      onUpload(file);
+  async function handleImport() {
+    if (readonlyView || (!tripFile && !routeFile)) return;
+    setImporting(true);
+    try {
+      await onImport(tripFile, routeFile);
+    } finally {
+      setImporting(false);
     }
   }
 
   return (
-    <div
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={onDrop}
-      style={{
-        border: '1px dashed #94a3b8',
-        borderRadius: 10,
-        padding: '1rem',
-        background: disabled ? '#f8fafc' : '#fff',
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>{label}</div>
-      <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 8 }}>Drag and drop or browse a file.</div>
-      <input
-        type="file"
-        className="form-control"
-        accept=".csv,.xlsx,.xls"
-        disabled={disabled}
-        onChange={handleFileInput}
-      />
+    <div className="mt-2">
+      <button
+        className="btn btn-sm btn-outline-secondary mb-3"
+        type="button"
+        onClick={onBack}
+      >
+        Back to Import Options
+      </button>
+      <div className="row">
+        <div className="col-md-6 mb-3">
+          <div className="d-flex gap-2 mb-2">
+            <button
+              className="btn btn-sm btn-outline-secondary"
+              type="button"
+              onClick={() => onDownloadSample('routes')}
+            >
+              Download Route Sample CSV
+            </button>
+          </div>
+          <div
+            style={{
+              border: '1px dashed #94a3b8',
+              borderRadius: 10,
+              padding: '1rem',
+              background: readonlyView ? '#f8fafc' : '#fff',
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Route File (CSV/XLSX)</div>
+            <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 8 }}>
+              Select the route file to import.
+            </div>
+            <input
+              type="file"
+              className="form-control"
+              accept=".csv,.xlsx,.xls"
+              disabled={readonlyView}
+              onChange={(event) => {
+                setRouteFile(event.target.files?.[0] ?? null);
+              }}
+            />
+            {routeFile && (
+              <div style={{ fontSize: 13, color: '#065f46', marginTop: 6 }}>
+                Selected: {routeFile.name}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="col-md-6 mb-3">
+          <div className="d-flex gap-2 mb-2">
+            <button
+              className="btn btn-sm btn-outline-secondary"
+              type="button"
+              onClick={() => onDownloadSample('trips')}
+            >
+              Download Trip Sample CSV
+            </button>
+          </div>
+          <div
+            style={{
+              border: '1px dashed #94a3b8',
+              borderRadius: 10,
+              padding: '1rem',
+              background: readonlyView ? '#f8fafc' : '#fff',
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Trip File (CSV/XLSX)</div>
+            <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 8 }}>
+              Select the trip file to import.
+            </div>
+            <input
+              type="file"
+              className="form-control"
+              accept=".csv,.xlsx,.xls"
+              disabled={readonlyView}
+              onChange={(event) => {
+                setTripFile(event.target.files?.[0] ?? null);
+              }}
+            />
+            {tripFile && (
+              <div style={{ fontSize: 13, color: '#065f46', marginTop: 6 }}>
+                Selected: {tripFile.name}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <button
+        className="btn btn-primary"
+        type="button"
+        disabled={readonlyView || importing || (!tripFile && !routeFile)}
+        onClick={handleImport}
+      >
+        {importing ? 'Importing...' : 'Import Files'}
+      </button>
+      {!tripFile && !routeFile && (
+        <div style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>
+          Select at least one file to import. Routes are imported first so trips can be validated against them.
+        </div>
+      )}
     </div>
   );
 }

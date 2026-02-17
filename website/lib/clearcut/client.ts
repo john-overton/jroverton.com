@@ -79,6 +79,7 @@ export interface ImportResponse {
   type: 'trips' | 'routes';
   trip_count: number;
   route_count: number;
+  skipped_rows?: Array<{ row: number; reason: string }>;
 }
 
 export interface ListTripsResponse {

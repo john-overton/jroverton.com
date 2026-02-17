@@ -29,6 +29,117 @@ function normalizeValue(value: unknown): string | null {
   return stringValue.length > 0 ? stringValue : null;
 }
 
+const DATE_TIME_FIELDS = new Set<string>([
+  'trip_date',
+  'scheduled_pickup_time',
+  'scheduled_appointment_time',
+  'pickup_arrive_time',
+  'pickup_leave_time',
+  'dropoff_arrive_time',
+  'dropoff_leave_time',
+  'route_date',
+  'scheduled_start_time',
+  'scheduled_end_time',
+  'actual_start_time',
+  'actual_end_time',
+]);
+
+const DATE_ONLY_FIELDS = new Set<string>(['trip_date', 'route_date']);
+
+/**
+ * Normalize date/time strings from various formats into YYYY-MM-DD HH:MM:SS.
+ * Handles: M/D/YY H:MM, MM/DD/YYYY HH:MM:SS, M-D-YYYY, and already-correct formats.
+ * Also accepts time-only values (H:MM, HH:MM, HH:MM:SS) combined with a fallback date.
+ * For date-only fields, returns YYYY-MM-DD.
+ */
+function normalizeDateTimeString(value: string | null, dateOnly: boolean, fallbackDate?: string | null): string | null {
+  if (!value || !value.trim()) {
+    return value;
+  }
+  const trimmed = value.trim();
+
+  // Already in YYYY-MM-DD format — pass through
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    if (dateOnly) {
+      return trimmed.slice(0, 10);
+    }
+    // Ensure time portion exists
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return `${trimmed} 00:00:00`;
+    }
+    return trimmed;
+  }
+
+  // Time-only: H:MM, HH:MM, H:MM:SS, HH:MM:SS — combine with fallback date
+  if (!dateOnly) {
+    const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (timeMatch) {
+      const hours = timeMatch[1].padStart(2, '0');
+      const minutes = timeMatch[2];
+      const seconds = timeMatch[3] ?? '00';
+      const datePart = extractDatePart(fallbackDate);
+      return `${datePart} ${hours}:${minutes}:${seconds}`;
+    }
+  }
+
+  // Match M/D/YY or M/D/YYYY with optional time (H:MM, HH:MM, HH:MM:SS, H:MM:SS)
+  // Also handles M-D-YY and M-D-YYYY variants
+  const match = trimmed.match(
+    /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
+  );
+  if (!match) {
+    return value;
+  }
+
+  const month = match[1].padStart(2, '0');
+  const day = match[2].padStart(2, '0');
+  let yearStr = match[3];
+  if (yearStr.length === 2) {
+    const twoDigit = parseInt(yearStr, 10);
+    yearStr = twoDigit >= 70 ? `19${yearStr}` : `20${yearStr}`;
+  }
+  const year = yearStr.padStart(4, '0');
+
+  if (dateOnly) {
+    return `${year}-${month}-${day}`;
+  }
+
+  const hours = (match[4] ?? '0').padStart(2, '0');
+  const minutes = (match[5] ?? '00').padStart(2, '0');
+  const seconds = (match[6] ?? '00').padStart(2, '0');
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Extract a YYYY-MM-DD date string from a value that may itself be in various formats.
+ * Falls back to 1970-01-01 if no date can be determined.
+ */
+function extractDatePart(value: string | null | undefined): string {
+  if (!value || !value.trim()) {
+    return '1970-01-01';
+  }
+  const trimmed = value.trim();
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return trimmed.slice(0, 10);
+  }
+
+  const match = trimmed.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
+  if (match) {
+    const month = match[1].padStart(2, '0');
+    const day = match[2].padStart(2, '0');
+    let yearStr = match[3];
+    if (yearStr.length === 2) {
+      const twoDigit = parseInt(yearStr, 10);
+      yearStr = twoDigit >= 70 ? `19${yearStr}` : `20${yearStr}`;
+    }
+    return `${yearStr.padStart(4, '0')}-${month}-${day}`;
+  }
+
+  return '1970-01-01';
+}
+
 function readRows(
   fileBuffer: Buffer,
   selectedSheetName?: string,
@@ -367,13 +478,28 @@ export function applyImportMapping(params: {
 
     const tripPartial: Partial<TripRow> = {};
     const routePartial: Partial<RouteRow> = {};
+
+    // First pass: extract date fields so they can serve as fallback for time-only values
+    const tripDateSource = params.config.field_mapping.trip['trip_date'];
+    const rawTripDate = tripDateSource ? getValueByHeader(row, tripDateSource) : null;
+    const routeDateSource = params.config.field_mapping.route['route_date'];
+    const rawRouteDate = routeDateSource ? getValueByHeader(row, routeDateSource) : null;
+
     for (const [target, source] of Object.entries(params.config.field_mapping.trip)) {
       if (!source) continue;
-      (tripPartial as Record<string, string | null>)[target] = getValueByHeader(row, source);
+      let value = getValueByHeader(row, source);
+      if (value && DATE_TIME_FIELDS.has(target)) {
+        value = normalizeDateTimeString(value, DATE_ONLY_FIELDS.has(target), rawTripDate);
+      }
+      (tripPartial as Record<string, string | null>)[target] = value;
     }
     for (const [target, source] of Object.entries(params.config.field_mapping.route)) {
       if (!source) continue;
-      (routePartial as Record<string, string | null>)[target] = getValueByHeader(row, source);
+      let value = getValueByHeader(row, source);
+      if (value && DATE_TIME_FIELDS.has(target)) {
+        value = normalizeDateTimeString(value, DATE_ONLY_FIELDS.has(target), rawRouteDate ?? rawTripDate);
+      }
+      (routePartial as Record<string, string | null>)[target] = value;
     }
     const derivedRouteId = deriveRouteIdFromPartials(tripPartial, routePartial);
     if (derivedRouteId) {
@@ -456,8 +582,29 @@ export function applyImportMapping(params: {
     }
   }
 
+  // Collect all valid route IDs (existing + newly created)
+  const validRouteIds = new Set(nextRoutes.map((route) => route.route_id.trim()));
+
+  // Filter out newly-created trips whose route was skipped/missing.
+  // Preserve existing trips (they were already in the DB with their route).
+  const existingTripIds = new Set(params.existingTrips.map((trip) => trip.trip_id));
+  const filteredTrips: TripRow[] = [];
+  let removedTripCount = 0;
+  for (const trip of nextTrips) {
+    if (existingTripIds.has(trip.trip_id) || validRouteIds.has(trip.route_id.trim())) {
+      filteredTrips.push(trip);
+    } else {
+      removedTripCount += 1;
+    }
+  }
+  if (removedTripCount > 0) {
+    errors.push({ row: 0, reason: `${removedTripCount} trip(s) removed because their route_id had no matching route.` });
+    skippedRows += removedTripCount;
+    createdTrips -= removedTripCount;
+  }
+
   return {
-    trips: nextTrips,
+    trips: filteredTrips,
     routes: nextRoutes,
     result: {
       imported: true,
