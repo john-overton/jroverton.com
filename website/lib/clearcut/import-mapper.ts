@@ -70,6 +70,18 @@ function normalizeDateTimeString(value: string | null, dateOnly: boolean, fallba
     return trimmed;
   }
 
+  // YYYY-MM-DD with optional time but missing seconds (e.g., 2022-04-01 05:00)
+  if (!dateOnly) {
+    const isoDateTimeMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (isoDateTimeMatch) {
+      const datePart = isoDateTimeMatch[1];
+      const hours = (isoDateTimeMatch[2] ?? '0').padStart(2, '0');
+      const minutes = (isoDateTimeMatch[3] ?? '00').padStart(2, '0');
+      const seconds = (isoDateTimeMatch[4] ?? '00').padStart(2, '0');
+      return `${datePart} ${hours}:${minutes}:${seconds}`;
+    }
+  }
+
   // Time-only: H:MM, HH:MM, H:MM:SS, HH:MM:SS — combine with fallback date
   if (!dateOnly) {
     const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
@@ -144,7 +156,7 @@ function readRows(
   fileBuffer: Buffer,
   selectedSheetName?: string,
 ): { rows: RawRow[]; sheetNames: string[]; selectedSheet: string } {
-  const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+  const workbook = XLSX.read(fileBuffer, { type: 'buffer', raw: true });
   const sheetNames = workbook.SheetNames;
   const firstSheetName = sheetNames[0];
   if (!firstSheetName || sheetNames.length === 0) {
@@ -579,6 +591,11 @@ export function applyImportMapping(params: {
 
     if (!rowUsed) {
       skippedRows += 1;
+      errors.push({
+        row: rowNumber,
+        reason:
+          'Row skipped: did not contribute to any trip or route. Check event mapping, key fields, and required identifiers.',
+      });
     }
   }
 

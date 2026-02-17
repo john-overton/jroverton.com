@@ -66,7 +66,10 @@ function parseMinutes(value: string | null | undefined, fallback: number): numbe
   return h * 60 + m;
 }
 
-function asDate(value: string): Date | null {
+function asDate(value: string | null | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
   const normalized = value.includes('T') ? value : value.replace(' ', 'T');
   const date = new Date(normalized);
   return Number.isNaN(date.getTime()) ? null : date;

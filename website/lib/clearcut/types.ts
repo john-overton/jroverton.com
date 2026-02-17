@@ -39,7 +39,7 @@ export interface TripRow {
   trip_id: string;
   trip_date?: string | null;
   scheduled_pickup_time: string;
-  scheduled_appointment_time: string;
+  scheduled_appointment_time: string | null;
   pickup_arrive_time: string | null;
   pickup_leave_time: string | null;
   dropoff_arrive_time: string | null;

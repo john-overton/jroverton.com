@@ -21,6 +21,16 @@ function normalizeDateTimeString(value: string | null, fallbackDate?: string | n
     return trimmed;
   }
 
+  // YYYY-MM-DD with optional time but missing seconds (e.g., 2022-04-01 05:00)
+  const isoDateTimeMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (isoDateTimeMatch) {
+    const datePart = isoDateTimeMatch[1];
+    const hours = (isoDateTimeMatch[2] ?? '0').padStart(2, '0');
+    const minutes = (isoDateTimeMatch[3] ?? '00').padStart(2, '0');
+    const seconds = (isoDateTimeMatch[4] ?? '00').padStart(2, '0');
+    return `${datePart} ${hours}:${minutes}:${seconds}`;
+  }
+
   // Already YYYY-MM-DD with no time — append midnight
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
     return `${trimmed} 00:00:00`;
@@ -95,7 +105,7 @@ const TRIP_REQUIRED_COLUMNS = [
   'trip_id',
   'route_id',
   'scheduled_pickup_time',
-  'scheduled_appointment_time',
+  // scheduled_appointment_time is optional – many trips do not have an appointment
   'status',
 ] as const;
 
@@ -125,7 +135,7 @@ function getCellValue(row: SheetRow, key: string): string | null {
 }
 
 function parseWorkbook(fileBuffer: Buffer): SheetRow[] {
-  const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+  const workbook = XLSX.read(fileBuffer, { type: 'buffer', raw: true });
   const firstSheetName = workbook.SheetNames[0];
   if (!firstSheetName) {
     throw new ApiError(400, 'empty_file', 'Uploaded file has no sheets.');
@@ -201,8 +211,12 @@ export function parseTripsFile(fileBuffer: Buffer): ParseResult<TripRow> {
     const scheduledPickup = getCellValue(row, 'scheduled_pickup_time');
     const scheduledAppointment = getCellValue(row, 'scheduled_appointment_time');
 
-    if (!tripId || !routeId || !status || !scheduledPickup || !scheduledAppointment) {
-      skipped.push({ row: rowIndex, reason: 'Missing required fields (trip_id, route_id, status, scheduled_pickup_time, or scheduled_appointment_time).' });
+    if (!tripId || !routeId || !status || !scheduledPickup) {
+      skipped.push({
+        row: rowIndex,
+        reason:
+          'Missing required fields (trip_id, route_id, status, or scheduled_pickup_time). scheduled_appointment_time is optional.',
+      });
       continue;
     }
 
@@ -214,8 +228,14 @@ export function parseTripsFile(fileBuffer: Buffer): ParseResult<TripRow> {
     const normalizedDropoffArrive = normalizeDateTimeString(getCellValue(row, 'dropoff_arrive_time'), tripDate);
     const normalizedDropoffLeave = normalizeDateTimeString(getCellValue(row, 'dropoff_leave_time'), tripDate);
 
-    if (!isValidDatetime(normalizedPickup, true) || !isValidDatetime(normalizedAppointment, true)) {
-      skipped.push({ row: rowIndex, reason: 'Invalid or missing required datetime (scheduled_pickup_time or scheduled_appointment_time).' });
+    // Only derive trip_date from the explicit trip_date column (no inference from time-of-day)
+    const effectiveTripDate = tripDate ? extractDatePart(tripDate) : null;
+
+    if (!isValidDatetime(normalizedPickup, true)) {
+      skipped.push({
+        row: rowIndex,
+        reason: 'Invalid or missing required datetime (scheduled_pickup_time).',
+      });
       continue;
     }
 
@@ -231,8 +251,10 @@ export function parseTripsFile(fileBuffer: Buffer): ParseResult<TripRow> {
 
     trips.push({
       trip_id: tripId,
+      trip_date: effectiveTripDate,
       scheduled_pickup_time: normalizedPickup!,
-      scheduled_appointment_time: normalizedAppointment!,
+      // Appointment time is optional; if absent or invalid, store NULL
+      scheduled_appointment_time: normalizedAppointment ?? null,
       pickup_arrive_time: normalizedPickupArrive,
       pickup_leave_time: normalizedPickupLeave,
       dropoff_arrive_time: normalizedDropoffArrive,
@@ -268,17 +290,20 @@ export function parseRoutesFile(fileBuffer: Buffer): ParseResult<RouteRow> {
     const routeId = getCellValue(row, 'route_id');
     const scheduledStart = getCellValue(row, 'scheduled_start_time');
     const scheduledEnd = getCellValue(row, 'scheduled_end_time');
+    const routeDate = getCellValue(row, 'route_date');
 
     if (!routeId || !scheduledStart || !scheduledEnd) {
       skipped.push({ row: rowIndex, reason: 'Missing required fields (route_id, scheduled_start_time, or scheduled_end_time).' });
       continue;
     }
 
-    const routeDate = getCellValue(row, 'route_date');
     const normalizedStart = normalizeDateTimeString(scheduledStart, routeDate);
     const normalizedEnd = normalizeDateTimeString(scheduledEnd, routeDate);
     const normalizedActualStart = normalizeDateTimeString(getCellValue(row, 'actual_start_time'), routeDate);
     const normalizedActualEnd = normalizeDateTimeString(getCellValue(row, 'actual_end_time'), routeDate);
+
+    // Only derive route_date from the explicit route_date column (no inference from times)
+    const effectiveRouteDate = routeDate ? extractDatePart(routeDate) : null;
 
     if (!isValidDatetime(normalizedStart, true) || !isValidDatetime(normalizedEnd, true)) {
       skipped.push({ row: rowIndex, reason: 'Invalid or missing required datetime (scheduled_start_time or scheduled_end_time).' });
@@ -292,6 +317,7 @@ export function parseRoutesFile(fileBuffer: Buffer): ParseResult<RouteRow> {
 
     routes.push({
       route_id: routeId,
+      route_date: effectiveRouteDate,
       route_name: getCellValue(row, 'route_name'),
       scheduled_start_time: normalizedStart!,
       scheduled_end_time: normalizedEnd!,

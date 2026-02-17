@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS trips (
   trip_id TEXT NOT NULL PRIMARY KEY,
   trip_date TEXT,
   scheduled_pickup_time TEXT NOT NULL,
-  scheduled_appointment_time TEXT NOT NULL,
+  scheduled_appointment_time TEXT,
   pickup_arrive_time TEXT,
   pickup_leave_time TEXT,
   dropoff_arrive_time TEXT,

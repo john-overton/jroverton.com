@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Dropdown } from 'react-bootstrap';
 import {
   Bar,
   BarChart,
@@ -361,6 +363,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [wizardKey, setWizardKey] = useState(0);
   const [tripPage, setTripPage] = useState(1);
   const [routePage, setRoutePage] = useState(1);
+  const [flatImportLog, setFlatImportLog] = useState<{
+    trips: Array<{ row: number; reason: string }>;
+    routes: Array<{ row: number; reason: string }>;
+  } | null>(null);
+  const [showFlatImportLog, setShowFlatImportLog] = useState(false);
   const [tripVisibleColumns, setTripVisibleColumns] = useState<Record<TripDataColumnKey, boolean>>({
     trip_id: true,
     route_id: true,
@@ -733,6 +740,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     }
   }
 
+  function onLogout() {
+    session.clearAuth();
+    void session.loadSession({ forceNoJwt: true });
+  }
+
   async function onUnlock(password: string) {
     setStatus('Unlocking session...');
     setError(null);
@@ -906,25 +918,30 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'end' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'end', alignItems: 'center' }}>
           {!readonlyView && (
-            <>
-              <button className="btn btn-outline-secondary" onClick={onRename} type="button">
-                Rename
-              </button>
-              <button className="btn btn-outline-secondary" onClick={onSetPassword} type="button">
-                Set Password
-              </button>
-              <button className="btn btn-outline-secondary" onClick={onRemovePassword} type="button">
-                Remove Password
-              </button>
-              <button className="btn btn-outline-secondary" onClick={onClone} type="button">
-                Save As New
-              </button>
-              <button className="btn btn-outline-danger" onClick={onDelete} type="button">
-                Delete
-              </button>
-            </>
+            <Dropdown>
+              <Dropdown.Toggle
+                variant="outline-secondary"
+                id="session-options-dropdown"
+                style={{ padding: '0.375rem 0.5rem' }}
+                title="Session options"
+                aria-label="Session options"
+              >
+                <Settings size={18} strokeWidth={2} aria-hidden />
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item onClick={onRename}>Rename</Dropdown.Item>
+                <Dropdown.Item onClick={onSetPassword}>Set Password</Dropdown.Item>
+                <Dropdown.Item onClick={onRemovePassword}>Remove Password</Dropdown.Item>
+                {ready?.hasJwt && <Dropdown.Item onClick={onLogout}>Logout</Dropdown.Item>}
+                <Dropdown.Divider />
+                <Dropdown.Item onClick={onClone}>Save As New</Dropdown.Item>
+                <Dropdown.Item onClick={onDelete} className="text-danger">
+                  Delete
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           )}
           <button className="btn btn-primary" disabled={readonlyView || saving} onClick={onSave} type="button">
             {saving ? 'Saving...' : 'Save Run Cut'}
@@ -1130,6 +1147,18 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       </div>
 
       {status && <p style={{ color: '#065f46', marginBottom: '0.5rem' }}>{status}</p>}
+      {flatImportLog && (flatImportLog.trips.length > 0 || flatImportLog.routes.length > 0) && (
+        <p style={{ marginTop: '-0.35rem', marginBottom: '0.75rem', fontSize: 13 }}>
+          Some rows were skipped during flat file import.{' '}
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => setShowFlatImportLog(true)}
+          >
+            View skipped row log
+          </button>
+        </p>
+      )}
       {error && <p style={{ color: '#b91c1c', marginBottom: '0.5rem' }}>{error}</p>}
 
       {tab === 'import' && (
@@ -1208,19 +1237,27 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                   if (readonlyView) return;
                   setStatus('Importing routes and trips...');
                   setError(null);
+                  setFlatImportLog(null);
                   try {
                     const skippedMessages: string[] = [];
+                    let routeSkipped: Array<{ row: number; reason: string }> = [];
+                    let tripSkipped: Array<{ row: number; reason: string }> = [];
                     if (routeFile) {
                       const routeResult = await session.uploadRoutes(routeFile);
                       if (routeResult?.skipped_rows?.length) {
                         skippedMessages.push(`${routeResult.skipped_rows.length} route row(s) skipped.`);
+                        routeSkipped = routeResult.skipped_rows;
                       }
                     }
                     if (tripFile) {
                       const tripResult = await session.uploadTrips(tripFile);
                       if (tripResult?.skipped_rows?.length) {
                         skippedMessages.push(`${tripResult.skipped_rows.length} trip row(s) skipped.`);
+                        tripSkipped = tripResult.skipped_rows;
                       }
+                    }
+                    if (routeSkipped.length > 0 || tripSkipped.length > 0) {
+                      setFlatImportLog({ routes: routeSkipped, trips: tripSkipped });
                     }
                     const statusParts = ['Import complete.'];
                     if (skippedMessages.length > 0) {
@@ -1733,6 +1770,14 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           </SectionCard>
         </>
       )}
+
+      {flatImportLog && (
+        <FlatImportLogModal
+          show={showFlatImportLog}
+          onClose={() => setShowFlatImportLog(false)}
+          log={flatImportLog}
+        />
+      )}
     </main>
   );
 }
@@ -1926,6 +1971,113 @@ function TripTable({ title, trips }: { title: string; trips: Array<{ trip_id: st
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function FlatImportLogModal(props: {
+  show: boolean;
+  onClose: () => void;
+  log: {
+    trips: Array<{ row: number; reason: string }>;
+    routes: Array<{ row: number; reason: string }>;
+  };
+}) {
+  if (!props.show) {
+    return null;
+  }
+
+  const hasTrips = props.log.trips.length > 0;
+  const hasRoutes = props.log.routes.length > 0;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.45)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1050,
+        padding: '1rem',
+      }}
+    >
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 10,
+          width: '100%',
+          maxWidth: 780,
+          maxHeight: '90vh',
+          overflow: 'auto',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: '1px solid #e5e7eb',
+            padding: '0.75rem 1rem',
+          }}
+        >
+          <h4 style={{ margin: 0, fontSize: 17 }}>Flat Import Skipped Rows</h4>
+          <button className="btn btn-sm btn-outline-secondary" type="button" onClick={props.onClose}>
+            Close
+          </button>
+        </div>
+        <div style={{ padding: '0.9rem 1rem' }}>
+          <p style={{ fontSize: 13, color: '#4b5563' }}>
+            These rows were skipped during the most recent flat-file import. Row numbers correspond to the
+            original CSV/XLSX (header is row 1).
+          </p>
+          {hasRoutes && (
+            <div
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                padding: '0.7rem',
+                marginBottom: '0.75rem',
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                Route file skipped rows ({props.log.routes.length})
+              </div>
+              <ul style={{ marginBottom: 0, maxHeight: 220, overflow: 'auto' }}>
+                {props.log.routes.map((err, idx) => (
+                  <li key={`flat-route-error-${idx}`} style={{ fontSize: 13 }}>
+                    Row {err.row}: {err.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {hasTrips && (
+            <div
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                padding: '0.7rem',
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                Trip file skipped rows ({props.log.trips.length})
+              </div>
+              <ul style={{ marginBottom: 0, maxHeight: 220, overflow: 'auto' }}>
+                {props.log.trips.map((err, idx) => (
+                  <li key={`flat-trip-error-${idx}`} style={{ fontSize: 13 }}>
+                    Row {err.row}: {err.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {!hasTrips && !hasRoutes && (
+            <p style={{ fontSize: 13, color: '#6b7280' }}>No skipped rows were reported for the last import.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
