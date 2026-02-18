@@ -6,9 +6,10 @@ import { DemandCompositeChart, HeatStrip, MetricCard, SectionCard } from './shar
 
 interface DemandTabProps {
   metrics: ClearcutMetrics;
+  intervalMinutes: number;
 }
 
-export default function DemandTab({ metrics }: DemandTabProps) {
+export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) {
   return (
     <>
       <div className="row row-cols-1 row-cols-md-5 g-3 mb-3">
@@ -18,9 +19,9 @@ export default function DemandTab({ metrics }: DemandTabProps) {
         <MetricCard columnClass="col" label="Peak Vehicles" value={`${metrics.peakVehicles}`} />
         <MetricCard columnClass="col" label="Total Trips" value={`${metrics.totalTrips}`} />
       </div>
-      <SectionCard title="Demand and Active Vehicles (15-min)">
+      <SectionCard title={`Demand and Active Vehicles (${intervalMinutes}-min)`}>
         <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-          Pickups and onboard demand are shown by 15-minute block with vehicles on road as a line overlay.
+          Pickups and onboard demand are shown by {intervalMinutes}-minute block with vehicles on road as a line overlay.
         </div>
         <DemandCompositeChart
           pickups={metrics.pickupsByBlock}

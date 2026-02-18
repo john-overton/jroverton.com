@@ -54,6 +54,7 @@ interface ComputeMetricsOptions {
   selectedDays?: number[];
   timeRangeStart?: string | null;
   timeRangeEnd?: string | null;
+  blockSizeMinutes?: number;
 }
 
 function parseMinutes(value: string | null | undefined, fallback: number): number {
@@ -308,7 +309,7 @@ export function computeClearcutMetrics(
   const startMinutes = parseMinutes(options.timeRangeStart ?? session.settings.time_range_start, baseStart);
   const endMinutes = parseMinutes(options.timeRangeEnd ?? session.settings.time_range_end, baseEnd);
   const normalizedEnd = endMinutes > startMinutes ? endMinutes : startMinutes + 60;
-  const blockSizeMinutes = 15;
+  const blockSizeMinutes = options.blockSizeMinutes ?? 15;
   const blockCount = Math.max(4, Math.ceil((normalizedEnd - startMinutes) / blockSizeMinutes));
   const blocks: TimeBlock[] = Array.from({ length: blockCount }).map((_, index) => {
     const start = startMinutes + index * blockSizeMinutes;
@@ -487,7 +488,7 @@ export function computeClearcutMetrics(
   const avgRideTimeMin =
     computeActualAvgRideTime(session.trips, selectedDays) ?? session.settings.avg_ride_time_min;
   // <15 min: current block only; 15-30: current + 1 previous; 30-45: current + 2 previous; etc.
-  const lookBackBlocks = Math.floor(avgRideTimeMin / 15);
+  const lookBackBlocks = Math.floor(avgRideTimeMin / blockSizeMinutes);
 
   for (let i = 0; i < blocks.length; i += 1) {
     pickupsByBlock[i] = Math.round((pickupsByBlock[i] / dayCount) * 10) / 10;

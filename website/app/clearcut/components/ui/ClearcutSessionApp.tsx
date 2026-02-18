@@ -71,6 +71,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [timeStartIndex, setTimeStartIndex] = useState(0);
   const [timeEndIndex, setTimeEndIndex] = useState(0);
   const [draggingTimeHandle, setDraggingTimeHandle] = useState<'start' | 'end' | null>(null);
+  const [intervalMinutes, setIntervalMinutes] = useState<15 | 30 | 60>(15);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const readonlyView = mode === 'readonly';
 
@@ -117,9 +119,10 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             selectedDays: selectedDayIds,
             timeRangeStart: rangeStartClock,
             timeRangeEnd: rangeEndClock,
+            blockSizeMinutes: intervalMinutes,
           })
         : null,
-    [rangeEndClock, rangeStartClock, ready, selectedDayIds],
+    [rangeEndClock, rangeStartClock, ready, selectedDayIds, intervalMinutes],
   );
   const hasData = ready ? ready.state.session.trip_count > 0 || ready.state.session.route_count > 0 : false;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -602,60 +605,100 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             padding: '0.75rem',
           }}
         >
-          <div className="row g-3 align-items-center">
-            <div className="col-lg-4">
-              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Weekday</div>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <button
-                  className={`btn btn-sm ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
-                  type="button"
-                  onClick={() =>
-                    setSelectedWeekdayDays((prev) =>
-                      prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
-                    )
-                  }
-                >
-                  Weekday
-                </button>
-                {WEEKDAY_DAY_IDS.map((day) => (
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: filtersOpen ? '0.5rem' : 0,
+              width: '100%',
+            }}
+          >
+            <span style={{ transform: filtersOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', display: 'inline-block' }}>&#9654;</span>
+            Filters
+          </button>
+          <div className="row g-3" style={{ display: filtersOpen ? undefined : 'none' }}>
+            <div className="col-lg-6">
+              <div className="d-flex flex-wrap align-items-center gap-3 mb-2">
+                <div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Interval</div>
+                  <div className="d-flex gap-1">
+                    {([15, 30, 60] as const).map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        className={`btn btn-sm ${intervalMinutes === mins ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        onClick={() => setIntervalMinutes(mins)}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="mb-2">
+                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Weekday</div>
+                <div className="d-flex flex-wrap align-items-center gap-2">
                   <button
-                    key={`weekday-pill-${day}`}
+                    className={`btn btn-sm ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
                     type="button"
-                    className={`btn btn-sm ${selectedWeekdayDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
-                    onClick={() => toggleWeekday(day)}
+                    onClick={() =>
+                      setSelectedWeekdayDays((prev) =>
+                        prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
+                      )
+                    }
                   >
-                    {DAY_LABELS[day]}
+                    Weekday
                   </button>
-                ))}
+                  {WEEKDAY_DAY_IDS.map((day) => (
+                    <button
+                      key={`weekday-pill-${day}`}
+                      type="button"
+                      className={`btn btn-sm ${selectedWeekdayDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      onClick={() => toggleWeekday(day)}
+                    >
+                      {DAY_LABELS[day]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Weekend</div>
+                <div className="d-flex flex-wrap align-items-center gap-2">
+                  <button
+                    className={`btn btn-sm ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    type="button"
+                    onClick={() =>
+                      setSelectedWeekendDays((prev) =>
+                        prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
+                      )
+                    }
+                  >
+                    Weekend
+                  </button>
+                  {WEEKEND_DAY_IDS.map((day) => (
+                    <button
+                      key={`weekend-pill-${day}`}
+                      type="button"
+                      className={`btn btn-sm ${selectedWeekendDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      onClick={() => toggleWeekend(day)}
+                    >
+                      {DAY_LABELS[day]}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="col-lg-3">
-              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Weekend</div>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <button
-                  className={`btn btn-sm ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
-                  type="button"
-                  onClick={() =>
-                    setSelectedWeekendDays((prev) =>
-                      prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
-                    )
-                  }
-                >
-                  Weekend
-                </button>
-                {WEEKEND_DAY_IDS.map((day) => (
-                  <button
-                    key={`weekend-pill-${day}`}
-                    type="button"
-                    className={`btn btn-sm ${selectedWeekendDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
-                    onClick={() => toggleWeekend(day)}
-                  >
-                    {DAY_LABELS[day]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="col-lg-5">
+            <div className="col-lg-6">
               <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Service Hour Time Selector</div>
               <div
                 ref={timeRangeTrackRef}
@@ -806,9 +849,9 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onOtpWindowChange={onOtpWindowChange}
         />
       )}
-      {tab === 'demand' && <DemandTab metrics={metrics} />}
+      {tab === 'demand' && <DemandTab metrics={metrics} intervalMinutes={intervalMinutes} />}
       {tab === 'performance' && (
-        <PerformanceTab metrics={metrics} />
+        <PerformanceTab metrics={metrics} intervalMinutes={intervalMinutes} />
       )}
       {hasVisitedMap && (
         <div style={{ display: tab === 'map' ? undefined : 'none' }}>

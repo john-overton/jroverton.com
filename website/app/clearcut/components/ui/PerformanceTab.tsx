@@ -6,9 +6,10 @@ import { MetricCard, PerformanceCompositeChart, SectionCard } from './shared';
 
 interface PerformanceTabProps {
   metrics: ClearcutMetrics;
+  intervalMinutes: number;
 }
 
-export default function PerformanceTab({ metrics }: PerformanceTabProps) {
+export default function PerformanceTab({ metrics, intervalMinutes }: PerformanceTabProps) {
   return (
     <>
       <div className="row">
@@ -17,7 +18,7 @@ export default function PerformanceTab({ metrics }: PerformanceTabProps) {
         <MetricCard label="Average Productivity" value={`${metrics.avgProductivity}`} />
         <MetricCard label="Peak Productivity" value={`${metrics.peakProductivity}`} />
       </div>
-      <SectionCard title="Productivity & OTP (15-min)">
+      <SectionCard title={`Productivity & OTP (${intervalMinutes}-min)`}>
         <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
           Productivity shown as bars (left axis). Pickup and dropoff OTP shown as lines (right axis, %).
         </div>
