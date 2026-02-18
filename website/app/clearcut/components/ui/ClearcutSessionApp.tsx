@@ -15,9 +15,8 @@ import DeadheadTab from './DeadheadTab';
 import DemandTab from './DemandTab';
 import ImportTab from './ImportTab';
 import MapTab from './MapTab';
-import OptimizeTab from './OptimizeTab';
 import PerformanceTab from './PerformanceTab';
-import RunsTab from './RunsTab';
+import RunStructureTab from './RunStructureTab';
 import {
   CLEARCUT_FONT_STACK,
   DEMAND_BLOCK_MINUTES,
@@ -28,15 +27,14 @@ import {
   parseClockToMinutes,
 } from './shared';
 
-type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runs' | 'optimize' | 'deadhead';
+type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runstructure' | 'deadhead';
 
 const TAB_ITEMS: Array<{ key: TabKey; label: string }> = [
   { key: 'import', label: 'Import' },
   { key: 'demand', label: 'Demand' },
   { key: 'performance', label: 'Performance' },
   { key: 'map', label: 'Trip Map' },
-  { key: 'runs', label: 'Run Structure' },
-  { key: 'optimize', label: 'Optimize' },
+  { key: 'runstructure', label: 'Run Structure' },
   { key: 'deadhead', label: 'Deadhead' },
 ];
 const WEEKDAY_DAY_IDS = [1, 2, 3, 4, 5] as const;
@@ -858,12 +856,14 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           <MapTab metrics={metrics} trips={ready?.state.trips ?? []} selectedDays={selectedDayIds} />
         </div>
       )}
-      {tab === 'runs' && <RunsTab metrics={metrics} />}
-      {tab === 'optimize' && (
-        <OptimizeTab
+      {tab === 'runstructure' && (
+        <RunStructureTab
           metrics={metrics}
           optimization={ready.state.optimization}
+          routes={ready.state.routes}
+          selectedDays={selectedDayIds}
           readonlyView={readonlyView}
+          intervalMinutes={intervalMinutes}
           onOptimizationChange={onOptimizationChange}
         />
       )}

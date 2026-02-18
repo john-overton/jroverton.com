@@ -360,6 +360,67 @@ export function TripTable({ title, trips }: { title: string; trips: Array<{ trip
   );
 }
 
+export function RunStructureChart({
+  pickups,
+  onBoard,
+  currentVehicles,
+  optimizedVehicles,
+  blocks,
+}: {
+  pickups: number[];
+  onBoard: number[];
+  currentVehicles: number[];
+  optimizedVehicles: number[];
+  blocks: Array<{ label: string }>;
+}) {
+  const data = useMemo(
+    () =>
+      blocks.map((block, index) => ({
+        label: block.label,
+        pickups: Math.round((pickups[index] ?? 0) * 10) / 10,
+        onBoard: Math.round((onBoard[index] ?? 0) * 10) / 10,
+        currentVehicles: Math.round((currentVehicles[index] ?? 0) * 10) / 10,
+        optimizedVehicles: Math.round((optimizedVehicles[index] ?? 0) * 10) / 10,
+      })),
+    [blocks, onBoard, pickups, currentVehicles, optimizedVehicles],
+  );
+
+  return (
+    <div style={{ height: 260 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+          <YAxis allowDecimals={false} width={38} />
+          <Tooltip
+            formatter={(value: number | string | undefined, name: string | undefined) => {
+              const v = typeof value === 'number' ? value : Number(value ?? 0);
+              if (name === 'currentVehicles') return [v, 'Current Vehicles'];
+              if (name === 'optimizedVehicles') return [v, 'Optimized Vehicles'];
+              if (name === 'onBoard') return [v, 'Active Trips'];
+              return [v, 'Pickups'];
+            }}
+            labelFormatter={(label) => `Time: ${label}`}
+            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+          />
+          <Legend
+            formatter={(value) => {
+              if (value === 'currentVehicles') return 'Current Vehicles';
+              if (value === 'optimizedVehicles') return 'Optimized Vehicles';
+              if (value === 'onBoard') return 'Active Trips';
+              return 'Pickups';
+            }}
+          />
+          <Bar dataKey="onBoard" fill="rgba(99, 102, 241, 0.25)" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="pickups" fill="#4f46e5" radius={[3, 3, 0, 0]} />
+          <Line type="monotone" dataKey="currentVehicles" stroke="#0d9488" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="optimizedVehicles" stroke="#d97706" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4 }} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export function PasswordPrompt({ onSubmit }: { onSubmit: (password: string) => Promise<void> }) {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
