@@ -6,6 +6,8 @@ import {
   BarChart,
   Cell,
   CartesianGrid,
+  ComposedChart,
+  Legend,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -241,6 +243,78 @@ export function DemandCompositeChart({
             name="vehicles"
           />
         </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function PerformanceCompositeChart({
+  productivity,
+  pickupOtp,
+  dropoffOtp,
+  blocks,
+}: {
+  productivity: number[];
+  pickupOtp: number[];
+  dropoffOtp: number[];
+  blocks: Array<{ label: string }>;
+}) {
+  const data = useMemo(
+    () =>
+      blocks.map((block, index) => ({
+        label: block.label,
+        productivity: Math.round((productivity[index] ?? 0) * 100) / 100,
+        pickupOtp: Math.round((pickupOtp[index] ?? 0) * 10) / 10,
+        dropoffOtp: Math.round((dropoffOtp[index] ?? 0) * 10) / 10,
+      })),
+    [blocks, productivity, pickupOtp, dropoffOtp],
+  );
+
+  return (
+    <div style={{ height: 460 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+          <YAxis yAxisId="left" allowDecimals width={38} />
+          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} width={38} tickFormatter={(v) => `${v}%`} />
+          <Tooltip
+            formatter={(value: number | string | undefined, name: string | undefined) => {
+              const v = typeof value === 'number' ? value : Number(value ?? 0);
+              if (name === 'pickupOtp') return [`${v}%`, 'Pickup OTP'];
+              if (name === 'dropoffOtp') return [`${v}%`, 'Dropoff OTP'];
+              return [v, 'Productivity'];
+            }}
+            labelFormatter={(label) => `Time: ${label}`}
+            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+          />
+          <Legend
+            formatter={(value) => {
+              if (value === 'pickupOtp') return 'Pickup OTP';
+              if (value === 'dropoffOtp') return 'Dropoff OTP';
+              return 'Productivity';
+            }}
+          />
+          <Bar yAxisId="left" dataKey="productivity" fill="rgba(99, 102, 241, 0.4)" radius={[3, 3, 0, 0]} />
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="pickupOtp"
+            stroke="#0d9488"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+          />
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="dropoffOtp"
+            stroke="#d97706"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+          />
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

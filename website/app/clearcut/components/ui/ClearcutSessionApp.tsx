@@ -808,7 +808,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       )}
       {tab === 'demand' && <DemandTab metrics={metrics} />}
       {tab === 'performance' && (
-        <PerformanceTab metrics={metrics} otpTargetPct={ready.state.settings.otp_target_pct} />
+        <PerformanceTab metrics={metrics} />
       )}
       {hasVisitedMap && (
         <div style={{ display: tab === 'map' ? undefined : 'none' }}>
