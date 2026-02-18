@@ -62,6 +62,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const filterStateInitialized = useRef(false);
   const timeRangeTrackRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<TabKey>(mode === 'readonly' ? 'demand' : 'import');
+  const [hasVisitedMap, setHasVisitedMap] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -768,7 +769,10 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                   type="button"
                   className={`nav-link ${tab === item.key ? 'active' : ''}`}
                   disabled={disabled}
-                  onClick={() => setTab(item.key)}
+                  onClick={() => {
+                    setTab(item.key);
+                    if (item.key === 'map') setHasVisitedMap(true);
+                  }}
                 >
                   {item.label}
                 </button>
@@ -806,7 +810,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       {tab === 'performance' && (
         <PerformanceTab metrics={metrics} otpTargetPct={ready.state.settings.otp_target_pct} />
       )}
-      {tab === 'map' && <MapTab metrics={metrics} trips={ready?.state.trips ?? []} selectedDays={selectedDayIds} />}
+      {hasVisitedMap && (
+        <div style={{ display: tab === 'map' ? undefined : 'none' }}>
+          <MapTab metrics={metrics} trips={ready?.state.trips ?? []} selectedDays={selectedDayIds} />
+        </div>
+      )}
       {tab === 'runs' && <RunsTab metrics={metrics} />}
       {tab === 'optimize' && (
         <OptimizeTab
