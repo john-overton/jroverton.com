@@ -223,7 +223,7 @@ export function DemandCompositeChart({
             formatter={(value: number | string | undefined, name: string | undefined) => {
               const normalizedValue = typeof value === 'number' ? value : Number(value ?? 0);
               if (name === 'vehicles') return [normalizedValue, 'Routes On Road'];
-              if (name === 'onBoard') return [normalizedValue, 'On Board'];
+              if (name === 'onBoard') return [normalizedValue, 'Active Trips'];
               return [normalizedValue, 'Pickups'];
             }}
             labelFormatter={(label) => `Time: ${label}`}

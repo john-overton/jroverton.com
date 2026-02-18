@@ -193,6 +193,22 @@ function ensureDayBlockSets(
   return created;
 }
 
+function computeActualAvgRideTime(trips: TripRow[], selectedDays: Set<number>): number | null {
+  const rideTimes: number[] = [];
+  for (const trip of trips) {
+    const pickup = asDate(trip.pickup_leave_time ?? '') ?? asDate(trip.pickup_arrive_time ?? '');
+    const dropoff = asDate(trip.dropoff_leave_time ?? '') ?? asDate(trip.dropoff_arrive_time ?? '');
+    if (!pickup || !dropoff || !selectedDays.has(pickup.getDay())) {
+      continue;
+    }
+    const minutes = (dropoff.getTime() - pickup.getTime()) / 60_000;
+    if (minutes > 0) {
+      rideTimes.push(minutes);
+    }
+  }
+  return rideTimes.length > 0 ? rideTimes.reduce((a, b) => a + b, 0) / rideTimes.length : null;
+}
+
 function pickMiles(trip: TripRow): number {
   const start = Number(trip.pick_odometer);
   const end = Number(trip.drop_odometer);
@@ -468,7 +484,8 @@ export function computeClearcutMetrics(
     }
   }
 
-  const avgRideTimeMin = session.settings.avg_ride_time_min;
+  const avgRideTimeMin =
+    computeActualAvgRideTime(session.trips, selectedDays) ?? session.settings.avg_ride_time_min;
   // <15 min: current block only; 15-30: current + 1 previous; 30-45: current + 2 previous; etc.
   const lookBackBlocks = Math.floor(avgRideTimeMin / 15);
 
@@ -478,7 +495,7 @@ export function computeClearcutMetrics(
     // On-board = rolling sum of pickups (passengers) from current + previous blocks based on avg ride time
     let onBoardSum = 0;
     for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
-      onBoardSum += pickupsPassengersByBlock[i - k];
+      onBoardSum += pickupsByBlock[i - k];
     }
     onBoardByBlock[i] = Math.round(onBoardSum * 10) / 10;
     vehiclesByBlock[i] = Math.round((vehiclesByBlock[i] / dayCount) * 10) / 10;
