@@ -195,7 +195,32 @@ Productivity is calculated as completed trips divided by revenue hours. Revenue 
 
 ## 3.1 Frontend Stack
 
-> **FILL IN:** *Specify: framework (React, Next.js, etc.), charting library (Recharts, D3, Chart.js), mapping library if applicable, state management approach, CSS approach (Tailwind, styled-components, etc.), build tooling.*
+- **Framework:** Next.js (App Router) with React, TypeScript
+- **Charting:** Recharts (BarChart, Line, ResponsiveContainer, Tooltip)
+- **UI Framework:** Bootstrap 5 via react-bootstrap, inline styles
+- **Icons:** lucide-react
+- **State Management:** React hooks (`useState`, `useMemo`, `useCallback`, `useEffect`); custom `useClearcutSession` hook for session lifecycle
+- **Build Tooling:** Next.js built-in (Turbopack dev, webpack production)
+
+### Component Architecture
+
+The session UI follows a tab-per-file pattern with a thin orchestrator. All files are in `website/app/clearcut/components/ui/`.
+
+| **File** | **Description** |
+|---|---|
+| `ClearcutSessionApp.tsx` | Orchestrator — owns session hook, filter bar (day/time selector), header, tab navigation, status/error display, and session-level action handlers (save, rename, clone, delete, password). Delegates tab rendering to individual components. |
+| `shared.tsx` | Shared display components (`MetricCard`, `MiniBars`, `HeatStrip`, `DemandCompositeChart`, `SectionCard`, `TripTable`, `PasswordPrompt`) and utility functions (`parseClockToMinutes`, `formatMinutesToClock`, `formatMinutesToLabel`, `parseDateTime`, `deriveSliderBoundsFromTrips`). Also exports shared constants (`CLEARCUT_FONT_STACK`, `DEMAND_BLOCK_MINUTES`). |
+| `ImportTab.tsx` | Import tab — file upload (wizard and flat-file), system settings (OTP windows), and data view tables with pagination. Owns import-specific state (view mode, pagination, column visibility, flat import log). Contains private `FlatFileImport` and `FlatImportLogModal` components. |
+| `DemandTab.tsx` | Demand tab — pure display. Peak metrics, composite demand/vehicles chart, deadhead heatmap. |
+| `PerformanceTab.tsx` | Performance tab — pure display. OTP and productivity metrics with block-level bar charts. |
+| `MapTab.tsx` | Trip Map tab — owns `mapBlockIdx` state for time scrubber. Pickup heatmap visualization. |
+| `RunsTab.tsx` | Run Structure tab — pure display. Current vs optimized run comparison. |
+| `OptimizeTab.tsx` | Optimize tab — optimization parameter sliders with estimated outcome metrics. Receives `onOptimizationChange` callback from orchestrator. |
+| `DeadheadTab.tsx` | Deadhead tab — pure display. Deadhead metrics, heatmap, and high-deadhead trip tables. |
+| `ImportMapperWizard.tsx` | Event-based import wizard with template management, field mapping, and validation. Used by `ImportTab`. |
+| `ClearcutLandingClient.tsx` | Landing page for creating new sessions and returning to existing ones via edit token. |
+
+**Data flow:** The orchestrator computes `ClearcutMetrics` (exported from `lib/clearcut/metrics.ts`) using the session state and current filter selections. This single metrics object is passed as a prop to each tab component, providing a clean data contract. The filter bar (day-of-week pills, time range slider) remains in the orchestrator since it affects all tabs via the `computeClearcutMetrics` call.
 
 ## 3.2 Backend / API
 
