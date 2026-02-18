@@ -10,11 +10,13 @@
   },
   "dependencies": {
     "@types/bootstrap": "^5.2.10",
+    "@types/mapbox-gl": "^3.4.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "bootstrap": "^5.3.8",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.555.0",
+    "mapbox-gl": "^3.18.1",
     "next": "^16.0.7",
     "react": "19.2.0",
     "react-bootstrap": "^2.10.10",

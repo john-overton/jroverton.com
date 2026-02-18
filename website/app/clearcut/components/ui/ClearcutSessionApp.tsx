@@ -813,7 +813,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       {tab === 'performance' && (
         <PerformanceTab metrics={metrics} otpTargetPct={ready.state.settings.otp_target_pct} />
       )}
-      {tab === 'map' && <MapTab metrics={metrics} />}
+      {tab === 'map' && <MapTab metrics={metrics} trips={ready?.state.trips ?? []} selectedDays={selectedDayIds} />}
       {tab === 'runs' && <RunsTab metrics={metrics} />}
       {tab === 'optimize' && (
         <OptimizeTab
