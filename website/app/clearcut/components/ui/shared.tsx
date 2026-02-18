@@ -107,14 +107,16 @@ export function MetricCard({
   value,
   sub,
   color,
+  columnClass,
 }: {
   label: string;
   value: string;
   sub?: string;
   color?: string;
+  columnClass?: string;
 }) {
   return (
-    <div className="col-md-3 col-sm-6 mb-3">
+    <div className={columnClass ?? 'col-md-3 col-sm-6 mb-3'}>
       <div style={{ border: '1px solid #dee5f0', borderRadius: 10, padding: '0.75rem', background: '#fff' }}>
         <div style={{ color: '#6b7280', fontSize: 13 }}>{label}</div>
         <div style={{ fontSize: 24, fontWeight: 700, color: color ?? '#1f2937' }}>{value}</div>
@@ -157,12 +159,13 @@ export function HeatStrip({ values, blocks }: { values: number[]; blocks?: Array
     label: blocks?.[index]?.label ?? `Block ${index + 1}`,
   }));
   return (
-    <div style={{ height: 42, borderRadius: 6, overflow: 'hidden', border: '1px solid #dbe3ef' }}>
+    <div style={{ height: 42, borderRadius: 6, overflow: 'visible', border: '1px solid #dbe3ef' }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barCategoryGap={0}>
           <XAxis dataKey="idx" hide />
           <YAxis hide domain={[0, 1]} />
           <Tooltip
+            allowEscapeViewBox={{ x: true, y: true }}
             formatter={(_value: number | string | undefined, _name, item) => {
               const payload = item?.payload as { value?: number; label?: string } | undefined;
               return [`${payload?.value ?? 0}%`, 'Empty-time'];

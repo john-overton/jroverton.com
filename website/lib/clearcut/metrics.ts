@@ -21,6 +21,7 @@ export interface ClearcutMetrics {
   peakPickups: number;
   peakVehicles: number;
   peakOnBoard: number;
+  avgOnBoard: number;
   avgOtp: number;
   pickupOtpPct: number;
   dropoffOtpPct: number;
@@ -132,8 +133,7 @@ function sumServiceHours(routes: RouteRow[]): number {
 }
 
 function pickBlockIndex(minutes: number, blocks: TimeBlock[]): number {
-  const idx = blocks.findIndex((block) => minutes >= block.startMinutes && minutes < block.endMinutes);
-  return idx >= 0 ? idx : Math.max(0, blocks.length - 1);
+  return blocks.findIndex((block) => minutes >= block.startMinutes && minutes < block.endMinutes);
 }
 
 function routeStart(route: RouteRow): Date | null {
@@ -305,6 +305,7 @@ export function computeClearcutMetrics(
   });
 
   const pickupsByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const pickupsPassengersByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const onBoardByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const vehiclesByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const deadheadByBlock = Array.from({ length: blockCount }).fill(0) as number[];
@@ -355,26 +356,31 @@ export function computeClearcutMetrics(
       continue;
     }
 
-    const idx = pickBlockIndex(dateToMinutes(pickupTimestamp), blocks);
-    pickupsByBlock[idx] += 1;
-    blockTripCounts[idx] += 1;
-
+    const passengers = parsePassengerCount(trip.passenger_count);
+    const tripDayKey = dateKey(pickupTimestamp);
+    const occupiedRouteBlocks = ensureDayBlockSets(occupiedRouteIdsByDayBlock, tripDayKey, blockCount);
+    // Occupied routes for deadhead: which blocks does this trip overlap (pickup to dropoff)
     const onboardStart = pickupTimestamp;
     const onboardEnd = tripDropoffTime(trip) ?? pickupTimestamp;
     const onboardStartMinutes = dateToMinutes(onboardStart);
     const onboardEndMinutes = Math.max(onboardStartMinutes, dateToMinutes(onboardEnd));
-    const passengers = parsePassengerCount(trip.passenger_count);
-    const tripDayKey = dateKey(pickupTimestamp);
-    const occupiedRouteBlocks = ensureDayBlockSets(occupiedRouteIdsByDayBlock, tripDayKey, blockCount);
     for (let blockIdx = 0; blockIdx < blocks.length; blockIdx += 1) {
       const block = blocks[blockIdx];
       if (onboardEndMinutes > block.startMinutes && onboardStartMinutes < block.endMinutes) {
-        onBoardByBlock[blockIdx] += passengers;
         if (trip.route_id) {
           occupiedRouteBlocks[blockIdx].add(trip.route_id);
         }
       }
     }
+
+    // Skip pickup counting and OTP when pickup falls outside the visible time range
+    const idx = pickBlockIndex(dateToMinutes(pickupTimestamp), blocks);
+    if (idx < 0) {
+      continue;
+    }
+    pickupsByBlock[idx] += 1;
+    pickupsPassengersByBlock[idx] += passengers;
+    blockTripCounts[idx] += 1;
 
     const scheduledPickup = asDate(trip.scheduled_pickup_time);
     const actualPickup = asDate(trip.pickup_arrive_time ?? '') ?? asDate(trip.pickup_leave_time ?? '');
@@ -462,9 +468,19 @@ export function computeClearcutMetrics(
     }
   }
 
+  const avgRideTimeMin = session.settings.avg_ride_time_min;
+  // <15 min: current block only; 15-30: current + 1 previous; 30-45: current + 2 previous; etc.
+  const lookBackBlocks = Math.floor(avgRideTimeMin / 15);
+
   for (let i = 0; i < blocks.length; i += 1) {
     pickupsByBlock[i] = Math.round((pickupsByBlock[i] / dayCount) * 10) / 10;
-    onBoardByBlock[i] = Math.round((onBoardByBlock[i] / dayCount) * 10) / 10;
+    pickupsPassengersByBlock[i] = Math.round((pickupsPassengersByBlock[i] / dayCount) * 10) / 10;
+    // On-board = rolling sum of pickups (passengers) from current + previous blocks based on avg ride time
+    let onBoardSum = 0;
+    for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
+      onBoardSum += pickupsPassengersByBlock[i - k];
+    }
+    onBoardByBlock[i] = Math.round(onBoardSum * 10) / 10;
     vehiclesByBlock[i] = Math.round((vehiclesByBlock[i] / dayCount) * 10) / 10;
     const trips = blockTripCounts[i] / dayCount;
     pickupOtpByBlock[i] =
@@ -476,8 +492,9 @@ export function computeClearcutMetrics(
     productivityByBlock[i] = vehiclesByBlock[i] > 0 ? trips / vehiclesByBlock[i] : 0;
     const activeVehiclesRaw = activeVehiclesRawByBlock[i];
     const occupiedVehiclesRaw = Math.min(occupiedVehiclesRawByBlock[i], activeVehiclesRaw);
+    // Only show deadhead when there are meaningful active vehicles in this block (after averaging)
     deadheadByBlock[i] =
-      activeVehiclesRaw > 0
+      activeVehiclesRaw > 0 && vehiclesByBlock[i] > 0
         ? Math.round((((activeVehiclesRaw - occupiedVehiclesRaw) / activeVehiclesRaw) * 100) * 10) / 10
         : 0;
   }
@@ -520,6 +537,7 @@ export function computeClearcutMetrics(
     peakPickups: Math.max(...pickupsByBlock, 0),
     peakVehicles: Math.max(...vehiclesByBlock, 0),
     peakOnBoard: Math.round(Math.max(...onBoardByBlock, 0) * 10) / 10,
+    avgOnBoard: Math.round(average(onBoardByBlock) * 10) / 10,
     avgOtp: totalTripEligible > 0 ? Math.round((totalTripOnTime / totalTripEligible) * 1000) / 10 : 0,
     pickupOtpPct: totalPickupEligible > 0 ? Math.round((totalPickupOnTime / totalPickupEligible) * 1000) / 10 : 0,
     dropoffOtpPct:
