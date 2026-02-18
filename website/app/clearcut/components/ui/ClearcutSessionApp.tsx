@@ -61,7 +61,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const session = useClearcutSession(token, mode);
   const filterStateInitialized = useRef(false);
   const timeRangeTrackRef = useRef<HTMLDivElement | null>(null);
-  const [tab, setTab] = useState<TabKey>('import');
+  const [tab, setTab] = useState<TabKey>(mode === 'readonly' ? 'demand' : 'import');
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -582,9 +582,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
               </Dropdown.Menu>
             </Dropdown>
           )}
-          <button className="btn btn-primary" disabled={readonlyView || saving} onClick={onSave} type="button">
-            {saving ? 'Saving...' : 'Save Run Cut'}
-          </button>
+          {!readonlyView && (
+            <button className="btn btn-primary" disabled={saving} onClick={onSave} type="button">
+              {saving ? 'Saving...' : 'Save Run Cut'}
+            </button>
+          )}
         </div>
       </header>
 
@@ -606,7 +608,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 <button
                   className={`btn btn-sm ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
                   type="button"
-                  disabled={readonlyView}
                   onClick={() =>
                     setSelectedWeekdayDays((prev) =>
                       prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
@@ -620,7 +621,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     key={`weekday-pill-${day}`}
                     type="button"
                     className={`btn btn-sm ${selectedWeekdayDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
-                    disabled={readonlyView}
                     onClick={() => toggleWeekday(day)}
                   >
                     {DAY_LABELS[day]}
@@ -634,7 +634,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 <button
                   className={`btn btn-sm ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
                   type="button"
-                  disabled={readonlyView}
                   onClick={() =>
                     setSelectedWeekendDays((prev) =>
                       prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
@@ -648,7 +647,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     key={`weekend-pill-${day}`}
                     type="button"
                     className={`btn btn-sm ${selectedWeekendDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
-                    disabled={readonlyView}
                     onClick={() => toggleWeekend(day)}
                   >
                     {DAY_LABELS[day]}
@@ -662,7 +660,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 ref={timeRangeTrackRef}
                 style={{ position: 'relative', height: 30 }}
                 onMouseDown={(event) => {
-                  if (readonlyView || allTimeBlocks.length <= 1) {
+                  if (allTimeBlocks.length <= 1) {
                     return;
                   }
                   const track = timeRangeTrackRef.current;
@@ -714,15 +712,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     border: '2px solid #fff',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
                     transform: 'translate(-50%, -50%)',
-                    pointerEvents: readonlyView ? 'none' : 'auto',
-                    cursor: readonlyView ? 'default' : 'ew-resize',
+                    pointerEvents: 'auto',
+                    cursor: 'ew-resize',
                     zIndex: 4,
                   }}
                   onMouseDown={(event) => {
                     event.stopPropagation();
-                    if (readonlyView) {
-                      return;
-                    }
                     setDraggingTimeHandle('start');
                   }}
                 />
@@ -738,15 +733,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     border: '2px solid #fff',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
                     transform: 'translate(-50%, -50%)',
-                    pointerEvents: readonlyView ? 'none' : 'auto',
-                    cursor: readonlyView ? 'default' : 'ew-resize',
+                    pointerEvents: 'auto',
+                    cursor: 'ew-resize',
                     zIndex: 4,
                   }}
                   onMouseDown={(event) => {
                     event.stopPropagation();
-                    if (readonlyView) {
-                      return;
-                    }
                     setDraggingTimeHandle('end');
                   }}
                 />
@@ -768,6 +760,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       <div style={{ marginTop: '0.9rem', marginBottom: '0.5rem' }}>
         <ul className="nav nav-tabs">
           {TAB_ITEMS.map((item) => {
+            if (item.key === 'import' && readonlyView) return null;
             const disabled = item.key !== 'import' && !hasData;
             return (
               <li className="nav-item" key={item.key}>
