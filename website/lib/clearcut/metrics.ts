@@ -35,6 +35,8 @@ export interface ClearcutMetrics {
   importedServiceHours: number;
   optimizedServiceHours: number;
   avgTripMiles: number;
+  avgStartDeadheadMinutes: number;
+  avgEndDeadheadMinutes: number;
   avgDeadheadStartMiles: number;
   avgDeadheadEndMiles: number;
   highDeadheadTripsStart: TripRow[];
@@ -306,8 +308,14 @@ export function computeClearcutMetrics(
 ): ClearcutMetrics {
   const baseStart = parseMinutes(session.settings.service_day_start, 240);
   const baseEnd = parseMinutes(session.settings.service_day_end, 1260);
-  const startMinutes = parseMinutes(options.timeRangeStart ?? session.settings.time_range_start, baseStart);
-  const endMinutes = parseMinutes(options.timeRangeEnd ?? session.settings.time_range_end, baseEnd);
+  const startMinutes = parseMinutes(
+    options.timeRangeStart !== undefined ? options.timeRangeStart : session.settings.time_range_start,
+    baseStart,
+  );
+  const endMinutes = parseMinutes(
+    options.timeRangeEnd !== undefined ? options.timeRangeEnd : session.settings.time_range_end,
+    baseEnd,
+  );
   const normalizedEnd = endMinutes > startMinutes ? endMinutes : startMinutes + 60;
   const blockSizeMinutes = options.blockSizeMinutes ?? 15;
   const blockCount = Math.max(4, Math.ceil((normalizedEnd - startMinutes) / blockSizeMinutes));
@@ -534,6 +542,56 @@ export function computeClearcutMetrics(
   const highDeadheadTripsEnd = highDeadhead.slice(splitIndex, splitIndex + 6).map((row) => row.trip);
   const derivedServiceWindow = deriveServiceWindow(session.trips);
 
+  // Compute average start/end deadhead from inter-trip odometer gaps, converted at 35mph.
+  // Group trips by route + day so odometer gaps only compare same-day consecutive trips.
+  const tripsByRouteDay = new Map<string, TripRow[]>();
+  for (const trip of session.trips) {
+    const pickup = tripPickupTime(trip);
+    if (!pickup || !selectedDays.has(pickup.getDay())) continue;
+    const key = `${trip.route_id}::${dateKey(pickup)}`;
+    let arr = tripsByRouteDay.get(key);
+    if (!arr) {
+      arr = [];
+      tripsByRouteDay.set(key, arr);
+    }
+    arr.push(trip);
+  }
+  const MAX_DEADHEAD_MILES = 30; // cap to filter erroneous data
+  const startDeadheadMiles: number[] = [];
+  const endDeadheadMiles: number[] = [];
+  const allInterTripMiles: number[] = [];
+  for (const dayTrips of tripsByRouteDay.values()) {
+    if (dayTrips.length < 2) continue;
+    // Sort trips by pickup time within this route-day
+    dayTrips.sort((a, b) => {
+      const aTime = tripPickupTime(a);
+      const bTime = tripPickupTime(b);
+      return (aTime?.getTime() ?? 0) - (bTime?.getTime() ?? 0);
+    });
+    // Compute inter-trip deadhead miles from odometer gaps
+    for (let i = 0; i < dayTrips.length - 1; i++) {
+      const dropOdo = Number(dayTrips[i].drop_odometer);
+      const nextPickOdo = Number(dayTrips[i + 1].pick_odometer);
+      if (Number.isFinite(dropOdo) && Number.isFinite(nextPickOdo)) {
+        const gap = Math.max(0, nextPickOdo - dropOdo);
+        if (gap > MAX_DEADHEAD_MILES) continue;
+        allInterTripMiles.push(gap);
+        if (i === 0) startDeadheadMiles.push(gap);
+        if (i === dayTrips.length - 2) endDeadheadMiles.push(gap);
+      }
+    }
+  }
+  // Convert miles to minutes at 35mph
+  const DEADHEAD_SPEED_MPH = 35;
+  const milesToMinutes = (miles: number) => (miles / DEADHEAD_SPEED_MPH) * 60;
+  const fallbackMiles = allInterTripMiles.length > 0 ? average(allInterTripMiles) : 0;
+  const avgStartDeadheadMinutes = Math.round(
+    milesToMinutes(startDeadheadMiles.length > 0 ? average(startDeadheadMiles) : fallbackMiles) * 10,
+  ) / 10;
+  const avgEndDeadheadMinutes = Math.round(
+    milesToMinutes(endDeadheadMiles.length > 0 ? average(endDeadheadMiles) : fallbackMiles) * 10,
+  ) / 10;
+
   const importedServiceHours = sumServiceHours(session.routes);
   const targetProductivity = session.optimization.target_productivity ?? 0;
   const optimizedServiceHours = Math.max(
@@ -562,7 +620,14 @@ export function computeClearcutMetrics(
       totalDropoffEligible > 0 ? Math.round((totalDropoffOnTime / totalDropoffEligible) * 1000) / 10 : 0,
     tripOtpPct: totalTripEligible > 0 ? Math.round((totalTripOnTime / totalTripEligible) * 1000) / 10 : 0,
     blocksBelowOtp: tripOtpByBlock.filter((value) => value < session.settings.otp_target_pct).length,
-    avgProductivity: Math.round(average(productivityByBlock) * 100) / 100,
+    avgProductivity: (() => {
+      const totalTripsPerDay = pickupsByBlock.reduce((a, b) => a + b, 0);
+      const totalVehicleBlocksPerDay = vehiclesByBlock.reduce((a, b) => a + b, 0);
+      const totalVehicleHoursPerDay = (totalVehicleBlocksPerDay * blockSizeMinutes) / 60;
+      return totalVehicleHoursPerDay > 0
+        ? Math.round((totalTripsPerDay / totalVehicleHoursPerDay) * 100) / 100
+        : 0;
+    })(),
     peakProductivity: Math.round(Math.max(...productivityByBlock, 0) * 100) / 100,
     totalTrips: session.trips.length,
     currentRuns: session.routes.length,
@@ -570,6 +635,8 @@ export function computeClearcutMetrics(
     importedServiceHours,
     optimizedServiceHours,
     avgTripMiles: Math.round(avgTripMiles * 10) / 10,
+    avgStartDeadheadMinutes,
+    avgEndDeadheadMinutes,
     avgDeadheadStartMiles: Math.round(average(deadheadByBlock.slice(0, 8)) * 10) / 10,
     avgDeadheadEndMiles: Math.round(average(deadheadByBlock.slice(-8)) * 10) / 10,
     highDeadheadTripsStart,

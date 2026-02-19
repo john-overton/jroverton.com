@@ -122,6 +122,19 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
         : null,
     [rangeEndClock, rangeStartClock, ready, selectedDayIds, intervalMinutes],
   );
+  // Full-day metrics without time range filter — used by optimizer so it sees all demand
+  const fullDayMetrics = useMemo(
+    () =>
+      ready
+        ? computeClearcutMetrics(ready.state, {
+            selectedDays: selectedDayIds,
+            timeRangeStart: null,
+            timeRangeEnd: null,
+            blockSizeMinutes: intervalMinutes,
+          })
+        : null,
+    [ready, selectedDayIds, intervalMinutes],
+  );
   const hasData = ready ? ready.state.session.trip_count > 0 || ready.state.session.route_count > 0 : false;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -859,6 +872,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       {tab === 'runstructure' && (
         <RunStructureTab
           metrics={metrics}
+          fullDayMetrics={fullDayMetrics!}
           optimization={ready.state.optimization}
           routes={ready.state.routes}
           selectedDays={selectedDayIds}

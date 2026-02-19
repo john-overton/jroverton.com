@@ -14,7 +14,6 @@ export interface OptimizedRouteRow {
   shiftStart: string;
   shiftEnd: string;
   durationHours: number;
-  estimatedTrips: number;
   activeBlockIndices: number[];
 }
 
@@ -148,22 +147,24 @@ export function buildCurrentRunCut(
 
 export function buildOptimizedRoutes(params: {
   blocks: TimeBlock[];
-  pickupsByBlock: number[];
+  activeTripsPerBlock: number[];
   targetProductivity: number;
   maxShiftHours: number;
   minShiftHours: number;
   peakVehicles: number;
+  startDeadheadMinutes: number;
+  endDeadheadMinutes: number;
 }): OptimizedRouteRow[] {
-  const { blocks, pickupsByBlock, targetProductivity, maxShiftHours, minShiftHours, peakVehicles } = params;
+  const { blocks, activeTripsPerBlock, targetProductivity, maxShiftHours, minShiftHours, peakVehicles, startDeadheadMinutes, endDeadheadMinutes } = params;
   if (blocks.length === 0 || targetProductivity <= 0 || peakVehicles <= 0) return [];
 
   const blockSizeMinutes = blocks.length > 1 ? blocks[1].startMinutes - blocks[0].startMinutes : 15;
   const maxShiftBlocks = Math.max(1, Math.floor((maxShiftHours * 60) / blockSizeMinutes));
   const minShiftBlocks = Math.max(1, Math.floor((minShiftHours * 60) / blockSizeMinutes));
 
-  // For each block, compute how many vehicles are needed
-  const requiredByBlock = pickupsByBlock.map((pickups) =>
-    Math.min(peakVehicles, Math.ceil(pickups / targetProductivity)),
+  // For each block, compute how many vehicles are needed based on active (on-board) trips
+  const requiredByBlock = activeTripsPerBlock.map((activeTrips) =>
+    Math.min(peakVehicles, Math.ceil(activeTrips / targetProductivity)),
   );
 
   const maxRequired = Math.max(...requiredByBlock, 0);
@@ -212,14 +213,18 @@ export function buildOptimizedRoutes(params: {
         vehicleId += 1;
         const startBlock = blocks[chunk[0]];
         const endBlock = blocks[chunk[chunk.length - 1]];
-        const durationHours = Math.round(((endBlock.endMinutes - startBlock.startMinutes) / 60) * 10) / 10;
+        // Round deadhead to block boundaries so shifts start/end at clean intervals
+        const startDeadheadBlocks = Math.ceil(startDeadheadMinutes / blockSizeMinutes);
+        const endDeadheadBlocks = Math.ceil(endDeadheadMinutes / blockSizeMinutes);
+        const shiftStartMin = Math.max(0, startBlock.startMinutes - startDeadheadBlocks * blockSizeMinutes);
+        const shiftEndMin = endBlock.endMinutes + endDeadheadBlocks * blockSizeMinutes;
+        const durationHours = Math.round(((shiftEndMin - shiftStartMin) / 60) * 10) / 10;
 
         routes.push({
           vehicleId,
-          shiftStart: formatMinutes(startBlock.startMinutes),
-          shiftEnd: formatMinutes(endBlock.endMinutes),
+          shiftStart: formatMinutes(shiftStartMin),
+          shiftEnd: formatMinutes(shiftEndMin),
           durationHours,
-          estimatedTrips: Math.round(durationHours * targetProductivity * 10) / 10,
           activeBlockIndices: chunk,
         });
         offset += maxShiftBlocks;
@@ -232,6 +237,11 @@ export function buildOptimizedRoutes(params: {
     const bStart = b.activeBlockIndices[0] ?? 0;
     return aStart - bStart;
   });
+
+  // Renumber vehicles sequentially after sorting
+  for (let i = 0; i < routes.length; i++) {
+    routes[i].vehicleId = i + 1;
+  }
 
   return routes;
 }
