@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
-import { buildCurrentRunCut, buildOptimizedRoutes, computeAvgShiftHours } from '@/lib/clearcut/run-structure';
+import { buildOptimizedRoutes, buildRunCutForDate, computeAvgShiftHours, getAvailableDates } from '@/lib/clearcut/run-structure';
 import type { OptimizationRow, RouteRow } from '@/lib/clearcut/types';
 
 import { RunStructureChart, SectionCard } from './shared';
@@ -45,13 +45,11 @@ export default function RunStructureTab({
   // Local slider overrides — null means "use prop value", non-null means "user is dragging"
   const [draftProductivity, setDraftProductivity] = useState<number | null>(null);
   const [draftMaxShift, setDraftMaxShift] = useState<number | null>(null);
-  const [draftPeakVehicles, setDraftPeakVehicles] = useState<number | null>(null);
   const [draftMinShift, setDraftMinShift] = useState<number | null>(null);
 
   // Resolved values: draft (if dragging) or persisted prop
   const localProductivity = draftProductivity ?? optimization.target_productivity ?? 2.0;
   const localMaxShift = draftMaxShift ?? optimization.max_driver_spread_hrs ?? 12;
-  const localPeakVehicles = draftPeakVehicles ?? optimization.peak_vehicles ?? fullDayMetrics.peakVehicles;
   const localMinShift = draftMinShift ?? parseRunStructureJson(optimization.run_structure_json).minShiftHrs;
 
   // Refs to read latest value in pointer-up handlers without stale closures
@@ -59,10 +57,24 @@ export default function RunStructureTab({
   productivityRef.current = localProductivity;
   const maxShiftRef = useRef(localMaxShift);
   maxShiftRef.current = localMaxShift;
-  const peakVehiclesRef = useRef(localPeakVehicles);
-  peakVehiclesRef.current = localPeakVehicles;
   const minShiftRef = useRef(localMinShift);
   minShiftRef.current = localMinShift;
+
+  const [selectedRunCutDate, setSelectedRunCutDate] = useState<string | null>(null);
+
+  const availableDates = useMemo(
+    () => getAvailableDates(routes, selectedDays),
+    [routes, selectedDays],
+  );
+
+  // Auto-select first available date when filter changes
+  useEffect(() => {
+    if (availableDates.length > 0 && (!selectedRunCutDate || !availableDates.includes(selectedRunCutDate))) {
+      setSelectedRunCutDate(availableDates[0]);
+    } else if (availableDates.length === 0) {
+      setSelectedRunCutDate(null);
+    }
+  }, [availableDates, selectedRunCutDate]);
 
   const avgShiftHours = useMemo(
     () => computeAvgShiftHours(routes, selectedDays),
@@ -70,8 +82,8 @@ export default function RunStructureTab({
   );
 
   const currentRunCut = useMemo(
-    () => buildCurrentRunCut(routes, selectedDays, fullDayMetrics.blocks, intervalMinutes),
-    [routes, selectedDays, fullDayMetrics.blocks, intervalMinutes],
+    () => selectedRunCutDate ? buildRunCutForDate(routes, selectedRunCutDate, fullDayMetrics.blocks, intervalMinutes) : [],
+    [routes, selectedRunCutDate, fullDayMetrics.blocks, intervalMinutes],
   );
 
   const optimizedRoutes = useMemo(
@@ -82,12 +94,32 @@ export default function RunStructureTab({
         targetProductivity: localProductivity,
         maxShiftHours: localMaxShift,
         minShiftHours: localMinShift,
-        peakVehicles: localPeakVehicles,
         startDeadheadMinutes: fullDayMetrics.avgStartDeadheadMinutes,
         endDeadheadMinutes: fullDayMetrics.avgEndDeadheadMinutes,
       }),
-    [fullDayMetrics.blocks, fullDayMetrics.onBoardByBlock, localProductivity, localMaxShift, localMinShift, localPeakVehicles, fullDayMetrics.avgStartDeadheadMinutes, fullDayMetrics.avgEndDeadheadMinutes],
+    [fullDayMetrics.blocks, fullDayMetrics.onBoardByBlock, localProductivity, localMaxShift, localMinShift, fullDayMetrics.avgStartDeadheadMinutes, fullDayMetrics.avgEndDeadheadMinutes],
   );
+
+  // Compute vehicles-per-block from current run cut using full-day blocks
+  const currentVehiclesByBlockFullDay = useMemo(() => {
+    const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
+    for (const row of currentRunCut) {
+      for (const idx of row.activeBlockIndices) {
+        if (idx >= 0 && idx < counts.length) counts[idx] += 1;
+      }
+    }
+    return counts;
+  }, [currentRunCut, fullDayMetrics.blocks.length]);
+
+  // Map full-day current vehicles onto the filtered view blocks for the chart
+  const currentVehiclesByBlock = useMemo(() => {
+    return metrics.blocks.map((viewBlock) => {
+      const fullIdx = fullDayMetrics.blocks.findIndex(
+        (b) => b.startMinutes === viewBlock.startMinutes,
+      );
+      return fullIdx >= 0 ? currentVehiclesByBlockFullDay[fullIdx] : 0;
+    });
+  }, [metrics.blocks, fullDayMetrics.blocks, currentVehiclesByBlockFullDay]);
 
   // Compute vehicles-per-block from optimized routes using full-day blocks
   const optimizedVehiclesByBlockFullDay = useMemo(() => {
@@ -119,7 +151,7 @@ export default function RunStructureTab({
   // Stats for current run cut — productivity from avg daily trips / daily service hours
   const currentStats = useMemo(() => {
     const totalHours = currentRunCut.reduce((sum, r) => sum + r.durationHours, 0);
-    const maxVehicles = fullDayMetrics.peakVehicles;
+    const maxVehicles = Math.max(...currentVehiclesByBlockFullDay, 0);
     const productivity = totalHours > 0
       ? Math.round((avgDailyTrips / totalHours) * 100) / 100
       : 0;
@@ -128,7 +160,7 @@ export default function RunStructureTab({
       maxVehicles,
       productivity,
     };
-  }, [currentRunCut, fullDayMetrics.peakVehicles, avgDailyTrips]);
+  }, [currentRunCut, currentVehiclesByBlockFullDay, avgDailyTrips]);
 
   // Stats for optimized routes — productivity from avg daily trips / optimized service hours
   const optimizedStats = useMemo(() => {
@@ -200,21 +232,13 @@ export default function RunStructureTab({
             />
           </div>
           <div className="col-md-3">
-            <label className="form-label">Peak Vehicles</label>
+            <label className="form-label">Deadhead</label>
             <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
-              Actual: <strong>{fullDayMetrics.peakVehicles}</strong> &middot; Target: <strong>{localPeakVehicles}</strong>
+              First Pick: <strong>{Math.round(fullDayMetrics.avgStartDeadheadMinutes * 10) / 10} min</strong>
             </div>
-            <input
-              className="form-range"
-              disabled={readonlyView}
-              type="range"
-              min={1}
-              max={Math.max(fullDayMetrics.peakVehicles + 10, 36)}
-              step={1}
-              value={localPeakVehicles}
-              onChange={(e) => setDraftPeakVehicles(Number(e.target.value))}
-              onPointerUp={() => { onOptimizationChange('peak_vehicles', peakVehiclesRef.current); setDraftPeakVehicles(null); }}
-            />
+            <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
+              Return to Yard: <strong>{Math.round(fullDayMetrics.avgEndDeadheadMinutes * 10) / 10} min</strong>
+            </div>
           </div>
         </div>
       </SectionCard>
@@ -226,7 +250,7 @@ export default function RunStructureTab({
         <RunStructureChart
           pickups={metrics.pickupsByBlock}
           onBoard={metrics.onBoardByBlock}
-          currentVehicles={metrics.vehiclesByBlock}
+          currentVehicles={currentVehiclesByBlock}
           optimizedVehicles={optimizedVehiclesByBlock}
           blocks={metrics.blocks}
         />
@@ -234,7 +258,22 @@ export default function RunStructureTab({
 
       <div className="row">
         <div className="col-lg-6 mb-3">
-          <SectionCard title="Average Run Cut">
+          <SectionCard title="Imported Run Cut">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto', minWidth: 200 }}
+                value={selectedRunCutDate ?? ''}
+                onChange={(e) => setSelectedRunCutDate(e.target.value || null)}
+              >
+                {availableDates.length === 0 && <option value="">No dates available</option>}
+                {availableDates.map((dateStr) => {
+                  const d = new Date(dateStr + 'T00:00:00');
+                  const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                  return <option key={dateStr} value={dateStr}>{label}</option>;
+                })}
+              </select>
+            </div>
             <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13, flexWrap: 'wrap' }}>
               <span>Avg Daily Trips: <strong>{avgDailyTrips}</strong></span>
               <span>Hours: <strong>{currentStats.totalHours}</strong></span>
@@ -242,7 +281,7 @@ export default function RunStructureTab({
               <span>Productivity: <strong>{currentStats.productivity}</strong></span>
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-              Average shift times per route across selected days, rounded up to {intervalMinutes}-min blocks.
+              Imported routes for the selected date, rounded up to {intervalMinutes}-min blocks.
             </div>
             <table className="table table-sm mb-0">
               <thead>
@@ -257,12 +296,12 @@ export default function RunStructureTab({
                 {currentRunCut.length === 0 && (
                   <tr>
                     <td colSpan={4} style={{ color: '#6b7280' }}>
-                      No routes available
+                      No routes for selected date
                     </td>
                   </tr>
                 )}
-                {currentRunCut.map((row) => (
-                  <tr key={row.routeName}>
+                {currentRunCut.map((row, idx) => (
+                  <tr key={`${row.routeName}-${idx}`}>
                     <td>{row.routeName}</td>
                     <td>{row.shiftStart}</td>
                     <td>{row.shiftEnd}</td>

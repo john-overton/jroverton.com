@@ -48,6 +48,10 @@ function roundUpToInterval(minutes: number, interval: number): number {
   return Math.ceil(minutes / interval) * interval;
 }
 
+function roundDownToInterval(minutes: number, interval: number): number {
+  return Math.floor(minutes / interval) * interval;
+}
+
 /**
  * Filter routes to only those whose start day-of-week is in selectedDays.
  */
@@ -58,6 +62,84 @@ function filterRoutesByDay(routes: RouteRow[], selectedDays: number[]): RouteRow
     const start = routeStartDate(route);
     return start ? daySet.has(start.getDay()) : false;
   });
+}
+
+function getRouteDateString(route: RouteRow): string | null {
+  if (route.route_date) return route.route_date;
+  const dt = routeStartDate(route);
+  if (!dt) return null;
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Get distinct calendar dates from routes matching the selected day-of-week filter.
+ * Returns sorted YYYY-MM-DD strings.
+ */
+export function getAvailableDates(routes: RouteRow[], selectedDays: number[]): string[] {
+  const filtered = filterRoutesByDay(routes, selectedDays);
+  const seen = new Set<string>();
+  for (const route of filtered) {
+    const dateStr = getRouteDateString(route);
+    if (dateStr) seen.add(dateStr);
+  }
+  return [...seen].sort();
+}
+
+/**
+ * Build a run cut for a specific calendar date.
+ * Shows each route's actual times for that day (no averaging).
+ */
+export function buildRunCutForDate(
+  routes: RouteRow[],
+  dateString: string,
+  blocks: TimeBlock[],
+  intervalMinutes: number,
+): CurrentRunCutRow[] {
+  if (blocks.length === 0) return [];
+
+  const filtered = routes.filter((route) => getRouteDateString(route) === dateString);
+  if (filtered.length === 0) return [];
+
+  const rows: CurrentRunCutRow[] = [];
+  for (const route of filtered) {
+    const start = routeStartDate(route);
+    const end = routeEndDate(route);
+    if (!start || !end) continue;
+    const startMin = dateToMinutes(start);
+    const endMin = dateToMinutes(end);
+    if (endMin <= startMin) continue;
+
+    const roundedStart = roundUpToInterval(startMin, intervalMinutes);
+    const roundedEnd = roundUpToInterval(endMin, intervalMinutes);
+    if (roundedEnd <= roundedStart) continue;
+
+    const activeBlockIndices: number[] = [];
+    for (let i = 0; i < blocks.length; i++) {
+      if (roundedStart < blocks[i].endMinutes && roundedEnd > blocks[i].startMinutes) {
+        activeBlockIndices.push(i);
+      }
+    }
+
+    const name = route.route_name ?? route.route_id;
+    rows.push({
+      routeName: name,
+      shiftStart: formatMinutes(roundedStart),
+      shiftEnd: formatMinutes(roundedEnd),
+      durationHours: Math.round(((roundedEnd - roundedStart) / 60) * 10) / 10,
+      activeBlockIndices,
+    });
+  }
+
+  rows.sort((a, b) => {
+    const aStart = a.activeBlockIndices[0] ?? 0;
+    const bStart = b.activeBlockIndices[0] ?? 0;
+    return aStart - bStart;
+  });
+
+  return rows;
 }
 
 export function computeAvgShiftHours(routes: RouteRow[], selectedDays: number[]): number {
@@ -151,20 +233,18 @@ export function buildOptimizedRoutes(params: {
   targetProductivity: number;
   maxShiftHours: number;
   minShiftHours: number;
-  peakVehicles: number;
   startDeadheadMinutes: number;
   endDeadheadMinutes: number;
 }): OptimizedRouteRow[] {
-  const { blocks, activeTripsPerBlock, targetProductivity, maxShiftHours, minShiftHours, peakVehicles, startDeadheadMinutes, endDeadheadMinutes } = params;
-  if (blocks.length === 0 || targetProductivity <= 0 || peakVehicles <= 0) return [];
+  const { blocks, activeTripsPerBlock, targetProductivity, maxShiftHours, minShiftHours, startDeadheadMinutes, endDeadheadMinutes } = params;
+  if (blocks.length === 0 || targetProductivity <= 0) return [];
 
   const blockSizeMinutes = blocks.length > 1 ? blocks[1].startMinutes - blocks[0].startMinutes : 15;
   const maxShiftBlocks = Math.max(1, Math.floor((maxShiftHours * 60) / blockSizeMinutes));
-  const minShiftBlocks = Math.max(1, Math.floor((minShiftHours * 60) / blockSizeMinutes));
 
   // For each block, compute how many vehicles are needed based on active (on-board) trips
   const requiredByBlock = activeTripsPerBlock.map((activeTrips) =>
-    Math.min(peakVehicles, Math.ceil(activeTrips / targetProductivity)),
+    Math.ceil(activeTrips / targetProductivity),
   );
 
   const maxRequired = Math.max(...requiredByBlock, 0);
@@ -174,7 +254,7 @@ export function buildOptimizedRoutes(params: {
   let vehicleId = 0;
 
   // Layer vehicles: vehicle layer N covers blocks needing >= N vehicles
-  for (let layer = 1; layer <= Math.min(maxRequired, peakVehicles); layer++) {
+  for (let layer = 1; layer <= maxRequired; layer++) {
     const activeIndices: number[] = [];
     for (let i = 0; i < blocks.length; i++) {
       if (requiredByBlock[i] >= layer) {
@@ -196,28 +276,22 @@ export function buildOptimizedRoutes(params: {
     }
     spans.push(currentSpan);
 
-    // Split spans that exceed max shift length, enforce min shift length
+    // Split spans that exceed max shift length
     for (const span of spans) {
       let offset = 0;
       while (offset < span.length) {
-        let chunk = span.slice(offset, offset + maxShiftBlocks);
-        // Pad short chunks to meet minimum shift length by extending into adjacent blocks
-        if (chunk.length < minShiftBlocks) {
-          const first = chunk[0];
-          const padStart = Math.max(0, first - (minShiftBlocks - chunk.length));
-          const padEnd = Math.min(blocks.length - 1, first + minShiftBlocks - 1);
-          const extended: number[] = [];
-          for (let b = padStart; b <= padEnd; b++) extended.push(b);
-          chunk = extended;
-        }
+        const chunk = span.slice(offset, offset + maxShiftBlocks);
         vehicleId += 1;
-        const startBlock = blocks[chunk[0]];
-        const endBlock = blocks[chunk[chunk.length - 1]];
-        // Round deadhead to block boundaries so shifts start/end at clean intervals
-        const startDeadheadBlocks = Math.ceil(startDeadheadMinutes / blockSizeMinutes);
-        const endDeadheadBlocks = Math.ceil(endDeadheadMinutes / blockSizeMinutes);
-        const shiftStartMin = Math.max(0, startBlock.startMinutes - startDeadheadBlocks * blockSizeMinutes);
-        const shiftEndMin = endBlock.endMinutes + endDeadheadBlocks * blockSizeMinutes;
+        const demandStartMin = blocks[chunk[0]].startMinutes;
+        const demandEndMin = blocks[chunk[chunk.length - 1]].endMinutes;
+        // Shift = demand + deadhead, snapped to block boundaries (15-min increments)
+        let shiftStartMin = Math.max(0, roundDownToInterval(demandStartMin - startDeadheadMinutes, blockSizeMinutes));
+        let shiftEndMin = roundUpToInterval(demandEndMin + endDeadheadMinutes, blockSizeMinutes);
+        // If shift is shorter than minimum, extend end forward to meet minimum (snapped)
+        const minShiftMin = minShiftHours * 60;
+        if (shiftEndMin - shiftStartMin < minShiftMin) {
+          shiftEndMin = roundUpToInterval(shiftStartMin + minShiftMin, blockSizeMinutes);
+        }
         const durationHours = Math.round(((shiftEndMin - shiftStartMin) / 60) * 10) / 10;
 
         routes.push({
