@@ -241,69 +241,74 @@ export function buildOptimizedRoutes(params: {
 
   const blockSizeMinutes = blocks.length > 1 ? blocks[1].startMinutes - blocks[0].startMinutes : 15;
   const maxShiftBlocks = Math.max(1, Math.floor((maxShiftHours * 60) / blockSizeMinutes));
+  const minShiftMin = minShiftHours * 60;
 
   // For each block, compute how many vehicles are needed based on active (on-board) trips
-  const requiredByBlock = activeTripsPerBlock.map((activeTrips) =>
+  const remainingByBlock = activeTripsPerBlock.map((activeTrips) =>
     Math.ceil(activeTrips / targetProductivity),
   );
 
-  const maxRequired = Math.max(...requiredByBlock, 0);
-  if (maxRequired === 0) return [];
+  if (Math.max(...remainingByBlock, 0) === 0) return [];
 
   const routes: OptimizedRouteRow[] = [];
   let vehicleId = 0;
 
-  // Layer vehicles: vehicle layer N covers blocks needing >= N vehicles
-  for (let layer = 1; layer <= maxRequired; layer++) {
-    const activeIndices: number[] = [];
-    for (let i = 0; i < blocks.length; i++) {
-      if (requiredByBlock[i] >= layer) {
-        activeIndices.push(i);
-      }
-    }
-    if (activeIndices.length === 0) continue;
-
-    // Group into contiguous spans
+  // Greedy: always assign the longest contiguous span of unmet demand first
+  for (;;) {
+    // Find all contiguous spans with remaining demand > 0
     const spans: number[][] = [];
-    let currentSpan: number[] = [activeIndices[0]];
-    for (let i = 1; i < activeIndices.length; i++) {
-      if (activeIndices[i] === activeIndices[i - 1] + 1) {
-        currentSpan.push(activeIndices[i]);
-      } else {
-        spans.push(currentSpan);
-        currentSpan = [activeIndices[i]];
+    let span: number[] = [];
+    for (let i = 0; i < blocks.length; i++) {
+      if (remainingByBlock[i] > 0) {
+        span.push(i);
+      } else if (span.length > 0) {
+        spans.push(span);
+        span = [];
       }
     }
-    spans.push(currentSpan);
+    if (span.length > 0) spans.push(span);
+    if (spans.length === 0) break;
 
-    // Split spans that exceed max shift length
-    for (const span of spans) {
-      let offset = 0;
-      while (offset < span.length) {
-        const chunk = span.slice(offset, offset + maxShiftBlocks);
-        vehicleId += 1;
-        const demandStartMin = blocks[chunk[0]].startMinutes;
-        const demandEndMin = blocks[chunk[chunk.length - 1]].endMinutes;
-        // Shift = demand + deadhead, snapped to block boundaries (15-min increments)
-        let shiftStartMin = Math.max(0, roundDownToInterval(demandStartMin - startDeadheadMinutes, blockSizeMinutes));
-        let shiftEndMin = roundUpToInterval(demandEndMin + endDeadheadMinutes, blockSizeMinutes);
-        // If shift is shorter than minimum, extend end forward to meet minimum (snapped)
-        const minShiftMin = minShiftHours * 60;
-        if (shiftEndMin - shiftStartMin < minShiftMin) {
-          shiftEndMin = roundUpToInterval(shiftStartMin + minShiftMin, blockSizeMinutes);
-        }
-        const durationHours = Math.round(((shiftEndMin - shiftStartMin) / 60) * 10) / 10;
+    // Pick the longest span
+    spans.sort((a, b) => b.length - a.length);
+    const longest = spans[0];
 
-        routes.push({
-          vehicleId,
-          shiftStart: formatMinutes(shiftStartMin),
-          shiftEnd: formatMinutes(shiftEndMin),
-          durationHours,
-          activeBlockIndices: chunk,
-        });
-        offset += maxShiftBlocks;
+    // Cap at max shift length
+    const chunk = longest.slice(0, maxShiftBlocks);
+
+    vehicleId += 1;
+    const demandStartMin = blocks[chunk[0]].startMinutes;
+    const demandEndMin = blocks[chunk[chunk.length - 1]].endMinutes;
+    // Shift = demand + deadhead, snapped to block boundaries (15-min increments)
+    let shiftStartMin = Math.max(0, roundDownToInterval(demandStartMin - startDeadheadMinutes, blockSizeMinutes));
+    let shiftEndMin = roundUpToInterval(demandEndMin + endDeadheadMinutes, blockSizeMinutes);
+    // If shift is shorter than minimum, extend end forward (snapped)
+    if (shiftEndMin - shiftStartMin < minShiftMin) {
+      shiftEndMin = roundUpToInterval(shiftStartMin + minShiftMin, blockSizeMinutes);
+    }
+
+    // Compute full block indices for the entire shift window (including deadhead + extension)
+    const fullBlockIndices: number[] = [];
+    for (let i = 0; i < blocks.length; i++) {
+      if (shiftStartMin < blocks[i].endMinutes && shiftEndMin > blocks[i].startMinutes) {
+        fullBlockIndices.push(i);
       }
     }
+
+    // Decrement remaining demand for ALL blocks this vehicle covers (not just demand chunk)
+    for (const idx of fullBlockIndices) {
+      remainingByBlock[idx] = Math.max(0, remainingByBlock[idx] - 1);
+    }
+
+    const durationHours = Math.round(((shiftEndMin - shiftStartMin) / 60) * 10) / 10;
+
+    routes.push({
+      vehicleId,
+      shiftStart: formatMinutes(shiftStartMin),
+      shiftEnd: formatMinutes(shiftEndMin),
+      durationHours,
+      activeBlockIndices: fullBlockIndices,
+    });
   }
 
   routes.sort((a, b) => {

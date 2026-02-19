@@ -587,8 +587,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
               <Dropdown.Menu align="end">
                 <Dropdown.Item onClick={onRename}>Rename</Dropdown.Item>
                 <Dropdown.Item onClick={onSetPassword}>Set Password</Dropdown.Item>
-                <Dropdown.Item onClick={onRemovePassword}>Remove Password</Dropdown.Item>
-                {ready?.hasJwt && <Dropdown.Item onClick={onLogout}>Logout</Dropdown.Item>}
+                {ready.state.session.has_password && (
+                  <>
+                    <Dropdown.Item onClick={onRemovePassword}>Remove Password</Dropdown.Item>
+                    <Dropdown.Item onClick={onLogout}>Logout</Dropdown.Item>
+                  </>
+                )}
                 <Dropdown.Divider />
                 <Dropdown.Item onClick={onClone}>Save As New</Dropdown.Item>
                 <Dropdown.Item onClick={onDelete} className="text-danger">

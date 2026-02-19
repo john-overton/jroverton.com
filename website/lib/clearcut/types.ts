@@ -107,7 +107,7 @@ export interface SessionState {
     | 'accessed_at'
     | 'trip_count'
     | 'route_count'
-  >;
+  > & { has_password: boolean };
   settings: SettingsRow;
   optimization: OptimizationRow;
   trips: TripRow[];

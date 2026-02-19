@@ -581,8 +581,8 @@ export function computeClearcutMetrics(
       }
     }
   }
-  // Convert miles to minutes at 35mph
-  const DEADHEAD_SPEED_MPH = 35;
+  // Convert miles to minutes at 25mph
+  const DEADHEAD_SPEED_MPH = 25;
   const milesToMinutes = (miles: number) => (miles / DEADHEAD_SPEED_MPH) * 60;
   const fallbackMiles = allInterTripMiles.length > 0 ? average(allInterTripMiles) : 0;
   const avgStartDeadheadMinutes = Math.round(

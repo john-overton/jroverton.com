@@ -72,6 +72,7 @@ export function getSessionState(record: SessionRecord): SessionState {
       accessed_at: record.accessed_at,
       trip_count: record.trip_count,
       route_count: record.route_count,
+      has_password: Boolean(record.password_hash),
     },
     settings: getSettings(record.edit_token),
     optimization: getOptimization(record.edit_token),
