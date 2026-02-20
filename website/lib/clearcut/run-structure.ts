@@ -250,6 +250,22 @@ export function buildOptimizedRoutes(params: {
 
   if (Math.max(...remainingByBlock, 0) === 0) return [];
 
+  // Dynamic bias cutoff: find the demand midpoint (50% cumulative volume),
+  // then pull it earlier by minShiftHours so PM routes start before peak
+  const totalVolume = activeTripsPerBlock.reduce((sum, v) => sum + v, 0);
+  const halfVolume = totalVolume / 2;
+  let midpointBlockIdx = blocks.length - 1;
+  let cumulativeVolume = 0;
+  for (let i = 0; i < activeTripsPerBlock.length; i++) {
+    cumulativeVolume += activeTripsPerBlock[i];
+    if (cumulativeVolume >= halfVolume) {
+      midpointBlockIdx = i;
+      break;
+    }
+  }
+  const minShiftBlocks = Math.floor(minShiftMin / blockSizeMinutes);
+  const cutoffBlockIdx = Math.max(0, midpointBlockIdx - minShiftBlocks);
+
   const routes: OptimizedRouteRow[] = [];
   let vehicleId = 0;
 
@@ -273,8 +289,22 @@ export function buildOptimizedRoutes(params: {
     spans.sort((a, b) => b.length - a.length);
     const longest = spans[0];
 
-    // Cap at max shift length
-    const chunk = longest.slice(0, maxShiftBlocks);
+    // Cap at max shift length, with PM bias for spans starting after cutoff
+    let chunk: number[];
+    if (longest[0] >= cutoffBlockIdx) {
+      // PM bias: extend backward toward cutoff so route starts earlier,
+      // then cap at maxShiftBlocks by trimming from the END (route ends sooner)
+      const spanEnd = longest[longest.length - 1];
+      let extendStart = Math.max(cutoffBlockIdx, spanEnd - maxShiftBlocks + 1);
+      extendStart = Math.min(extendStart, longest[0]);
+      const extendedIndices: number[] = [];
+      for (let i = extendStart; i <= spanEnd; i++) {
+        extendedIndices.push(i);
+      }
+      chunk = extendedIndices.slice(0, maxShiftBlocks);
+    } else {
+      chunk = longest.slice(0, maxShiftBlocks);
+    }
 
     vehicleId += 1;
     const demandStartMin = blocks[chunk[0]].startMinutes;
