@@ -22,13 +22,16 @@ interface RunStructureTabProps {
   ) => void;
 }
 
-function parseRunStructureJson(json: string | null): { minShiftHrs: number } {
-  if (!json) return { minShiftHrs: 4 };
+function parseRunStructureJson(json: string | null): { minShiftHrs: number; routeLengthBias: number } {
+  if (!json) return { minShiftHrs: 4, routeLengthBias: 0.5 };
   try {
     const parsed = JSON.parse(json);
-    return { minShiftHrs: typeof parsed.minShiftHrs === 'number' ? parsed.minShiftHrs : 4 };
+    return {
+      minShiftHrs: typeof parsed.minShiftHrs === 'number' ? parsed.minShiftHrs : 4,
+      routeLengthBias: typeof parsed.routeLengthBias === 'number' ? parsed.routeLengthBias : 0.5,
+    };
   } catch {
-    return { minShiftHrs: 4 };
+    return { minShiftHrs: 4, routeLengthBias: 0.5 };
   }
 }
 
@@ -46,11 +49,14 @@ export default function RunStructureTab({
   const [draftProductivity, setDraftProductivity] = useState<number | null>(null);
   const [draftMaxShift, setDraftMaxShift] = useState<number | null>(null);
   const [draftMinShift, setDraftMinShift] = useState<number | null>(null);
+  const [draftRouteBias, setDraftRouteBias] = useState<number | null>(null);
 
   // Resolved values: draft (if dragging) or persisted prop
+  const runStructureSettings = parseRunStructureJson(optimization.run_structure_json);
   const localProductivity = draftProductivity ?? optimization.target_productivity ?? 2.0;
   const localMaxShift = draftMaxShift ?? optimization.max_driver_spread_hrs ?? 12;
-  const localMinShift = draftMinShift ?? parseRunStructureJson(optimization.run_structure_json).minShiftHrs;
+  const localMinShift = draftMinShift ?? runStructureSettings.minShiftHrs;
+  const localRouteBias = draftRouteBias ?? runStructureSettings.routeLengthBias;
 
   // Refs to read latest value in pointer-up handlers without stale closures
   const productivityRef = useRef(localProductivity);
@@ -59,6 +65,8 @@ export default function RunStructureTab({
   maxShiftRef.current = localMaxShift;
   const minShiftRef = useRef(localMinShift);
   minShiftRef.current = localMinShift;
+  const routeBiasRef = useRef(localRouteBias);
+  routeBiasRef.current = localRouteBias;
 
   const [selectedRunCutDate, setSelectedRunCutDate] = useState<string | null>(null);
 
@@ -96,8 +104,9 @@ export default function RunStructureTab({
         minShiftHours: localMinShift,
         startDeadheadMinutes: fullDayMetrics.avgStartDeadheadMinutes,
         endDeadheadMinutes: fullDayMetrics.avgEndDeadheadMinutes,
+        routeLengthBias: localRouteBias,
       }),
-    [fullDayMetrics.blocks, fullDayMetrics.onBoardByBlock, localProductivity, localMaxShift, localMinShift, fullDayMetrics.avgStartDeadheadMinutes, fullDayMetrics.avgEndDeadheadMinutes],
+    [fullDayMetrics.blocks, fullDayMetrics.onBoardByBlock, localProductivity, localMaxShift, localMinShift, fullDayMetrics.avgStartDeadheadMinutes, fullDayMetrics.avgEndDeadheadMinutes, localRouteBias],
   );
 
   // Compute vehicles-per-block from current run cut using full-day blocks
@@ -211,7 +220,7 @@ export default function RunStructureTab({
               step={0.5}
               value={localMinShift}
               onChange={(e) => setDraftMinShift(Number(e.target.value))}
-              onPointerUp={() => { onOptimizationChange('run_structure_json', JSON.stringify({ minShiftHrs: minShiftRef.current })); setDraftMinShift(null); }}
+              onPointerUp={() => { onOptimizationChange('run_structure_json', JSON.stringify({ minShiftHrs: minShiftRef.current, routeLengthBias: routeBiasRef.current })); setDraftMinShift(null); }}
             />
           </div>
           <div className="col-md-3">
@@ -239,6 +248,25 @@ export default function RunStructureTab({
             <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
               Return to Yard: <strong>{Math.round(fullDayMetrics.avgEndDeadheadMinutes * 10) / 10} min</strong>
             </div>
+          </div>
+        </div>
+        <div className="row g-3 mt-1">
+          <div className="col-md-3">
+            <label className="form-label">Route Length Bias</label>
+            <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
+              Short &larr; <strong>{localRouteBias}</strong> &rarr; Long
+            </div>
+            <input
+              className="form-range"
+              disabled={readonlyView}
+              type="range"
+              min={0}
+              max={1}
+              step={0.1}
+              value={localRouteBias}
+              onChange={(e) => setDraftRouteBias(Number(e.target.value))}
+              onPointerUp={() => { onOptimizationChange('run_structure_json', JSON.stringify({ minShiftHrs: minShiftRef.current, routeLengthBias: routeBiasRef.current })); setDraftRouteBias(null); }}
+            />
           </div>
         </div>
       </SectionCard>

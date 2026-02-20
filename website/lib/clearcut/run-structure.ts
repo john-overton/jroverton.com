@@ -235,41 +235,41 @@ export function buildOptimizedRoutes(params: {
   minShiftHours: number;
   startDeadheadMinutes: number;
   endDeadheadMinutes: number;
+  routeLengthBias?: number;
 }): OptimizedRouteRow[] {
   const { blocks, activeTripsPerBlock, targetProductivity, maxShiftHours, minShiftHours, startDeadheadMinutes, endDeadheadMinutes } = params;
+  const routeLengthBias = Math.max(0, Math.min(1, params.routeLengthBias ?? 0.5));
   if (blocks.length === 0 || targetProductivity <= 0) return [];
 
   const blockSizeMinutes = blocks.length > 1 ? blocks[1].startMinutes - blocks[0].startMinutes : 15;
   const maxShiftBlocks = Math.max(1, Math.floor((maxShiftHours * 60) / blockSizeMinutes));
+  const minShiftBlocks = Math.max(1, Math.floor((minShiftHours * 60) / blockSizeMinutes));
   const minShiftMin = minShiftHours * 60;
 
-  // For each block, compute how many vehicles are needed based on active (on-board) trips
+  // Preferred route length based on bias slider (0 = short routes, 1 = long routes)
+  const preferredBlocks = Math.round(minShiftBlocks + routeLengthBias * (maxShiftBlocks - minShiftBlocks));
+
+  // Target vehicles per block — this is the demand curve we want to hug
   const remainingByBlock = activeTripsPerBlock.map((activeTrips) =>
     Math.ceil(activeTrips / targetProductivity),
   );
 
   if (Math.max(...remainingByBlock, 0) === 0) return [];
 
-  // Dynamic bias cutoff: find the demand midpoint (50% cumulative volume),
-  // then pull it earlier by minShiftHours so PM routes start before peak
+  // Demand midpoint: block where cumulative volume reaches 50%
+  // PM routes (after midpoint) extend backward instead of forward
   const totalVolume = activeTripsPerBlock.reduce((sum, v) => sum + v, 0);
-  const halfVolume = totalVolume / 2;
   let midpointBlockIdx = blocks.length - 1;
-  let cumulativeVolume = 0;
+  let cumVol = 0;
   for (let i = 0; i < activeTripsPerBlock.length; i++) {
-    cumulativeVolume += activeTripsPerBlock[i];
-    if (cumulativeVolume >= halfVolume) {
-      midpointBlockIdx = i;
-      break;
-    }
+    cumVol += activeTripsPerBlock[i];
+    if (cumVol >= totalVolume / 2) { midpointBlockIdx = i; break; }
   }
-  const minShiftBlocks = Math.floor(minShiftMin / blockSizeMinutes);
-  const cutoffBlockIdx = Math.max(0, midpointBlockIdx - minShiftBlocks);
 
   const routes: OptimizedRouteRow[] = [];
   let vehicleId = 0;
 
-  // Greedy: always assign the longest contiguous span of unmet demand first
+  // Demand-constrained placement: place routes that only cover blocks with remaining demand > 0
   for (;;) {
     // Find all contiguous spans with remaining demand > 0
     const spans: number[][] = [];
@@ -285,36 +285,43 @@ export function buildOptimizedRoutes(params: {
     if (span.length > 0) spans.push(span);
     if (spans.length === 0) break;
 
-    // Pick the longest span
-    spans.sort((a, b) => b.length - a.length);
-    const longest = spans[0];
+    // Pick the span whose length is closest to preferredBlocks
+    spans.sort((a, b) => {
+      const diffA = Math.abs(a.length - preferredBlocks);
+      const diffB = Math.abs(b.length - preferredBlocks);
+      if (diffA !== diffB) return diffA - diffB;
+      // Tie-break: prefer the earlier span
+      return a[0] - b[0];
+    });
+    const chosen = spans[0];
 
-    // Cap at max shift length, with PM bias for spans starting after cutoff
-    let chunk: number[];
-    if (longest[0] >= cutoffBlockIdx) {
-      // PM bias: extend backward toward cutoff so route starts earlier,
-      // then cap at maxShiftBlocks by trimming from the END (route ends sooner)
-      const spanEnd = longest[longest.length - 1];
-      let extendStart = Math.max(cutoffBlockIdx, spanEnd - maxShiftBlocks + 1);
-      extendStart = Math.min(extendStart, longest[0]);
-      const extendedIndices: number[] = [];
-      for (let i = extendStart; i <= spanEnd; i++) {
-        extendedIndices.push(i);
-      }
-      chunk = extendedIndices.slice(0, maxShiftBlocks);
-    } else {
-      chunk = longest.slice(0, maxShiftBlocks);
-    }
+    // Take a chunk from the span, capped at preferred length
+    const chunkLen = Math.min(chosen.length, preferredBlocks);
+    const chunk = chosen.slice(0, chunkLen);
 
     vehicleId += 1;
     const demandStartMin = blocks[chunk[0]].startMinutes;
     const demandEndMin = blocks[chunk[chunk.length - 1]].endMinutes;
-    // Shift = demand + deadhead, snapped to block boundaries (15-min increments)
-    let shiftStartMin = Math.max(0, roundDownToInterval(demandStartMin - startDeadheadMinutes, blockSizeMinutes));
-    let shiftEndMin = roundUpToInterval(demandEndMin + endDeadheadMinutes, blockSizeMinutes);
-    // If shift is shorter than minimum, extend end forward (snapped)
-    if (shiftEndMin - shiftStartMin < minShiftMin) {
-      shiftEndMin = roundUpToInterval(shiftStartMin + minShiftMin, blockSizeMinutes);
+    const chunkMidBlock = chunk[Math.floor(chunk.length / 2)];
+    const isPmRoute = chunkMidBlock > midpointBlockIdx;
+
+    let shiftStartMin: number;
+    let shiftEndMin: number;
+
+    if (isPmRoute) {
+      // PM route: end stays tight to demand, extensions go BACKWARD
+      shiftEndMin = roundUpToInterval(demandEndMin + endDeadheadMinutes, blockSizeMinutes);
+      shiftStartMin = Math.max(0, roundDownToInterval(demandStartMin - startDeadheadMinutes, blockSizeMinutes));
+      if (shiftEndMin - shiftStartMin < minShiftMin) {
+        shiftStartMin = Math.max(0, roundDownToInterval(shiftEndMin - minShiftMin, blockSizeMinutes));
+      }
+    } else {
+      // AM route: start stays tight to demand, extensions go FORWARD
+      shiftStartMin = Math.max(0, roundDownToInterval(demandStartMin - startDeadheadMinutes, blockSizeMinutes));
+      shiftEndMin = roundUpToInterval(demandEndMin + endDeadheadMinutes, blockSizeMinutes);
+      if (shiftEndMin - shiftStartMin < minShiftMin) {
+        shiftEndMin = roundUpToInterval(shiftStartMin + minShiftMin, blockSizeMinutes);
+      }
     }
 
     // Compute full block indices for the entire shift window (including deadhead + extension)
@@ -325,8 +332,9 @@ export function buildOptimizedRoutes(params: {
       }
     }
 
-    // Decrement remaining demand for ALL blocks this vehicle covers (not just demand chunk)
-    for (const idx of fullBlockIndices) {
+    // Decrement remaining demand only for blocks in the demand chunk (not deadhead extensions)
+    // This prevents over-supply: deadhead blocks don't consume demand from other routes
+    for (const idx of chunk) {
       remainingByBlock[idx] = Math.max(0, remainingByBlock[idx] - 1);
     }
 
