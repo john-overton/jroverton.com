@@ -365,7 +365,7 @@ export default function ImportTab({
           </div>
         </div>
         <div className="text-xs text-cc-text-muted mt-3">
-          Service window is auto-derived from imported data (actual times preferred, fallback to scheduled), with a 1-hour buffer before first pickup and after last dropoff.
+          Service window is auto-derived from imported data (actual times preferred, fallback to scheduled), with a 30-minute buffer before the earliest trip or shift start and after the latest trip or shift end.
         </div>
         <hr className="my-3 border-cc-border" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">

@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/clearcut/components/shadcn/table';
-import type { TripRow } from '@/lib/clearcut/types';
+import type { RouteRow, TripRow } from '@/lib/clearcut/types';
 import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
 
 export const DEMAND_BLOCK_MINUTES = 15;
@@ -68,8 +68,9 @@ export function parseDateTime(value: string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function deriveSliderBoundsFromTrips(params: {
+export function deriveSliderBounds(params: {
   trips: TripRow[];
+  routes: RouteRow[];
   fallbackStartMinutes: number;
   fallbackEndMinutes: number;
 }): { startMinutes: number; endMinutes: number } {
@@ -93,6 +94,17 @@ export function deriveSliderBoundsFromTrips(params: {
     }
   }
 
+  for (const route of params.routes) {
+    const rStart = parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time);
+    const rEnd = parseDateTime(route.actual_end_time) ?? parseDateTime(route.scheduled_end_time);
+    if (rStart && (!earliest || rStart.getTime() < earliest.getTime())) {
+      earliest = rStart;
+    }
+    if (rEnd && (!latest || rEnd.getTime() > latest.getTime())) {
+      latest = rEnd;
+    }
+  }
+
   if (!earliest || !latest) {
     return {
       startMinutes: params.fallbackStartMinutes,
@@ -109,8 +121,13 @@ export function deriveSliderBoundsFromTrips(params: {
 
   const earliestMinutes = earliest.getHours() * 60 + earliest.getMinutes();
   const latestMinutes = latest.getHours() * 60 + latest.getMinutes();
-  const derivedStart = Math.max(0, earliestMinutes - 60);
-  const derivedEnd = Math.min(24 * 60, Math.max(derivedStart + 60, latestMinutes + 60));
+  const derivedStart = Math.max(0, earliestMinutes - 30);
+  const derivedEnd = Math.min(24 * 60, Math.max(derivedStart + 60, latestMinutes + 30));
+
+  if (derivedEnd > 23 * 60 + 59) {
+    return { startMinutes: 0, endMinutes: 24 * 60 };
+  }
+
   return { startMinutes: derivedStart, endMinutes: derivedEnd };
 }
 
@@ -218,23 +235,44 @@ export function DemandCompositeChart({
   pickups,
   onBoard,
   vehicles,
+  maxPickups,
+  maxOnBoard,
+  maxVehicles,
   blocks,
+  mode,
 }: {
   pickups: number[];
   onBoard: number[];
   vehicles: number[];
+  maxPickups?: number[];
+  maxOnBoard?: number[];
+  maxVehicles?: number[];
   blocks: Array<{ label: string }>;
+  mode?: 'avg' | 'max';
 }) {
   const { chartColors } = useClearcutTheme();
+  const activePickups = mode === 'max' && maxPickups ? maxPickups : pickups;
+  const activeOnBoard = mode === 'max' && maxOnBoard ? maxOnBoard : onBoard;
+  const activeVehicles = mode === 'max' && maxVehicles ? maxVehicles : vehicles;
+
+  // Fix Y-axis to the max across both modes so the scale stays constant during transitions
+  const yMax = useMemo(() => {
+    const allValues = [
+      ...pickups, ...onBoard, ...vehicles,
+      ...(maxPickups ?? []), ...(maxOnBoard ?? []), ...(maxVehicles ?? []),
+    ];
+    return Math.ceil(Math.max(...allValues, 1));
+  }, [pickups, onBoard, vehicles, maxPickups, maxOnBoard, maxVehicles]);
+
   const data = useMemo(
     () =>
       blocks.map((block, index) => ({
         label: block.label,
-        pickups: Math.round((pickups[index] ?? 0) * 10) / 10,
-        onBoard: Math.round((onBoard[index] ?? 0) * 10) / 10,
-        vehicles: Math.round((vehicles[index] ?? 0) * 10) / 10,
+        pickups: Math.round((activePickups[index] ?? 0) * 10) / 10,
+        onBoard: Math.round((activeOnBoard[index] ?? 0) * 10) / 10,
+        vehicles: Math.round((activeVehicles[index] ?? 0) * 10) / 10,
       })),
-    [blocks, onBoard, pickups, vehicles],
+    [blocks, activeOnBoard, activePickups, activeVehicles],
   );
 
   return (
@@ -243,7 +281,7 @@ export function DemandCompositeChart({
         <BarChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" hide />
-          <YAxis allowDecimals={false} width={38} />
+          <YAxis allowDecimals={false} width={38} domain={[0, yMax]} />
           <Tooltip
             formatter={(value: number | string | undefined, name: string | undefined) => {
               const normalizedValue = typeof value === 'number' ? value : Number(value ?? 0);
@@ -295,7 +333,7 @@ export function PerformanceCompositeChart({
   );
 
   return (
-    <div className="h-[460px]">
+    <div className="h-[345px]">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />

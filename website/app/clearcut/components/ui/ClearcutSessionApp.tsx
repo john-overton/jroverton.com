@@ -31,7 +31,7 @@ import RunStructureTab from './RunStructureTab';
 import {
   DEMAND_BLOCK_MINUTES,
   PasswordPrompt,
-  deriveSliderBoundsFromTrips,
+  deriveSliderBounds,
   formatMinutesToClock,
   formatMinutesToLabel,
   parseClockToMinutes,
@@ -90,12 +90,13 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const fallbackServiceEndMinutes = parseClockToMinutes(ready?.state.settings.service_day_end, 21 * 60);
   const sliderBounds = useMemo(
     () =>
-      deriveSliderBoundsFromTrips({
+      deriveSliderBounds({
         trips: ready?.state.trips ?? [],
+        routes: ready?.state.routes ?? [],
         fallbackStartMinutes: fallbackServiceStartMinutes,
         fallbackEndMinutes: fallbackServiceEndMinutes,
       }),
-    [fallbackServiceEndMinutes, fallbackServiceStartMinutes, ready?.state.trips],
+    [fallbackServiceEndMinutes, fallbackServiceStartMinutes, ready?.state.trips, ready?.state.routes],
   );
   const serviceStartMinutes = sliderBounds.startMinutes;
   const serviceEndMinutes = sliderBounds.endMinutes;

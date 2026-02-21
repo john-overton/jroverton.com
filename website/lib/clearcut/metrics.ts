@@ -18,10 +18,20 @@ export interface ClearcutMetrics {
   dropoffOtpByBlock: number[];
   tripOtpByBlock: number[];
   productivityByBlock: number[];
+  maxPickupsByBlock: number[];
+  maxOnBoardByBlock: number[];
+  maxVehiclesByBlock: number[];
   peakPickups: number;
   peakVehicles: number;
   peakOnBoard: number;
   avgOnBoard: number;
+  maxPeakPickups: number;
+  maxPeakOnBoardPassengers: number;
+  avgPeakOnBoardPassengers: number;
+  maxPeakVehicles: number;
+  maxPeakPickupsDate: string | null;
+  maxPeakOnBoardDate: string | null;
+  maxPeakVehiclesDate: string | null;
   avgOtp: number;
   pickupOtpPct: number;
   dropoffOtpPct: number;
@@ -235,7 +245,7 @@ function isOnTimeWithWindow(params: {
   return diff >= -Math.max(0, params.beforeMin) && diff <= Math.max(0, params.afterMin);
 }
 
-function deriveServiceWindow(trips: TripRow[]): ClearcutMetrics['derivedServiceWindow'] {
+function deriveServiceWindow(trips: TripRow[], routes: RouteRow[]): ClearcutMetrics['derivedServiceWindow'] {
   let earliest: Date | null = null;
   let latest: Date | null = null;
 
@@ -257,6 +267,17 @@ function deriveServiceWindow(trips: TripRow[]): ClearcutMetrics['derivedServiceW
     }
   }
 
+  for (const route of routes) {
+    const rStart = routeStart(route);
+    const rEnd = routeEnd(route);
+    if (rStart && (!earliest || rStart.getTime() < earliest.getTime())) {
+      earliest = rStart;
+    }
+    if (rEnd && (!latest || rEnd.getTime() > latest.getTime())) {
+      latest = rEnd;
+    }
+  }
+
   if (!earliest || !latest) {
     return {
       startLabel: '--:--',
@@ -269,11 +290,14 @@ function deriveServiceWindow(trips: TripRow[]): ClearcutMetrics['derivedServiceW
     };
   }
 
-  const derivedStart = new Date(earliest.getTime() - 60 * 60 * 1000);
-  const derivedEnd = new Date(latest.getTime() + 60 * 60 * 1000);
+  const derivedStart = new Date(earliest.getTime() - 30 * 60 * 1000);
+  const derivedEnd = new Date(latest.getTime() + 30 * 60 * 1000);
   const rawDurationMinutes = Math.max(0, Math.round((derivedEnd.getTime() - derivedStart.getTime()) / 60000));
+  const endMinutesOfDay = derivedEnd.getHours() * 60 + derivedEnd.getMinutes();
   const crossesMidnight =
-    derivedStart.toDateString() !== derivedEnd.toDateString() || rawDurationMinutes >= 24 * 60;
+    derivedStart.toDateString() !== derivedEnd.toDateString() ||
+    rawDurationMinutes >= 24 * 60 ||
+    endMinutesOfDay > 23 * 60 + 59;
 
   if (crossesMidnight) {
     return {
@@ -350,6 +374,9 @@ export function computeClearcutMetrics(
   const occupiedRouteIdsByDayBlock = new Map<string, Array<Set<string>>>();
   const activeVehiclesRawByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const occupiedVehiclesRawByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const pickupsByDayBlock = new Map<string, number[]>();
+  const passengersByDayBlock = new Map<string, number[]>();
+  const vehiclesByDayBlock = new Map<string, number[]>();
 
   let totalPickupEligible = 0;
   let totalPickupOnTime = 0;
@@ -406,6 +433,19 @@ export function computeClearcutMetrics(
     pickupsByBlock[idx] += 1;
     pickupsPassengersByBlock[idx] += passengers;
     blockTripCounts[idx] += 1;
+
+    let dayPickups = pickupsByDayBlock.get(tripDayKey);
+    if (!dayPickups) {
+      dayPickups = Array.from({ length: blockCount }).fill(0) as number[];
+      pickupsByDayBlock.set(tripDayKey, dayPickups);
+    }
+    dayPickups[idx] += 1;
+    let dayPassengers = passengersByDayBlock.get(tripDayKey);
+    if (!dayPassengers) {
+      dayPassengers = Array.from({ length: blockCount }).fill(0) as number[];
+      passengersByDayBlock.set(tripDayKey, dayPassengers);
+    }
+    dayPassengers[idx] += passengers;
 
     const scheduledPickup = asDate(trip.scheduled_pickup_time);
     const actualPickup = asDate(trip.pickup_arrive_time ?? '') ?? asDate(trip.pickup_leave_time ?? '');
@@ -471,6 +511,12 @@ export function computeClearcutMetrics(
       if (endM > block.startMinutes && startM < block.endMinutes) {
         vehiclesByBlock[i] += 1;
         activeRouteBlocks[i].add(route.route_id);
+        let dayVehicles = vehiclesByDayBlock.get(routeDayKey);
+        if (!dayVehicles) {
+          dayVehicles = Array.from({ length: blockCount }).fill(0) as number[];
+          vehiclesByDayBlock.set(routeDayKey, dayVehicles);
+        }
+        dayVehicles[i] += 1;
       }
     }
   }
@@ -525,6 +571,75 @@ export function computeClearcutMetrics(
         : 0;
   }
 
+  // Compute max-per-block across individual days
+  const maxPickupsByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const maxOnBoardByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const maxVehiclesByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+
+  for (const [, dayPickups] of pickupsByDayBlock) {
+    for (let i = 0; i < blockCount; i += 1) {
+      if (dayPickups[i] > maxPickupsByBlock[i]) {
+        maxPickupsByBlock[i] = dayPickups[i];
+      }
+    }
+    for (let i = 0; i < blockCount; i += 1) {
+      let onBoardSum = 0;
+      for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
+        onBoardSum += dayPickups[i - k];
+      }
+      if (onBoardSum > maxOnBoardByBlock[i]) {
+        maxOnBoardByBlock[i] = onBoardSum;
+      }
+    }
+  }
+
+  for (const [, dayVehicles] of vehiclesByDayBlock) {
+    for (let i = 0; i < blockCount; i += 1) {
+      if (dayVehicles[i] > maxVehiclesByBlock[i]) {
+        maxVehiclesByBlock[i] = dayVehicles[i];
+      }
+    }
+  }
+
+  // Passenger-based on-board for cards (separate from trip-count chart)
+  const onBoardPassengersByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  for (let i = 0; i < blockCount; i += 1) {
+    let sum = 0;
+    for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
+      sum += pickupsPassengersByBlock[i - k];
+    }
+    onBoardPassengersByBlock[i] = Math.round(sum * 10) / 10;
+  }
+  const avgPeakOnBoardPassengers = Math.round(Math.max(...onBoardPassengersByBlock, 0) * 10) / 10;
+
+  let maxPeakOnBoardPassengers = 0;
+  let maxOnBoardPeakDate: string | null = null;
+  for (const [dk, dayPassengers] of passengersByDayBlock) {
+    for (let i = 0; i < blockCount; i += 1) {
+      let sum = 0;
+      for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
+        sum += dayPassengers[i - k];
+      }
+      if (sum > maxPeakOnBoardPassengers) {
+        maxPeakOnBoardPassengers = sum;
+        maxOnBoardPeakDate = dk;
+      }
+    }
+  }
+
+  function findPeakDate(byDayBlock: Map<string, number[]>): string | null {
+    let bestDate: string | null = null;
+    let bestVal = 0;
+    for (const [dk, arr] of byDayBlock) {
+      const dayMax = Math.max(...arr, 0);
+      if (dayMax > bestVal) {
+        bestVal = dayMax;
+        bestDate = dk;
+      }
+    }
+    return bestDate;
+  }
+
   const tripMiles = session.trips.map(pickMiles).filter((m) => m > 0);
   const avgTripMiles = average(tripMiles);
   const deadheadThreshold = session.settings.deadhead_threshold_pct / 100;
@@ -540,7 +655,7 @@ export function computeClearcutMetrics(
   const splitIndex = Math.floor(highDeadhead.length / 2);
   const highDeadheadTripsStart = highDeadhead.slice(0, 6).map((row) => row.trip);
   const highDeadheadTripsEnd = highDeadhead.slice(splitIndex, splitIndex + 6).map((row) => row.trip);
-  const derivedServiceWindow = deriveServiceWindow(session.trips);
+  const derivedServiceWindow = deriveServiceWindow(session.trips, session.routes);
 
   // Compute average start/end deadhead from inter-trip odometer gaps, converted at 35mph.
   // Group trips by route + day so odometer gaps only compare same-day consecutive trips.
@@ -610,10 +725,20 @@ export function computeClearcutMetrics(
     dropoffOtpByBlock,
     tripOtpByBlock,
     productivityByBlock,
+    maxPickupsByBlock,
+    maxOnBoardByBlock,
+    maxVehiclesByBlock,
     peakPickups: Math.max(...pickupsByBlock, 0),
     peakVehicles: Math.max(...vehiclesByBlock, 0),
     peakOnBoard: Math.round(Math.max(...onBoardByBlock, 0) * 10) / 10,
     avgOnBoard: Math.round(average(onBoardByBlock) * 10) / 10,
+    maxPeakPickups: Math.max(...maxPickupsByBlock, 0),
+    maxPeakOnBoardPassengers: Math.round(maxPeakOnBoardPassengers * 10) / 10,
+    avgPeakOnBoardPassengers,
+    maxPeakVehicles: Math.max(...maxVehiclesByBlock, 0),
+    maxPeakPickupsDate: findPeakDate(pickupsByDayBlock),
+    maxPeakOnBoardDate: maxOnBoardPeakDate,
+    maxPeakVehiclesDate: findPeakDate(vehiclesByDayBlock),
     avgOtp: totalTripEligible > 0 ? Math.round((totalTripOnTime / totalTripEligible) * 1000) / 10 : 0,
     pickupOtpPct: totalPickupEligible > 0 ? Math.round((totalPickupOnTime / totalPickupEligible) * 1000) / 10 : 0,
     dropoffOtpPct:
