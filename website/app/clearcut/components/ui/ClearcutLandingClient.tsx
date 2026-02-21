@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
+import { Button } from '@/app/clearcut/components/shadcn/button';
+import { Input } from '@/app/clearcut/components/shadcn/input';
+import { Label } from '@/app/clearcut/components/shadcn/label';
 import { ClearcutClientError, createSession } from '@/lib/clearcut/client';
 
 const TOKEN_REGEX = /^[a-f0-9]{12}$/;
-const CLEARCUT_FONT_STACK =
-  '"Inter", "SF Pro Text", "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif';
 
 export default function ClearcutLandingClient() {
   const router = useRouter();
@@ -42,109 +43,80 @@ export default function ClearcutLandingClient() {
   }
 
   return (
-    <main
-      style={{
-        maxWidth: 960,
-        margin: '0 auto',
-        padding: '4rem 1.25rem 2rem',
-        fontFamily: CLEARCUT_FONT_STACK,
-      }}
-    >
-      <header style={{ marginBottom: '1.25rem' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>RunCut</h1>
-        <p style={{ color: '#4b5563', marginBottom: 0 }}>Run Cutting &amp; Optimization Tool</p>
+    <main className="max-w-[960px] mx-auto px-5 pt-16 pb-8">
+      <header className="mb-5">
+        <h1 className="text-3xl font-bold mb-1">RunCut</h1>
+        <p className="text-cc-text-secondary">Run Cutting &amp; Optimization Tool</p>
       </header>
 
-      <section
-        style={{
-          border: '1px solid #dbe1ea',
-          borderRadius: 10,
-          background: '#fff',
-          padding: '1rem',
-          marginBottom: '1rem',
-        }}
-      >
-        <h2 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>Create New Session</h2>
+      <section className="border border-cc-border rounded-[10px] bg-cc-surface-1 p-4 mb-4">
+        <h2 className="text-xl font-semibold mb-3">Create New Session</h2>
         <form onSubmit={onCreateSession}>
-          <div className="row g-3">
-            <div className="col-md-8">
-              <label className="form-label" htmlFor="session-name">
-                Session Name
-              </label>
-              <input
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2">
+              <Label htmlFor="session-name">Session Name</Label>
+              <Input
                 id="session-name"
-                className="form-control"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
+                className="mt-1"
               />
             </div>
-            <div className="col-md-4">
-              <label className="form-label" htmlFor="session-password">
-                Password (Optional)
-              </label>
-              <input
+            <div>
+              <Label htmlFor="session-password">Password (Optional)</Label>
+              <Input
                 id="session-password"
-                className="form-control"
                 value={password}
                 minLength={6}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Minimum 6 characters"
                 type="password"
+                className="mt-1"
               />
             </div>
           </div>
-          <div style={{ marginTop: '0.9rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button className="btn btn-primary" type="submit" disabled={isCreating}>
+          <div className="mt-4 flex gap-2 items-center">
+            <Button type="submit" disabled={isCreating}>
               {isCreating ? 'Creating...' : 'Create Session'}
-            </button>
-            <span style={{ color: '#6b7280', fontSize: 13 }}>
+            </Button>
+            <span className="text-cc-text-muted text-[13px]">
               You will be redirected to your edit URL after creation.
             </span>
           </div>
         </form>
       </section>
 
-      <section
-        style={{
-          border: '1px solid #dbe1ea',
-          borderRadius: 10,
-          background: '#fff',
-          padding: '1rem',
-          marginBottom: '1rem',
-        }}
-      >
-        <h2 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>Return to Session</h2>
-        <div className="row g-2">
-          <div className="col-sm-8">
-            <input
-              className="form-control"
+      <section className="border border-cc-border rounded-[10px] bg-cc-surface-1 p-4 mb-4">
+        <h2 className="text-xl font-semibold mb-3">Return to Session</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="sm:col-span-2">
+            <Input
               value={tokenInput}
               onChange={(event) => setTokenInput(event.target.value.trim())}
               placeholder="Enter 12-character edit token"
               spellCheck={false}
             />
           </div>
-          <div className="col-sm-4">
-            <button
-              className="btn btn-outline-secondary w-100"
-              disabled={!tokenValid}
-              onClick={() => router.push(`/clearcut/s/${tokenInput.trim()}`)}
-              type="button"
-            >
-              Open Edit Session
-            </button>
-          </div>
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={!tokenValid}
+            onClick={() => router.push(`/clearcut/s/${tokenInput.trim()}`)}
+            type="button"
+          >
+            Open Edit Session
+          </Button>
         </div>
         {!tokenValid && tokenInput.length > 0 && (
-          <p style={{ marginTop: '0.5rem', color: '#b45309', fontSize: 13 }}>
+          <p className="mt-2 text-cc-warning text-[13px]">
             Token must be a 12-character lowercase hex value.
           </p>
         )}
       </section>
 
-      {message && <p style={{ color: '#b91c1c' }}>{message}</p>}
+      {message && <p className="text-cc-danger">{message}</p>}
 
-      <div style={{ marginTop: '1rem' }}>
+      <div className="mt-4">
         <Link href="/">Back to Home</Link>
       </div>
     </main>

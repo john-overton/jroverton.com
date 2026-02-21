@@ -2,6 +2,32 @@
 
 import { useMemo, useState } from 'react';
 
+import { Button } from '@/app/clearcut/components/shadcn/button';
+import { Checkbox } from '@/app/clearcut/components/shadcn/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/app/clearcut/components/shadcn/dialog';
+import { Input } from '@/app/clearcut/components/shadcn/input';
+import { Label } from '@/app/clearcut/components/shadcn/label';
+import { Progress } from '@/app/clearcut/components/shadcn/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/clearcut/components/shadcn/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/app/clearcut/components/shadcn/table';
 import type {
   ImportApplyResponse,
   ImportMappingConfig,
@@ -11,6 +37,8 @@ import type {
   RouteRow,
   TripRow,
 } from '@/lib/clearcut/types';
+
+import { SectionCard } from './shared';
 
 const CANONICAL_EVENTS: Array<ImportMappingConfig['event_values'][string]> = [
   'pullout',
@@ -265,11 +293,10 @@ export default function ImportMapperWizard(props: Props) {
 
   return (
     <div>
-      <SectionTitle title="Import Mapper Wizard" />
-      <div className="row g-3 mb-3">
-        <div className="col-md-8">
-          <input
-            className="form-control"
+      <h3 className="text-[17px] font-semibold mb-3">Import Mapper Wizard</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <div className="md:col-span-2">
+          <Input
             type="file"
             accept=".csv,.xlsx,.xls"
             onChange={(event) => {
@@ -283,42 +310,32 @@ export default function ImportMapperWizard(props: Props) {
             disabled={props.readonlyView}
           />
         </div>
-        <div className="col-md-4">
-          <button className="btn btn-outline-primary w-100" type="button" onClick={handlePreview} disabled={!file}>
-            Preview First 100 Rows
-          </button>
-        </div>
+        <Button variant="outline" className="w-full" type="button" onClick={handlePreview} disabled={!file}>
+          Preview First 100 Rows
+        </Button>
       </div>
 
       {preview && (
         <>
           {sheetNames.length > 1 && (
-            <div
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: '0.75rem',
-                marginBottom: '0.8rem',
-                background: '#f8fafc',
-              }}
-            >
-              <label className="form-label" style={{ fontWeight: 600 }}>
-                Workbook Sheet
-              </label>
-              <select
-                className="form-select"
+            <div className="border border-cc-border rounded-lg p-3 mb-3 bg-cc-surface-2">
+              <Label className="font-semibold">Workbook Sheet</Label>
+              <Select
                 value={selectedSheetName}
-                onChange={(event) => {
-                  void handleSheetChange(event.target.value);
-                }}
+                onValueChange={(v) => { void handleSheetChange(v); }}
               >
-                {sheetNames.map((sheetName) => (
-                  <option key={sheetName} value={sheetName}>
-                    {sheetName}
-                  </option>
-                ))}
-              </select>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sheetNames.map((sheetName) => (
+                    <SelectItem key={sheetName} value={sheetName}>
+                      {sheetName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-cc-text-muted mt-1.5">
                 This workbook has multiple sheets. Choose the sheet to preview and import.
               </div>
             </div>
@@ -358,13 +375,13 @@ export default function ImportMapperWizard(props: Props) {
             matchRules={config.match_rules}
             onMatchRulesChange={(next) => setConfig((prev) => ({ ...prev, match_rules: next }))}
           />
-          <div className="d-flex gap-2 mb-3">
-            <button className="btn btn-outline-secondary" type="button" onClick={handleValidate}>
+          <div className="flex gap-2 mb-3">
+            <Button variant="outline" type="button" onClick={handleValidate}>
               Validate Mapping
-            </button>
-            <button className="btn btn-primary" type="button" onClick={handleApply} disabled={props.readonlyView}>
+            </Button>
+            <Button type="button" onClick={handleApply} disabled={props.readonlyView}>
               Apply Import
-            </button>
+            </Button>
           </div>
           {validateResult && <ImportReviewSummary validateResult={validateResult} applyResult={applyResult} />}
         </>
@@ -388,8 +405,9 @@ export default function ImportMapperWizard(props: Props) {
         readonlyView={props.readonlyView}
       />
 
-      {status && <p style={{ color: '#065f46', marginTop: '0.6rem' }}>{status}</p>}
-      {error && <p style={{ color: '#b91c1c', marginTop: '0.6rem' }}>{error}</p>}
+      {status && <p className="text-cc-success mt-2">{status}</p>}
+      {error && <p className="text-cc-danger mt-2">{error}</p>}
+
       <ImportStatusModal
         show={showImportModal}
         running={importRunning}
@@ -407,10 +425,6 @@ export default function ImportMapperWizard(props: Props) {
   );
 }
 
-function SectionTitle({ title }: { title: string }) {
-  return <h3 style={{ fontSize: 17, marginBottom: '0.75rem' }}>{title}</h3>;
-}
-
 function ImportStatusModal(props: {
   show: boolean;
   running: boolean;
@@ -420,59 +434,29 @@ function ImportStatusModal(props: {
   result: (ImportApplyResponse & { trip_count: number; route_count: number }) | null;
   onClose: () => void;
 }) {
-  if (!props.show) {
-    return null;
-  }
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.45)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1050,
-        padding: '1rem',
-      }}
-    >
-      <div style={{ background: '#fff', borderRadius: 10, width: '100%', maxWidth: 760, maxHeight: '90vh', overflow: 'auto' }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid #e5e7eb',
-            padding: '0.75rem 1rem',
-          }}
-        >
-          <h4 style={{ margin: 0, fontSize: 17 }}>Import Status</h4>
-          <button className="btn btn-sm btn-outline-secondary" type="button" onClick={props.onClose} disabled={props.running}>
-            Close
-          </button>
-        </div>
-        <div style={{ padding: '0.9rem 1rem' }}>
-          <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 6 }}>
+    <Dialog open={props.show} onOpenChange={(open) => { if (!open && !props.running) props.onClose(); }}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
+        <DialogHeader>
+          <DialogTitle>Import Status</DialogTitle>
+        </DialogHeader>
+        <div>
+          <div className="text-[13px] text-cc-text-secondary mb-1.5">
             {props.running ? 'Import is in progress...' : 'Import finished.'}
           </div>
-          <div className="progress mb-3" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={props.progress}>
-            <div className={`progress-bar ${props.running ? 'progress-bar-striped progress-bar-animated' : ''}`} style={{ width: `${props.progress}%` }}>
-              {props.progress}%
-            </div>
-          </div>
+          <Progress value={props.progress} className="mb-3" />
 
           {props.result && (
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.7rem', marginBottom: '0.75rem' }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Inserted Summary</div>
-              <div style={{ fontSize: 13 }}>
+            <div className="border border-cc-border rounded-lg p-3 mb-3">
+              <div className="font-semibold mb-1.5">Inserted Summary</div>
+              <div className="text-[13px]">
                 Trips inserted: <strong>{props.result.summary.created_trips}</strong>
               </div>
-              <div style={{ fontSize: 13, marginBottom: 6 }}>
+              <div className="text-[13px] mb-1.5">
                 Routes inserted: <strong>{props.result.summary.created_routes}</strong>
               </div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Trip dates inserted:</div>
-              <ul style={{ marginBottom: 8 }}>
+              <div className="text-[13px] mb-1">Trip dates inserted:</div>
+              <ul className="mb-2">
                 {props.result.inserted_by_date.trips.length === 0 && <li>None</li>}
                 {props.result.inserted_by_date.trips.map((item) => (
                   <li key={`trip-date-${item.date}`}>
@@ -480,8 +464,8 @@ function ImportStatusModal(props: {
                   </li>
                 ))}
               </ul>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Route dates inserted:</div>
-              <ul style={{ marginBottom: 0 }}>
+              <div className="text-[13px] mb-1">Route dates inserted:</div>
+              <ul className="mb-0">
                 {props.result.inserted_by_date.routes.length === 0 && <li>None</li>}
                 {props.result.inserted_by_date.routes.map((item) => (
                   <li key={`route-date-${item.date}`}>
@@ -492,11 +476,11 @@ function ImportStatusModal(props: {
             </div>
           )}
 
-          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.7rem', marginBottom: '0.75rem' }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>Import Log</div>
-            <ul style={{ marginBottom: 0 }}>
+          <div className="border border-cc-border rounded-lg p-3 mb-3">
+            <div className="font-semibold mb-1.5">Import Log</div>
+            <ul className="mb-0">
               {props.logs.map((line, index) => (
-                <li key={`import-log-${index}`} style={{ fontSize: 13 }}>
+                <li key={`import-log-${index}`} className="text-[13px]">
                   {line}
                 </li>
               ))}
@@ -504,13 +488,13 @@ function ImportStatusModal(props: {
           </div>
 
           {props.errors.length > 0 && (
-            <div style={{ border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 8, padding: '0.7rem' }}>
-              <div style={{ fontWeight: 600, marginBottom: 6, color: '#991b1b' }}>
+            <div className="border border-cc-danger/30 bg-cc-danger/5 rounded-lg p-3">
+              <div className="font-semibold mb-1.5 text-cc-danger">
                 Import Errors ({props.errors.length})
               </div>
-              <ul style={{ marginBottom: 0, maxHeight: 220, overflow: 'auto' }}>
+              <ul className="mb-0 max-h-[220px] overflow-auto">
                 {props.errors.map((err, idx) => (
-                  <li key={`import-error-${idx}`} style={{ fontSize: 13, color: '#7f1d1d' }}>
+                  <li key={`import-error-${idx}`} className="text-[13px] text-cc-danger">
                     Row {err.row}: {err.reason}
                   </li>
                 ))}
@@ -518,35 +502,35 @@ function ImportStatusModal(props: {
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function FilePreviewTable({ preview }: { preview: ImportPreviewResponse }) {
   const shownRows = preview.rows.slice(0, 8);
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>File Preview ({preview.sample_count} sampled rows)</div>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="table table-sm mb-0">
-          <thead>
-            <tr>
+    <div className="border border-cc-border rounded-lg p-3 mb-3">
+      <div className="font-semibold mb-2">File Preview ({preview.sample_count} sampled rows)</div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
               {preview.headers.map((header) => (
-                <th key={header}>{header}</th>
+                <TableHead key={header}>{header}</TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {shownRows.map((row, idx) => (
-              <tr key={`preview-row-${idx}`}>
+              <TableRow key={`preview-row-${idx}`}>
                 {preview.headers.map((header) => (
-                  <td key={`${idx}-${header}`}>{row[header] ?? ''}</td>
+                  <TableCell key={`${idx}-${header}`}>{row[header] ?? ''}</TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
@@ -561,41 +545,41 @@ function EventValueMapper(props: {
   onEventMapChange: (rawValue: string, mappedValue: ImportMappingConfig['event_values'][string]) => void;
 }) {
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Event Mapping</div>
-      <label className="form-label">Event Column</label>
-      <select
-        className="form-select mb-2"
-        value={props.eventColumn}
-        onChange={(event) => props.onEventColumnChange(event.target.value)}
-      >
-        <option value="">Select column</option>
-        {props.headers.map((header) => (
-          <option key={header} value={header}>
-            {header}
-          </option>
-        ))}
-      </select>
+    <div className="border border-cc-border rounded-lg p-3 mb-3">
+      <div className="font-semibold mb-2">Event Mapping</div>
+      <Label>Event Column</Label>
+      <Select value={props.eventColumn} onValueChange={props.onEventColumnChange}>
+        <SelectTrigger className="mt-1 mb-2">
+          <SelectValue placeholder="Select column" />
+        </SelectTrigger>
+        <SelectContent>
+          {props.headers.map((header) => (
+            <SelectItem key={header} value={header}>
+              {header}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {props.eventValues.map((rawValue) => (
-        <div key={rawValue} className="row g-2 align-items-center mb-2">
-          <div className="col-md-6">
-            <code>{rawValue}</code>
-          </div>
-          <div className="col-md-6">
-            <select
-              className="form-select"
-              value={props.mappings[rawValue] ?? 'other'}
-              onChange={(event) =>
-                props.onEventMapChange(rawValue, event.target.value as ImportMappingConfig['event_values'][string])
-              }
-            >
+        <div key={rawValue} className="grid grid-cols-2 gap-2 items-center mb-2">
+          <code>{rawValue}</code>
+          <Select
+            value={props.mappings[rawValue] ?? 'other'}
+            onValueChange={(v) =>
+              props.onEventMapChange(rawValue, v as ImportMappingConfig['event_values'][string])
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
               {CANONICAL_EVENTS.map((option) => (
-                <option key={option} value={option}>
+                <SelectItem key={option} value={option}>
                   {option}
-                </option>
+                </SelectItem>
               ))}
-            </select>
-          </div>
+            </SelectContent>
+          </Select>
         </div>
       ))}
     </div>
@@ -610,11 +594,11 @@ function SchemaFieldMapper(props: {
   onRouteMapChange: (field: keyof RouteRow, source: string) => void;
 }) {
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Schema Field Mapping</div>
-      <div className="row">
-        <div className="col-md-6">
-          <h4 style={{ fontSize: 15 }}>Trip Fields</h4>
+    <div className="border border-cc-border rounded-lg p-3 mb-3">
+      <div className="font-semibold mb-2">Schema Field Mapping</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <h4 className="text-[15px] font-semibold">Trip Fields</h4>
           {TRIP_FIELD_OPTIONS.map((field) => (
             <SelectField
               key={field}
@@ -625,8 +609,8 @@ function SchemaFieldMapper(props: {
             />
           ))}
         </div>
-        <div className="col-md-6">
-          <h4 style={{ fontSize: 15 }}>Route Fields</h4>
+        <div>
+          <h4 className="text-[15px] font-semibold">Route Fields</h4>
           {ROUTE_FIELD_OPTIONS.map((field) => (
             <SelectField
               key={field}
@@ -650,8 +634,8 @@ function MatchRulesBuilder(props: {
   const tripRouteJoin = props.matchRules.trip_route_join;
   return (
     <>
-      <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>Trip Grouping</div>
+      <div className="border border-cc-border rounded-lg p-3 mb-3">
+        <div className="font-semibold mb-2">Trip Grouping</div>
         <div className="mb-2">Grouping keys (supports one or multiple columns)</div>
         {TRIP_FIELD_OPTIONS.map((key) => (
           <CheckField
@@ -694,8 +678,8 @@ function MatchRulesBuilder(props: {
           }
         />
       </div>
-      <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>Trip / Route Join</div>
+      <div className="border border-cc-border rounded-lg p-3 mb-3">
+        <div className="font-semibold mb-2">Trip / Route Join</div>
         <div className="mb-2">Join columns (default: date + route_id)</div>
         {[
           { trip_field: 'trip_date' as keyof TripRow, route_field: 'route_date' as keyof RouteRow, label: 'Date' },
@@ -739,8 +723,8 @@ function ImportReviewSummary(props: {
   applyResult: (ImportApplyResponse & { trip_count: number; route_count: number }) | null;
 }) {
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Review Summary</div>
+    <div className="border border-cc-border rounded-lg p-3 mb-3">
+      <div className="font-semibold mb-2">Review Summary</div>
       <div>Valid: {props.validateResult.valid ? 'yes' : 'no'}</div>
       {props.validateResult.errors.length > 0 && (
         <ul>
@@ -757,7 +741,7 @@ function ImportReviewSummary(props: {
         </ul>
       )}
       {props.applyResult && (
-        <div style={{ marginTop: 8 }}>
+        <div className="mt-2">
           <div>
             Processed rows: <strong>{props.applyResult.summary.processed_rows}</strong>
           </div>
@@ -829,71 +813,64 @@ function TemplateManager(props: {
   }
 
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.8rem' }}>
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <div style={{ fontWeight: 600 }}>Template Manager</div>
-        <button className="btn btn-sm btn-outline-secondary" type="button" onClick={props.onRefresh}>
+    <div className="border border-cc-border rounded-lg p-3 mb-3">
+      <div className="flex justify-between items-center mb-2">
+        <div className="font-semibold">Template Manager</div>
+        <Button variant="outline" size="sm" type="button" onClick={props.onRefresh}>
           Refresh
-        </button>
+        </Button>
       </div>
-      <div className="row g-2 mb-2">
-        <div className="col-md-4">
-          <input
-            className="form-control"
-            placeholder="Template Name"
-            value={props.templateName}
-            onChange={(event) => props.onTemplateNameChange(event.target.value)}
-            disabled={props.readonlyView}
-          />
-        </div>
-        <div className="col-md-4">
-          <input
-            className="form-control"
-            placeholder="Source System"
-            value={props.sourceSystem}
-            onChange={(event) => props.onSourceSystemChange(event.target.value)}
-            disabled={props.readonlyView}
-          />
-        </div>
-        <div className="col-md-4">
-          <button className="btn btn-outline-primary w-100" type="button" onClick={props.onSave} disabled={props.readonlyView}>
-            Save Template
-          </button>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+        <Input
+          placeholder="Template Name"
+          value={props.templateName}
+          onChange={(event) => props.onTemplateNameChange(event.target.value)}
+          disabled={props.readonlyView}
+        />
+        <Input
+          placeholder="Source System"
+          value={props.sourceSystem}
+          onChange={(event) => props.onSourceSystemChange(event.target.value)}
+          disabled={props.readonlyView}
+        />
+        <Button variant="outline" className="w-full" type="button" onClick={props.onSave} disabled={props.readonlyView}>
+          Save Template
+        </Button>
       </div>
       <textarea
-        className="form-control mb-2"
+        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mb-2"
         rows={2}
         placeholder="Notes"
         value={props.notes}
         onChange={(event) => props.onNotesChange(event.target.value)}
         disabled={props.readonlyView}
       />
-      <div style={{ maxHeight: 240, overflow: 'auto' }}>
+      <div className="max-h-[240px] overflow-auto">
         {props.templates.map((template) => (
           <div
             key={template.id}
-            style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: '0.5rem', marginBottom: '0.45rem' }}
+            className="border border-cc-border rounded-md p-2 mb-1.5"
           >
-            <div style={{ fontWeight: 600 }}>{template.template_name}</div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>{template.source_system}</div>
-            <div className="d-flex gap-2 mt-2">
-              <button className="btn btn-sm btn-outline-secondary" type="button" onClick={() => props.onLoad(template)}>
+            <div className="font-semibold">{template.template_name}</div>
+            <div className="text-xs text-cc-text-muted">{template.source_system}</div>
+            <div className="flex gap-2 mt-2">
+              <Button variant="outline" size="sm" type="button" onClick={() => props.onLoad(template)}>
                 Load
-              </button>
-              <button
-                className="btn btn-sm btn-outline-info"
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() =>
                   setInfoTemplateId((current) => (current === template.id ? null : template.id))
                 }
               >
                 Info
-              </button>
+              </Button>
               {!props.readonlyView && (
-                <button className="btn btn-sm btn-outline-danger" type="button" onClick={() => props.onDelete(template.id)}>
+                <Button variant="destructive" size="sm" type="button" onClick={() => props.onDelete(template.id)}>
                   Delete
-                </button>
+                </Button>
               )}
             </div>
             {infoTemplateId === template.id && (
@@ -917,33 +894,33 @@ function TemplateInfoPanel({
   };
 }) {
   return (
-    <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 8, paddingTop: 8 }}>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+    <div className="border-t border-cc-border mt-2 pt-2">
+      <div className="text-xs text-cc-text-muted mb-1">
         Event column: <code>{info.eventColumn}</code>
       </div>
-      <div style={{ fontSize: 12, color: '#374151', marginBottom: 6 }}>
+      <div className="text-xs text-cc-text-secondary mb-1.5">
         Notes: {info.notes}
       </div>
-      <div style={{ fontSize: 12, fontWeight: 600 }}>Expected field mappings</div>
-      <div className="row">
-        <div className="col-md-6">
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Trip</div>
-          <ul style={{ marginBottom: 4 }}>
-            {info.tripMappings.length === 0 && <li style={{ fontSize: 12 }}>No trip mappings saved.</li>}
+      <div className="text-xs font-semibold">Expected field mappings</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div>
+          <div className="text-xs text-cc-text-muted mt-1">Trip</div>
+          <ul className="mb-1">
+            {info.tripMappings.length === 0 && <li className="text-xs">No trip mappings saved.</li>}
             {info.tripMappings.map((item) => (
-              <li key={`trip-map-${item.target}`} style={{ fontSize: 12 }}>
-                <code>{item.target}</code> ← <code>{item.source}</code>
+              <li key={`trip-map-${item.target}`} className="text-xs">
+                <code>{item.target}</code> &larr; <code>{item.source}</code>
               </li>
             ))}
           </ul>
         </div>
-        <div className="col-md-6">
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Route</div>
-          <ul style={{ marginBottom: 4 }}>
-            {info.routeMappings.length === 0 && <li style={{ fontSize: 12 }}>No route mappings saved.</li>}
+        <div>
+          <div className="text-xs text-cc-text-muted mt-1">Route</div>
+          <ul className="mb-1">
+            {info.routeMappings.length === 0 && <li className="text-xs">No route mappings saved.</li>}
             {info.routeMappings.map((item) => (
-              <li key={`route-map-${item.target}`} style={{ fontSize: 12 }}>
-                <code>{item.target}</code> ← <code>{item.source}</code>
+              <li key={`route-map-${item.target}`} className="text-xs">
+                <code>{item.target}</code> &larr; <code>{item.source}</code>
               </li>
             ))}
           </ul>
@@ -966,15 +943,20 @@ function SelectField({
 }) {
   return (
     <div className="mb-2">
-      <label className="form-label">{label}</label>
-      <select className="form-select" value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Not mapped</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+      <Label>{label}</Label>
+      <Select value={value || '__not_mapped__'} onValueChange={(v) => onChange(v === '__not_mapped__' ? '' : v)}>
+        <SelectTrigger className="mt-1">
+          <SelectValue placeholder="Not mapped" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__not_mapped__">Not mapped</SelectItem>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -989,14 +971,12 @@ function CheckField({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="form-check mb-1">
-      <input
-        className="form-check-input"
-        type="checkbox"
+    <div className="flex items-center gap-2 mb-1">
+      <Checkbox
         checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
+        onCheckedChange={(v) => onChange(v === true)}
       />
-      <label className="form-check-label">{label}</label>
+      <Label className="font-normal">{label}</Label>
     </div>
   );
 }

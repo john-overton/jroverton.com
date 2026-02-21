@@ -3,6 +3,24 @@
 import { useState } from 'react';
 
 import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
+import { Button } from '@/app/clearcut/components/shadcn/button';
+import { Checkbox } from '@/app/clearcut/components/shadcn/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/app/clearcut/components/shadcn/dialog';
+import { Input } from '@/app/clearcut/components/shadcn/input';
+import { Label } from '@/app/clearcut/components/shadcn/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/app/clearcut/components/shadcn/table';
 import type { ImportResponse } from '@/lib/clearcut/client';
 import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
 import type {
@@ -200,42 +218,42 @@ export default function ImportTab({
     <>
       <SectionCard title="Data Import">
         {importViewMode === 'main' && (
-          <div className="row g-3">
-            <div className="col-md-6">
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: '0.9rem' }}>
-                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
-                  Event-based import with templates and field mapping.
-                </div>
-                <button
-                  className="btn btn-outline-primary w-100"
-                  type="button"
-                  onClick={() => setImportViewMode('wizard')}
-                >
-                  Trip Import Wizard
-                </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="border border-cc-border rounded-[10px] p-4">
+              <div className="text-[13px] text-cc-text-muted mb-2">
+                Event-based import with templates and field mapping.
               </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                type="button"
+                onClick={() => setImportViewMode('wizard')}
+              >
+                Trip Import Wizard
+              </Button>
             </div>
-            <div className="col-md-6">
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: '0.9rem' }}>
-                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
-                  Direct trip/route file upload with CSV samples.
-                </div>
-                <button
-                  className="btn btn-outline-secondary w-100"
-                  type="button"
-                  onClick={() => setImportViewMode('flat')}
-                >
-                  Flat File Import
-                </button>
+            <div className="border border-cc-border rounded-[10px] p-4">
+              <div className="text-[13px] text-cc-text-muted mb-2">
+                Direct trip/route file upload with CSV samples.
               </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                type="button"
+                onClick={() => setImportViewMode('flat')}
+              >
+                Flat File Import
+              </Button>
             </div>
           </div>
         )}
 
         {importViewMode === 'wizard' && (
           <div className="mt-2">
-            <button
-              className="btn btn-sm btn-outline-secondary mb-3"
+            <Button
+              variant="outline"
+              size="sm"
+              className="mb-3"
               type="button"
               onClick={() => {
                 setImportViewMode('main');
@@ -245,7 +263,7 @@ export default function ImportTab({
               }}
             >
               Back to Import Options
-            </button>
+            </Button>
             <ImportMapperWizard
               key={`import-wizard-${wizardKey}`}
               readonlyView={readonlyView}
@@ -307,57 +325,56 @@ export default function ImportTab({
           />
         )}
         {!readonlyView && (
-          <button className="btn btn-outline-primary mt-3" onClick={onLoadDemo} type="button">
+          <Button variant="outline" className="mt-3" onClick={onLoadDemo} type="button">
             Load Demo Dataset
-          </button>
+          </Button>
         )}
       </SectionCard>
 
       <SectionCard title="System Settings">
-        <div className="row g-3">
-          <div className="col-md-4">
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Derived Service Start</div>
-            <div style={{ fontWeight: 600 }}>{metrics.derivedServiceWindow.startLabel}</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <div className="text-[13px] text-cc-text-muted">Derived Service Start</div>
+            <div className="font-semibold">{metrics.derivedServiceWindow.startLabel}</div>
           </div>
-          <div className="col-md-4">
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Derived Service End</div>
-            <div style={{ fontWeight: 600 }}>{metrics.derivedServiceWindow.endLabel}</div>
+          <div>
+            <div className="text-[13px] text-cc-text-muted">Derived Service End</div>
+            <div className="font-semibold">{metrics.derivedServiceWindow.endLabel}</div>
           </div>
-          <div className="col-md-4">
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Service Hours</div>
-            <div style={{ fontWeight: 600 }}>
+          <div>
+            <div className="text-[13px] text-cc-text-muted">Service Hours</div>
+            <div className="font-semibold">
               {metrics.derivedServiceWindow.isTwentyFourHours
                 ? '24:00'
                 : metrics.derivedServiceWindow.durationLabel}
             </div>
           </div>
-          <div className="col-md-6">
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Earliest Data Time</div>
-            <div style={{ fontWeight: 600 }}>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+          <div>
+            <div className="text-[13px] text-cc-text-muted">Earliest Data Time</div>
+            <div className="font-semibold">
               {metrics.derivedServiceWindow.earliestDataTime ?? 'No trip data'}
             </div>
           </div>
-          <div className="col-md-6">
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Latest Data Time</div>
-            <div style={{ fontWeight: 600 }}>
+          <div>
+            <div className="text-[13px] text-cc-text-muted">Latest Data Time</div>
+            <div className="font-semibold">
               {metrics.derivedServiceWindow.latestDataTime ?? 'No trip data'}
             </div>
           </div>
-          <div className="col-12">
-            <div style={{ fontSize: 12, color: '#6b7280' }}>
-              Service window is auto-derived from imported data (actual times preferred, fallback to scheduled), with a 1-hour buffer before first pickup and after last dropoff.
-            </div>
-          </div>
-          <div className="col-12">
-            <hr style={{ margin: '0.5rem 0' }} />
-          </div>
-          <div className="col-md-3">
-            <label className="form-label">Pickup OTP: minutes before</label>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: '-2px', marginBottom: 6 }}>
+        </div>
+        <div className="text-xs text-cc-text-muted mt-3">
+          Service window is auto-derived from imported data (actual times preferred, fallback to scheduled), with a 1-hour buffer before first pickup and after last dropoff.
+        </div>
+        <hr className="my-3 border-cc-border" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <Label>Pickup OTP: minutes before</Label>
+            <div className="text-xs text-cc-text-muted mb-1.5">
               Minutes before scheduled pickup that is on time.
             </div>
-            <input
-              className="form-control"
+            <Input
               type="number"
               min={0}
               max={180}
@@ -369,13 +386,12 @@ export default function ImportTab({
               }
             />
           </div>
-          <div className="col-md-3">
-            <label className="form-label">Pickup OTP: minutes after</label>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: '-2px', marginBottom: 6 }}>
+          <div>
+            <Label>Pickup OTP: minutes after</Label>
+            <div className="text-xs text-cc-text-muted mb-1.5">
               Minutes after scheduled pickup that is on time.
             </div>
-            <input
-              className="form-control"
+            <Input
               type="number"
               min={0}
               max={180}
@@ -387,13 +403,12 @@ export default function ImportTab({
               }
             />
           </div>
-          <div className="col-md-3">
-            <label className="form-label">Dropoff OTP: minutes before</label>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: '-2px', marginBottom: 6 }}>
+          <div>
+            <Label>Dropoff OTP: minutes before</Label>
+            <div className="text-xs text-cc-text-muted mb-1.5">
               Minutes before dropoff that is on time.
             </div>
-            <input
-              className="form-control"
+            <Input
               type="number"
               min={0}
               max={180}
@@ -405,13 +420,12 @@ export default function ImportTab({
               }
             />
           </div>
-          <div className="col-md-3">
-            <label className="form-label">Dropoff OTP: minutes after</label>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: '-2px', marginBottom: 6 }}>
+          <div>
+            <Label>Dropoff OTP: minutes after</Label>
+            <div className="text-xs text-cc-text-muted mb-1.5">
               Minutes after dropoff that is on time.
             </div>
-            <input
-              className="form-control"
+            <Input
               type="number"
               min={0}
               max={180}
@@ -427,24 +441,22 @@ export default function ImportTab({
       </SectionCard>
 
       <SectionCard title="Data Views">
-        <details style={{ marginBottom: 12 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+        <details className="mb-3">
+          <summary className="cursor-pointer font-semibold">
             Trips ({state.trips.length})
           </summary>
-          <div style={{ overflowX: 'auto', marginTop: 8 }}>
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Columns</div>
-              <div className="d-flex flex-wrap gap-3">
+          <div className="overflow-x-auto mt-2">
+            <div className="mb-3">
+              <div className="text-xs text-cc-text-muted mb-1.5">Columns</div>
+              <div className="flex flex-wrap gap-3">
                 {TRIP_DATA_COLUMNS.map((column) => (
-                  <label key={`trip-col-toggle-${column.key}`} className="form-check-label" style={{ fontSize: 13 }}>
-                    <input
-                      type="checkbox"
-                      className="form-check-input me-1"
+                  <label key={`trip-col-toggle-${column.key}`} className="flex items-center gap-1.5 text-[13px]">
+                    <Checkbox
                       checked={tripVisibleColumns[column.key]}
-                      onChange={(event) =>
+                      onCheckedChange={(v) =>
                         setTripVisibleColumns((prev) => ({
                           ...prev,
-                          [column.key]: event.target.checked,
+                          [column.key]: v === true,
                         }))
                       }
                     />
@@ -453,82 +465,82 @@ export default function ImportTab({
                 ))}
               </div>
             </div>
-            <table className="table table-sm">
-              <thead>
-                <tr>
+            <Table>
+              <TableHeader>
+                <TableRow>
                   {activeTripColumns.map((column) => (
-                    <th key={`trip-col-head-${column.key}`}>{column.label}</th>
+                    <TableHead key={`trip-col-head-${column.key}`}>{column.label}</TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {tripPageRows.map((trip) => (
-                  <tr key={`trip-view-${trip.trip_id}-${trip.route_id}`}>
+                  <TableRow key={`trip-view-${trip.trip_id}-${trip.route_id}`}>
                     {activeTripColumns.map((column) => (
-                      <td key={`trip-row-${trip.trip_id}-${column.key}`}>
+                      <TableCell key={`trip-row-${trip.trip_id}-${column.key}`}>
                         {column.getValue(trip) ?? '-'}
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
                 {state.trips.length === 0 && (
-                  <tr>
-                    <td colSpan={Math.max(activeTripColumns.length, 1)} style={{ color: '#6b7280' }}>
+                  <TableRow>
+                    <TableCell colSpan={Math.max(activeTripColumns.length, 1)} className="text-cc-text-muted">
                       No trips available.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
                 {state.trips.length > 0 && activeTripColumns.length === 0 && (
-                  <tr>
-                    <td style={{ color: '#6b7280' }}>Select at least one column.</td>
-                  </tr>
+                  <TableRow>
+                    <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
             {state.trips.length > 0 && (
-              <div className="d-flex align-items-center justify-content-between">
-                <button
-                  className="btn btn-sm btn-outline-secondary"
+              <div className="flex items-center justify-between mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   disabled={currentTripPage <= 1}
                   onClick={() => setTripPage((prev) => Math.max(1, prev - 1))}
                 >
                   Previous
-                </button>
-                <div style={{ fontSize: 13 }}>
+                </Button>
+                <div className="text-[13px]">
                   Page {currentTripPage} of {tripTotalPages}
                 </div>
-                <button
-                  className="btn btn-sm btn-outline-secondary"
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   disabled={currentTripPage >= tripTotalPages}
                   onClick={() => setTripPage((prev) => Math.min(tripTotalPages, prev + 1))}
                 >
                   Next
-                </button>
+                </Button>
               </div>
             )}
           </div>
         </details>
 
         <details>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+          <summary className="cursor-pointer font-semibold">
             Routes ({state.routes.length})
           </summary>
-          <div style={{ overflowX: 'auto', marginTop: 8 }}>
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Columns</div>
-              <div className="d-flex flex-wrap gap-3">
+          <div className="overflow-x-auto mt-2">
+            <div className="mb-3">
+              <div className="text-xs text-cc-text-muted mb-1.5">Columns</div>
+              <div className="flex flex-wrap gap-3">
                 {ROUTE_DATA_COLUMNS.map((column) => (
-                  <label key={`route-col-toggle-${column.key}`} className="form-check-label" style={{ fontSize: 13 }}>
-                    <input
-                      type="checkbox"
-                      className="form-check-input me-1"
+                  <label key={`route-col-toggle-${column.key}`} className="flex items-center gap-1.5 text-[13px]">
+                    <Checkbox
                       checked={routeVisibleColumns[column.key]}
-                      onChange={(event) =>
+                      onCheckedChange={(v) =>
                         setRouteVisibleColumns((prev) => ({
                           ...prev,
-                          [column.key]: event.target.checked,
+                          [column.key]: v === true,
                         }))
                       }
                     />
@@ -537,59 +549,61 @@ export default function ImportTab({
                 ))}
               </div>
             </div>
-            <table className="table table-sm">
-              <thead>
-                <tr>
+            <Table>
+              <TableHeader>
+                <TableRow>
                   {activeRouteColumns.map((column) => (
-                    <th key={`route-col-head-${column.key}`}>{column.label}</th>
+                    <TableHead key={`route-col-head-${column.key}`}>{column.label}</TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {routePageRows.map((route) => (
-                  <tr key={`route-view-${route.route_id}`}>
+                  <TableRow key={`route-view-${route.route_id}`}>
                     {activeRouteColumns.map((column) => (
-                      <td key={`route-row-${route.route_id}-${column.key}`}>
+                      <TableCell key={`route-row-${route.route_id}-${column.key}`}>
                         {column.getValue(route) ?? '-'}
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
                 {state.routes.length === 0 && (
-                  <tr>
-                    <td colSpan={Math.max(activeRouteColumns.length, 1)} style={{ color: '#6b7280' }}>
+                  <TableRow>
+                    <TableCell colSpan={Math.max(activeRouteColumns.length, 1)} className="text-cc-text-muted">
                       No routes available.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
                 {state.routes.length > 0 && activeRouteColumns.length === 0 && (
-                  <tr>
-                    <td style={{ color: '#6b7280' }}>Select at least one column.</td>
-                  </tr>
+                  <TableRow>
+                    <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
             {state.routes.length > 0 && (
-              <div className="d-flex align-items-center justify-content-between">
-                <button
-                  className="btn btn-sm btn-outline-secondary"
+              <div className="flex items-center justify-between mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   disabled={currentRoutePage <= 1}
                   onClick={() => setRoutePage((prev) => Math.max(1, prev - 1))}
                 >
                   Previous
-                </button>
-                <div style={{ fontSize: 13 }}>
+                </Button>
+                <div className="text-[13px]">
                   Page {currentRoutePage} of {routeTotalPages}
                 </div>
-                <button
-                  className="btn btn-sm btn-outline-secondary"
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   disabled={currentRoutePage >= routeTotalPages}
                   onClick={() => setRoutePage((prev) => Math.min(routeTotalPages, prev + 1))}
                 >
                   Next
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -597,15 +611,16 @@ export default function ImportTab({
       </SectionCard>
 
       {flatImportLog && (flatImportLog.trips.length > 0 || flatImportLog.routes.length > 0) && (
-        <p style={{ fontSize: 13 }}>
+        <p className="text-[13px]">
           Some rows were skipped during flat file import.{' '}
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
-            className="btn btn-sm btn-outline-secondary"
             onClick={() => setShowFlatImportLog(true)}
           >
             View skipped row log
-          </button>
+          </Button>
         </p>
       )}
 
@@ -647,39 +662,37 @@ function FlatFileImport({
 
   return (
     <div className="mt-2">
-      <button
-        className="btn btn-sm btn-outline-secondary mb-3"
+      <Button
+        variant="outline"
+        size="sm"
+        className="mb-3"
         type="button"
         onClick={onBack}
       >
         Back to Import Options
-      </button>
-      <div className="row">
-        <div className="col-md-6 mb-3">
-          <div className="d-flex gap-2 mb-2">
-            <button
-              className="btn btn-sm btn-outline-secondary"
+      </Button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <div className="flex gap-2 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
               onClick={() => onDownloadSample('routes')}
             >
               Download Route Sample CSV
-            </button>
+            </Button>
           </div>
           <div
-            style={{
-              border: '1px dashed #94a3b8',
-              borderRadius: 10,
-              padding: '1rem',
-              background: readonlyView ? '#f8fafc' : '#fff',
-            }}
+            className="border border-dashed border-cc-border-hover rounded-[10px] p-4"
+            style={{ background: readonlyView ? 'var(--color-cc-surface-2)' : undefined }}
           >
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>Route File (CSV/XLSX)</div>
-            <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 8 }}>
+            <div className="font-semibold mb-1.5">Route File (CSV/XLSX)</div>
+            <div className="text-cc-text-muted text-[13px] mb-2">
               Select the route file to import.
             </div>
-            <input
+            <Input
               type="file"
-              className="form-control"
               accept=".csv,.xlsx,.xls"
               disabled={readonlyView}
               onChange={(event) => {
@@ -687,37 +700,33 @@ function FlatFileImport({
               }}
             />
             {routeFile && (
-              <div style={{ fontSize: 13, color: '#065f46', marginTop: 6 }}>
+              <div className="text-[13px] text-cc-success mt-1.5">
                 Selected: {routeFile.name}
               </div>
             )}
           </div>
         </div>
-        <div className="col-md-6 mb-3">
-          <div className="d-flex gap-2 mb-2">
-            <button
-              className="btn btn-sm btn-outline-secondary"
+        <div>
+          <div className="flex gap-2 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
               onClick={() => onDownloadSample('trips')}
             >
               Download Trip Sample CSV
-            </button>
+            </Button>
           </div>
           <div
-            style={{
-              border: '1px dashed #94a3b8',
-              borderRadius: 10,
-              padding: '1rem',
-              background: readonlyView ? '#f8fafc' : '#fff',
-            }}
+            className="border border-dashed border-cc-border-hover rounded-[10px] p-4"
+            style={{ background: readonlyView ? 'var(--color-cc-surface-2)' : undefined }}
           >
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>Trip File (CSV/XLSX)</div>
-            <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 8 }}>
+            <div className="font-semibold mb-1.5">Trip File (CSV/XLSX)</div>
+            <div className="text-cc-text-muted text-[13px] mb-2">
               Select the trip file to import.
             </div>
-            <input
+            <Input
               type="file"
-              className="form-control"
               accept=".csv,.xlsx,.xls"
               disabled={readonlyView}
               onChange={(event) => {
@@ -725,23 +734,23 @@ function FlatFileImport({
               }}
             />
             {tripFile && (
-              <div style={{ fontSize: 13, color: '#065f46', marginTop: 6 }}>
+              <div className="text-[13px] text-cc-success mt-1.5">
                 Selected: {tripFile.name}
               </div>
             )}
           </div>
         </div>
       </div>
-      <button
-        className="btn btn-primary"
+      <Button
+        className="mt-3"
         type="button"
         disabled={readonlyView || importing || (!tripFile && !routeFile)}
         onClick={handleImport}
       >
         {importing ? 'Importing...' : 'Import Files'}
-      </button>
+      </Button>
       {!tripFile && !routeFile && (
-        <div style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>
+        <div className="text-[13px] text-cc-text-muted mt-2">
           Select at least one file to import. Routes are imported first so trips can be validated against them.
         </div>
       )}
@@ -757,70 +766,28 @@ function FlatImportLogModal(props: {
     routes: Array<{ row: number; reason: string }>;
   };
 }) {
-  if (!props.show) {
-    return null;
-  }
-
   const hasTrips = props.log.trips.length > 0;
   const hasRoutes = props.log.routes.length > 0;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.45)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1050,
-        padding: '1rem',
-      }}
-    >
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: 10,
-          width: '100%',
-          maxWidth: 780,
-          maxHeight: '90vh',
-          overflow: 'auto',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid #e5e7eb',
-            padding: '0.75rem 1rem',
-          }}
-        >
-          <h4 style={{ margin: 0, fontSize: 17 }}>Flat Import Skipped Rows</h4>
-          <button className="btn btn-sm btn-outline-secondary" type="button" onClick={props.onClose}>
-            Close
-          </button>
-        </div>
-        <div style={{ padding: '0.9rem 1rem' }}>
-          <p style={{ fontSize: 13, color: '#4b5563' }}>
+    <Dialog open={props.show} onOpenChange={(open) => { if (!open) props.onClose(); }}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
+        <DialogHeader>
+          <DialogTitle>Flat Import Skipped Rows</DialogTitle>
+        </DialogHeader>
+        <div>
+          <p className="text-[13px] text-cc-text-secondary">
             These rows were skipped during the most recent flat-file import. Row numbers correspond to the
             original CSV/XLSX (header is row 1).
           </p>
           {hasRoutes && (
-            <div
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: '0.7rem',
-                marginBottom: '0.75rem',
-              }}
-            >
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>
+            <div className="border border-cc-border rounded-lg p-3 mb-3">
+              <div className="font-semibold mb-1.5">
                 Route file skipped rows ({props.log.routes.length})
               </div>
-              <ul style={{ marginBottom: 0, maxHeight: 220, overflow: 'auto' }}>
+              <ul className="mb-0 max-h-[220px] overflow-auto">
                 {props.log.routes.map((err, idx) => (
-                  <li key={`flat-route-error-${idx}`} style={{ fontSize: 13 }}>
+                  <li key={`flat-route-error-${idx}`} className="text-[13px]">
                     Row {err.row}: {err.reason}
                   </li>
                 ))}
@@ -828,19 +795,13 @@ function FlatImportLogModal(props: {
             </div>
           )}
           {hasTrips && (
-            <div
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: '0.7rem',
-              }}
-            >
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>
+            <div className="border border-cc-border rounded-lg p-3">
+              <div className="font-semibold mb-1.5">
                 Trip file skipped rows ({props.log.trips.length})
               </div>
-              <ul style={{ marginBottom: 0, maxHeight: 220, overflow: 'auto' }}>
+              <ul className="mb-0 max-h-[220px] overflow-auto">
                 {props.log.trips.map((err, idx) => (
-                  <li key={`flat-trip-error-${idx}`} style={{ fontSize: 13 }}>
+                  <li key={`flat-trip-error-${idx}`} className="text-[13px]">
                     Row {err.row}: {err.reason}
                   </li>
                 ))}
@@ -848,10 +809,10 @@ function FlatImportLogModal(props: {
             </div>
           )}
           {!hasTrips && !hasRoutes && (
-            <p style={{ fontSize: 13, color: '#6b7280' }}>No skipped rows were reported for the last import.</p>
+            <p className="text-[13px] text-cc-text-muted">No skipped rows were reported for the last import.</p>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

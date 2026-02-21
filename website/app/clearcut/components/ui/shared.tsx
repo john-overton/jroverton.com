@@ -15,10 +15,20 @@ import {
   YAxis,
 } from 'recharts';
 
+import { Button } from '@/app/clearcut/components/shadcn/button';
+import { Input } from '@/app/clearcut/components/shadcn/input';
+import { Label } from '@/app/clearcut/components/shadcn/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/app/clearcut/components/shadcn/table';
 import type { TripRow } from '@/lib/clearcut/types';
+import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
 
-export const CLEARCUT_FONT_STACK =
-  '"Inter", "SF Pro Text", "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif';
 export const DEMAND_BLOCK_MINUTES = 15;
 
 export function parseClockToMinutes(value: string | null | undefined, fallback: number): number {
@@ -109,7 +119,6 @@ export function MetricCard({
   value,
   sub,
   color,
-  columnClass,
 }: {
   label: string;
   value: string;
@@ -118,24 +127,25 @@ export function MetricCard({
   columnClass?: string;
 }) {
   return (
-    <div className={columnClass ?? 'col-md-3 col-sm-6 mb-3'}>
-      <div style={{ border: '1px solid #dee5f0', borderRadius: 10, padding: '0.75rem', background: '#fff' }}>
-        <div style={{ color: '#6b7280', fontSize: 13 }}>{label}</div>
-        <div style={{ fontSize: 24, fontWeight: 700, color: color ?? '#1f2937' }}>{value}</div>
-        {sub && <div style={{ color: '#6b7280', fontSize: 12 }}>{sub}</div>}
+    <div className="bg-cc-surface-1 border border-cc-border rounded-[10px] p-3">
+      <div className="text-cc-text-muted text-[13px]">{label}</div>
+      <div className="text-2xl font-bold" style={{ color: color ?? undefined }}>
+        {value}
       </div>
+      {sub && <div className="text-cc-text-muted text-xs">{sub}</div>}
     </div>
   );
 }
 
 export function MiniBars({ values, max }: { values: number[]; max?: number }) {
+  const { chartColors } = useClearcutTheme();
   const resolvedMax = max ?? Math.max(...values, 1);
   const data = values.map((value, index) => ({
     idx: index,
     value: Math.round(value * 100) / 100,
   }));
   return (
-    <div style={{ height: 100 }}>
+    <div className="h-[100px]">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: 2 }}>
           <XAxis dataKey="idx" hide />
@@ -143,9 +153,9 @@ export function MiniBars({ values, max }: { values: number[]; max?: number }) {
           <Tooltip
             formatter={(value: number | string | undefined) => [Number(value ?? 0), 'Value']}
             labelFormatter={(label) => `Block ${Number(label) + 1}`}
-            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
           />
-          <Bar dataKey="value" fill="#4f46e5" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="value" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -161,7 +171,7 @@ export function HeatStrip({ values, blocks }: { values: number[]; blocks?: Array
     label: blocks?.[index]?.label ?? `Block ${index + 1}`,
   }));
   return (
-    <div style={{ height: 42, borderRadius: 6, overflow: 'visible', border: '1px solid #dbe3ef' }}>
+    <div className="h-[42px] rounded-md overflow-visible border border-cc-border">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barCategoryGap={0}>
           <XAxis dataKey="idx" hide />
@@ -176,7 +186,7 @@ export function HeatStrip({ values, blocks }: { values: number[]; blocks?: Array
               const first = payload?.[0]?.payload as { label?: string } | undefined;
               return first?.label ?? '';
             }}
-            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
           />
           <Bar dataKey="unit" isAnimationActive={false}>
             {data.map((entry, index) => {
@@ -203,6 +213,7 @@ export function DemandCompositeChart({
   vehicles: number[];
   blocks: Array<{ label: string }>;
 }) {
+  const { chartColors } = useClearcutTheme();
   const data = useMemo(
     () =>
       blocks.map((block, index) => ({
@@ -215,10 +226,10 @@ export function DemandCompositeChart({
   );
 
   return (
-    <div style={{ height: 230 }}>
+    <div className="h-[230px]">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" hide />
           <YAxis allowDecimals={false} width={38} />
           <Tooltip
@@ -229,14 +240,14 @@ export function DemandCompositeChart({
               return [normalizedValue, 'Pickups'];
             }}
             labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
           />
-          <Bar dataKey="onBoard" fill="rgba(99, 102, 241, 0.25)" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="pickups" fill="#4f46e5" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
+          <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
           <Line
             type="monotone"
             dataKey="vehicles"
-            stroke="#0d9488"
+            stroke={chartColors[1]}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}
@@ -259,6 +270,7 @@ export function PerformanceCompositeChart({
   dropoffOtp: number[];
   blocks: Array<{ label: string }>;
 }) {
+  const { chartColors } = useClearcutTheme();
   const data = useMemo(
     () =>
       blocks.map((block, index) => ({
@@ -271,10 +283,10 @@ export function PerformanceCompositeChart({
   );
 
   return (
-    <div style={{ height: 460 }}>
+    <div className="h-[460px]">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis yAxisId="left" allowDecimals width={38} />
           <YAxis yAxisId="right" orientation="right" domain={[0, 100]} width={38} tickFormatter={(v) => `${v}%`} />
@@ -286,7 +298,7 @@ export function PerformanceCompositeChart({
               return [v, 'Productivity'];
             }}
             labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
           />
           <Legend
             formatter={(value) => {
@@ -295,12 +307,12 @@ export function PerformanceCompositeChart({
               return 'Productivity';
             }}
           />
-          <Bar yAxisId="left" dataKey="productivity" fill="rgba(99, 102, 241, 0.4)" radius={[3, 3, 0, 0]} />
+          <Bar yAxisId="left" dataKey="productivity" fill={`${chartColors[0]}66`} radius={[3, 3, 0, 0]} />
           <Line
             yAxisId="right"
             type="monotone"
             dataKey="pickupOtp"
-            stroke="#0d9488"
+            stroke={chartColors[1]}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}
@@ -309,7 +321,7 @@ export function PerformanceCompositeChart({
             yAxisId="right"
             type="monotone"
             dataKey="dropoffOtp"
-            stroke="#d97706"
+            stroke={chartColors[3]}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}
@@ -322,8 +334,8 @@ export function PerformanceCompositeChart({
 
 export function SectionCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section style={{ border: '1px solid #dee5f0', borderRadius: 10, background: '#fff', padding: '0.9rem', marginBottom: '0.9rem' }}>
-      <h3 style={{ fontSize: 17, marginBottom: '0.75rem' }}>{title}</h3>
+    <section className="border border-cc-border rounded-[10px] bg-cc-surface-1 p-4 mb-4">
+      <h3 className="text-[17px] font-semibold mb-3">{title}</h3>
       {children}
     </section>
   );
@@ -331,31 +343,31 @@ export function SectionCard({ title, children }: { title: string; children: Reac
 
 export function TripTable({ title, trips }: { title: string; trips: Array<{ trip_id: string; route_id: string }> }) {
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem' }}>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>{title}</div>
-      <table className="table table-sm mb-0">
-        <thead>
-          <tr>
-            <th>Trip</th>
-            <th>Route</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="border border-cc-border rounded-lg p-3 mb-3">
+      <div className="font-semibold mb-2">{title}</div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Trip</TableHead>
+            <TableHead>Route</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {trips.length === 0 && (
-            <tr>
-              <td colSpan={2} style={{ color: '#6b7280' }}>
+            <TableRow>
+              <TableCell colSpan={2} className="text-cc-text-muted">
                 No trips available
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           )}
           {trips.map((trip) => (
-            <tr key={trip.trip_id}>
-              <td>{trip.trip_id}</td>
-              <td>{trip.route_id}</td>
-            </tr>
+            <TableRow key={trip.trip_id}>
+              <TableCell>{trip.trip_id}</TableCell>
+              <TableCell>{trip.route_id}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -373,6 +385,7 @@ export function RunStructureChart({
   optimizedVehicles: number[];
   blocks: Array<{ label: string }>;
 }) {
+  const { chartColors } = useClearcutTheme();
   const data = useMemo(
     () =>
       blocks.map((block, index) => ({
@@ -386,10 +399,10 @@ export function RunStructureChart({
   );
 
   return (
-    <div style={{ height: 260 }}>
+    <div className="h-[260px]">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} width={38} />
           <Tooltip
@@ -401,7 +414,7 @@ export function RunStructureChart({
               return [v, 'Pickups'];
             }}
             labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, borderColor: '#dbe3ef' }}
+            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
           />
           <Legend
             formatter={(value) => {
@@ -411,10 +424,10 @@ export function RunStructureChart({
               return 'Pickups';
             }}
           />
-          <Bar dataKey="onBoard" fill="rgba(99, 102, 241, 0.25)" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="pickups" fill="#4f46e5" radius={[3, 3, 0, 0]} />
-          <Line type="monotone" dataKey="currentVehicles" stroke="#0d9488" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-          <Line type="monotone" dataKey="optimizedVehicles" stroke="#d97706" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4 }} />
+          <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
+          <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
+          <Line type="monotone" dataKey="currentVehicles" stroke={chartColors[1]} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="optimizedVehicles" stroke={chartColors[3]} strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4 }} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -437,19 +450,17 @@ export function PasswordPrompt({ onSubmit }: { onSubmit: (password: string) => P
 
   return (
     <form onSubmit={submit}>
-      <label htmlFor="unlock-password" className="form-label">
-        Password
-      </label>
-      <input
+      <Label htmlFor="unlock-password">Password</Label>
+      <Input
         id="unlock-password"
         type="password"
-        className="form-control"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
+        className="mt-1"
       />
-      <button className="btn btn-primary mt-3" type="submit" disabled={!password || submitting}>
+      <Button className="mt-3" type="submit" disabled={!password || submitting}>
         {submitting ? 'Unlocking...' : 'Unlock'}
-      </button>
+      </Button>
     </form>
   );
 }

@@ -4,6 +4,8 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { Label } from '@/app/clearcut/components/shadcn/label';
+import { Slider } from '@/app/clearcut/components/shadcn/slider';
 import type { ClearcutMetrics, TimeBlock } from '@/lib/clearcut/metrics';
 import type { TripRow } from '@/lib/clearcut/types';
 
@@ -75,12 +77,6 @@ function tripsToGeoTrips(trips: TripRow[], blocks: TimeBlock[], selectedDays: Se
   return result;
 }
 
-/**
- * Build a GeoJSON FeatureCollection with gaussian temporal falloff
- * so adjacent time blocks blend smoothly as the slider moves.
- * Weights are normalized to 0–1 so the full color ramp is used
- * regardless of absolute passenger counts.
- */
 function buildGeoJSON(
   geoTrips: GeoTrip[],
   selectedBlock: number,
@@ -88,7 +84,6 @@ function buildGeoJSON(
   const SIGMA = 1.5;
   const TWO_SIGMA_SQ = 2 * SIGMA * SIGMA;
 
-  // First pass: compute raw weights and find max for normalization
   const rawEntries: Array<{ t: GeoTrip; rawWeight: number }> = [];
   let maxWeight = 0;
   for (const t of geoTrips) {
@@ -99,7 +94,6 @@ function buildGeoJSON(
     if (w > maxWeight) maxWeight = w;
   }
 
-  // Second pass: normalize to 0–1 range
   const scale = maxWeight > 0 ? 1 / maxWeight : 1;
   const features: GeoJSON.Feature<GeoJSON.Point>[] = rawEntries.map(({ t, rawWeight }) => ({
     type: 'Feature',
@@ -110,7 +104,6 @@ function buildGeoJSON(
   return { type: 'FeatureCollection', features };
 }
 
-/** Compute evenly-spaced legend labels for the time slider. */
 function computeLegendLabels(blocks: TimeBlock[]): string[] {
   const count = blocks.length;
   if (count === 0) return [];
@@ -236,7 +229,6 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
         },
       });
 
-      // Visible circle layer at high zoom — colored by pickup (blue) vs dropoff (red)
       map.addLayer({
         id: 'trips-point',
         type: 'circle',
@@ -257,7 +249,6 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
         },
       });
 
-      // Invisible hit-test layer at ALL zoom levels for hover detection
       map.addLayer({
         id: 'trips-hit',
         type: 'circle',
@@ -269,7 +260,6 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
         },
       });
 
-      /* ---- Hover popup (works at all zoom levels) ---- */
       const popup = new mapboxgl.Popup({
         closeButton: false,
         closeOnClick: false,
@@ -289,7 +279,6 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
       map.on('mousemove', 'trips-hit', (e) => {
         if (!e.features || e.features.length === 0) return;
 
-        // Query a small bbox around the cursor to catch nearby points
         const bbox: [mapboxgl.PointLike, mapboxgl.PointLike] = [
           [e.point.x - 15, e.point.y - 15],
           [e.point.x + 15, e.point.y + 15],
@@ -338,7 +327,6 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
     };
   }, [mapboxToken, mapStyle]);
 
-  /* ---- Update GeoJSON source when trips or selected block change ---- */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoadedRef.current) return;
@@ -348,7 +336,6 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
     source.setData(buildGeoJSON(geoTrips, mapBlockIdx));
   }, [geoTrips, mapBlockIdx]);
 
-  /* ---- Auto-fit bounds on first meaningful data load ---- */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoadedRef.current || geoTrips.length === 0 || boundsAppliedRef.current) return;
@@ -361,11 +348,10 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
     boundsAppliedRef.current = true;
   }, [geoTrips]);
 
-  /* ---- No token fallback ---- */
   if (!mapboxToken) {
     return (
       <SectionCard title="Trip Heatmap">
-        <p style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>
+        <p className="text-cc-text-muted text-center py-5">
           Mapbox token not configured. Add <code>NEXT_PUBLIC_MAPBOX_TOKEN</code> to{' '}
           <code>.env.local</code> to enable the map.
         </p>
@@ -377,31 +363,20 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
     <>
       <SectionCard title="Trip Heatmap">
         {/* Time scrubber */}
-        <div style={{ marginBottom: 12 }}>
-          <label className="form-label" style={{ fontWeight: 600 }}>
+        <div className="mb-3">
+          <Label className="font-semibold">
             Time Block: {metrics.blocks[mapBlockIdx]?.label ?? 'N/A'}
-          </label>
-          <input
-            className="form-range"
-            type="range"
+          </Label>
+          <Slider
             min={0}
             max={Math.max(0, metrics.blocks.length - 1)}
-            value={mapBlockIdx}
-            onChange={(e) => setMapBlockIdx(Number(e.target.value))}
+            step={1}
+            value={[mapBlockIdx]}
+            onValueChange={([v]) => setMapBlockIdx(v)}
+            className="mt-2"
           />
           {/* Time legend */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: 11,
-              color: '#6b7280',
-              marginTop: 2,
-              paddingLeft: 2,
-              paddingRight: 2,
-              userSelect: 'none',
-            }}
-          >
+          <div className="flex justify-between text-[11px] text-cc-text-muted mt-1 px-0.5 select-none">
             {legendLabels.map((label, i) => (
               <span key={i}>{label}</span>
             ))}
@@ -426,7 +401,7 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
         />
 
         {geoTrips.length === 0 && (
-          <p style={{ color: '#6b7280', textAlign: 'center', marginTop: 12 }}>
+          <p className="text-cc-text-muted text-center mt-3">
             No trips with GPS coordinates available for the selected filters.
           </p>
         )}

@@ -11,7 +11,7 @@ interface DeadheadTabProps {
 export default function DeadheadTab({ metrics }: DeadheadTabProps) {
   return (
     <>
-      <div className="row">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard label="Avg Trip Miles" value={`${metrics.avgTripMiles}`} />
         <MetricCard label="Avg Empty-Time % (Start)" value={`${metrics.avgDeadheadStartMiles}%`} />
         <MetricCard label="Avg Empty-Time % (End)" value={`${metrics.avgDeadheadEndMiles}%`} />
@@ -21,13 +21,9 @@ export default function DeadheadTab({ metrics }: DeadheadTabProps) {
         <HeatStrip values={metrics.deadheadByBlock} blocks={metrics.blocks} />
       </SectionCard>
       <SectionCard title="High Deadhead Trips">
-        <div className="row">
-          <div className="col-md-6">
-            <TripTable title="Start of Service" trips={metrics.highDeadheadTripsStart} />
-          </div>
-          <div className="col-md-6">
-            <TripTable title="End of Service" trips={metrics.highDeadheadTripsEnd} />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TripTable title="Start of Service" trips={metrics.highDeadheadTripsStart} />
+          <TripTable title="End of Service" trips={metrics.highDeadheadTripsEnd} />
         </div>
       </SectionCard>
     </>

@@ -4,12 +4,22 @@ import Link from 'next/link';
 import { Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dropdown } from 'react-bootstrap';
 
+import { Button } from '@/app/clearcut/components/shadcn/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/app/clearcut/components/shadcn/dropdown-menu';
+import { Tabs, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/tabs';
 import { ClearcutClientError } from '@/lib/clearcut/client';
 import { buildDemoTripsAndRoutes } from '@/lib/clearcut/demo-data';
 import { computeClearcutMetrics } from '@/lib/clearcut/metrics';
 import { useClearcutSession, type ClearcutMode } from '@/lib/clearcut/use-clearcut-session';
+import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
+import { palettes, type PaletteId } from '@/app/clearcut/theme/palettes';
 
 import DeadheadTab from './DeadheadTab';
 import DemandTab from './DemandTab';
@@ -18,7 +28,6 @@ import MapTab from './MapTab';
 import PerformanceTab from './PerformanceTab';
 import RunStructureTab from './RunStructureTab';
 import {
-  CLEARCUT_FONT_STACK,
   DEMAND_BLOCK_MINUTES,
   PasswordPrompt,
   deriveSliderBoundsFromTrips,
@@ -57,6 +66,7 @@ interface Props {
 export default function ClearcutSessionApp({ token, mode }: Props) {
   const router = useRouter();
   const session = useClearcutSession(token, mode);
+  const { paletteId, setPaletteId } = useClearcutTheme();
   const filterStateInitialized = useRef(false);
   const timeRangeTrackRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<TabKey>(mode === 'readonly' ? 'demand' : 'import');
@@ -122,7 +132,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
         : null,
     [rangeEndClock, rangeStartClock, ready, selectedDayIds, intervalMinutes],
   );
-  // Full-day metrics without time range filter — used by optimizer so it sees all demand
   const fullDayMetrics = useMemo(
     () =>
       ready
@@ -459,14 +468,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
 
   if (session.loadState.status === 'loading') {
     return (
-      <main
-        style={{
-          maxWidth: 1100,
-          margin: '0 auto',
-          padding: '4rem 1.25rem 2rem',
-          fontFamily: CLEARCUT_FONT_STACK,
-        }}
-      >
+      <main className="max-w-[1100px] mx-auto px-5 pt-16 pb-8">
         <p>Loading session...</p>
       </main>
     );
@@ -474,16 +476,9 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
 
   if (session.loadState.status === 'not_found') {
     return (
-      <main
-        style={{
-          maxWidth: 900,
-          margin: '0 auto',
-          padding: '4rem 1.25rem 2rem',
-          fontFamily: CLEARCUT_FONT_STACK,
-        }}
-      >
-        <h1>Session Not Found</h1>
-        <p style={{ color: '#4b5563' }}>
+      <main className="max-w-[900px] mx-auto px-5 pt-16 pb-8">
+        <h1 className="text-2xl font-bold">Session Not Found</h1>
+        <p className="text-cc-text-secondary">
           The session token is invalid or no longer exists.
         </p>
         <Link href="/clearcut">Create a new session</Link>
@@ -493,42 +488,28 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
 
   if (session.loadState.status === 'password_required') {
     return (
-      <main
-        style={{
-          maxWidth: 560,
-          margin: '0 auto',
-          padding: '4rem 1.25rem 2rem',
-          fontFamily: CLEARCUT_FONT_STACK,
-        }}
-      >
-        <h1 style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>{session.loadState.name}</h1>
-        <p style={{ color: '#4b5563', marginBottom: '1rem' }}>This edit session is password protected.</p>
+      <main className="max-w-[560px] mx-auto px-5 pt-16 pb-8">
+        <h1 className="text-3xl font-bold mb-2">{session.loadState.name}</h1>
+        <p className="text-cc-text-secondary mb-4">This edit session is password protected.</p>
         <PasswordPrompt onSubmit={onUnlock} />
         {session.loadState.retryAfterSeconds && (
-          <p style={{ color: '#b45309', marginTop: '0.75rem' }}>
+          <p className="text-cc-warning mt-3">
             Try again in {session.loadState.retryAfterSeconds} seconds.
           </p>
         )}
-        {error && <p style={{ color: '#b91c1c', marginTop: '0.75rem' }}>{error}</p>}
+        {error && <p className="text-cc-danger mt-3">{error}</p>}
       </main>
     );
   }
 
   if (session.loadState.status === 'error') {
     return (
-      <main
-        style={{
-          maxWidth: 900,
-          margin: '0 auto',
-          padding: '4rem 1.25rem 2rem',
-          fontFamily: CLEARCUT_FONT_STACK,
-        }}
-      >
-        <h1>Unable to load session</h1>
-        <p style={{ color: '#b91c1c' }}>{session.loadState.message}</p>
-        <button className="btn btn-outline-secondary" onClick={() => session.loadSession()} type="button">
+      <main className="max-w-[900px] mx-auto px-5 pt-16 pb-8">
+        <h1 className="text-2xl font-bold">Unable to load session</h1>
+        <p className="text-cc-danger">{session.loadState.message}</p>
+        <Button variant="outline" onClick={() => session.loadSession()} type="button">
           Retry
-        </button>
+        </Button>
       </main>
     );
   }
@@ -538,29 +519,23 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   }
 
   return (
-    <main
-      style={{
-        maxWidth: 1200,
-        margin: '0 auto',
-        padding: '3rem 1.25rem 2rem',
-        fontFamily: CLEARCUT_FONT_STACK,
-      }}
-    >
-      <header style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'start' }}>
+    <main className="max-w-[1200px] mx-auto px-5 pt-12 pb-8">
+      <header className="flex justify-between gap-3 items-start">
         <div>
-          <h1 style={{ fontSize: '2rem', marginBottom: '0.35rem' }}>{ready.state.session.name}</h1>
-          <div style={{ color: '#4b5563', fontSize: 14 }}>
-            Run Cutting &amp; Optimization Tool {readonlyView ? '• Read-only Mode' : ''}
+          <h1 className="text-3xl font-bold mb-1">{ready.state.session.name}</h1>
+          <div className="text-cc-text-secondary text-sm">
+            Run Cutting &amp; Optimization Tool {readonlyView ? '- Read-only Mode' : ''}
           </div>
-          <div style={{ color: '#4b5563', fontSize: 13, marginTop: 6 }}>
+          <div className="text-cc-text-secondary text-[13px] mt-1.5">
             Data loaded: {ready.state.session.trip_count} trips, {ready.state.session.route_count} routes
           </div>
           {!readonlyView && origin && (
-            <div style={{ marginTop: 8, fontSize: 13 }}>
+            <div className="mt-2 text-[13px]">
               Share link: <code>{`${origin}/clearcut/r/${ready.state.session.readonly_token}`}</code>{' '}
-              <button
-                className="btn btn-sm btn-outline-secondary"
-                style={{ marginLeft: 8 }}
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-2"
                 type="button"
                 onClick={async () => {
                   await navigator.clipboard.writeText(`${origin}/clearcut/r/${ready.state.session.readonly_token}`);
@@ -568,103 +543,89 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 }}
               >
                 Copy
-              </button>
+              </Button>
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'end', alignItems: 'center' }}>
+        <div className="flex gap-2 flex-wrap justify-end items-center">
           {!readonlyView && (
-            <Dropdown>
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                id="session-options-dropdown"
-                style={{ padding: '0.375rem 0.5rem' }}
-                title="Session options"
-                aria-label="Session options"
-              >
-                <Settings size={18} strokeWidth={2} aria-hidden />
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item onClick={onRename}>Rename</Dropdown.Item>
-                <Dropdown.Item onClick={onSetPassword}>Set Password</Dropdown.Item>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Session options">
+                  <Settings size={18} strokeWidth={2} aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onRename}>Rename</DropdownMenuItem>
+                <DropdownMenuItem onClick={onSetPassword}>Set Password</DropdownMenuItem>
                 {ready.state.session.has_password && (
                   <>
-                    <Dropdown.Item onClick={onRemovePassword}>Remove Password</Dropdown.Item>
-                    <Dropdown.Item onClick={onLogout}>Logout</Dropdown.Item>
+                    <DropdownMenuItem onClick={onRemovePassword}>Remove Password</DropdownMenuItem>
+                    <DropdownMenuItem onClick={onLogout}>Logout</DropdownMenuItem>
                   </>
                 )}
-                <Dropdown.Divider />
-                <Dropdown.Item onClick={onClone}>Save As New</Dropdown.Item>
-                <Dropdown.Item onClick={onDelete} className="text-danger">
+                <DropdownMenuSeparator />
+                {palettes.map((p) => (
+                  <DropdownMenuItem
+                    key={p.id}
+                    onClick={() => setPaletteId(p.id as PaletteId)}
+                  >
+                    {paletteId === p.id ? `\u2713 ${p.name}` : `  ${p.name}`}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onClone}>Save As New</DropdownMenuItem>
+                <DropdownMenuItem className="text-cc-danger" onClick={onDelete}>
                   Delete
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {!readonlyView && (
-            <button className="btn btn-primary" disabled={saving} onClick={onSave} type="button">
+            <Button disabled={saving} onClick={onSave} type="button">
               {saving ? 'Saving...' : 'Save Run Cut'}
-            </button>
+            </Button>
           )}
         </div>
       </header>
 
       {hasData && allTimeBlocks.length > 0 && (
-        <section
-          style={{
-            marginTop: '0.8rem',
-            marginBottom: '0.4rem',
-            border: '1px solid #dee5f0',
-            borderRadius: 10,
-            background: '#fff',
-            padding: '0.75rem',
-          }}
-        >
+        <section className="mt-3 mb-1 border border-cc-border rounded-[10px] bg-cc-surface-1 p-3">
           <button
             type="button"
             onClick={() => setFiltersOpen((prev) => !prev)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 600,
-              color: '#374151',
-              marginBottom: filtersOpen ? '0.5rem' : 0,
-              width: '100%',
-            }}
+            className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full"
+            style={{ marginBottom: filtersOpen ? '0.5rem' : 0 }}
           >
             <span style={{ transform: filtersOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', display: 'inline-block' }}>&#9654;</span>
             Filters
           </button>
-          <div className="row g-3" style={{ display: filtersOpen ? undefined : 'none' }}>
-            <div className="col-lg-6">
-              <div className="d-flex flex-wrap align-items-center gap-3 mb-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" style={{ display: filtersOpen ? undefined : 'none' }}>
+            <div>
+              <div className="flex flex-wrap items-center gap-3 mb-2">
                 <div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Interval</div>
-                  <div className="d-flex gap-1">
+                  <div className="text-xs text-cc-text-muted mb-1">Interval</div>
+                  <div className="flex gap-1">
                     {([15, 30, 60] as const).map((mins) => (
-                      <button
+                      <Button
                         key={mins}
                         type="button"
-                        className={`btn btn-sm ${intervalMinutes === mins ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        size="sm"
+                        variant={intervalMinutes === mins ? 'default' : 'outline'}
                         onClick={() => setIntervalMinutes(mins)}
                       >
                         {mins}m
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
               </div>
               <div className="mb-2">
-                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Weekday</div>
-                <div className="d-flex flex-wrap align-items-center gap-2">
-                  <button
-                    className={`btn btn-sm ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
+                <div className="text-xs text-cc-text-muted mb-1">Weekday</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'default' : 'outline'}
                     type="button"
                     onClick={() =>
                       setSelectedWeekdayDays((prev) =>
@@ -673,24 +634,26 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     }
                   >
                     Weekday
-                  </button>
+                  </Button>
                   {WEEKDAY_DAY_IDS.map((day) => (
-                    <button
+                    <Button
                       key={`weekday-pill-${day}`}
                       type="button"
-                      className={`btn btn-sm ${selectedWeekdayDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      size="sm"
+                      variant={selectedWeekdayDays.includes(day) ? 'default' : 'outline'}
                       onClick={() => toggleWeekday(day)}
                     >
                       {DAY_LABELS[day]}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Weekend</div>
-                <div className="d-flex flex-wrap align-items-center gap-2">
-                  <button
-                    className={`btn btn-sm ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'btn-primary' : 'btn-outline-secondary'}`}
+                <div className="text-xs text-cc-text-muted mb-1">Weekend</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'default' : 'outline'}
                     type="button"
                     onClick={() =>
                       setSelectedWeekendDays((prev) =>
@@ -699,22 +662,23 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     }
                   >
                     Weekend
-                  </button>
+                  </Button>
                   {WEEKEND_DAY_IDS.map((day) => (
-                    <button
+                    <Button
                       key={`weekend-pill-${day}`}
                       type="button"
-                      className={`btn btn-sm ${selectedWeekendDays.includes(day) ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      size="sm"
+                      variant={selectedWeekendDays.includes(day) ? 'default' : 'outline'}
                       onClick={() => toggleWeekend(day)}
                     >
                       {DAY_LABELS[day]}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="col-lg-6">
-              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Service Hour Time Selector</div>
+            <div>
+              <div className="text-xs text-cc-text-muted mb-1">Service Hour Time Selector</div>
               <div
                 ref={timeRangeTrackRef}
                 style={{ position: 'relative', height: 30 }}
@@ -744,7 +708,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     height: 4,
                     transform: 'translateY(-50%)',
                     borderRadius: 4,
-                    background: '#e5e7eb',
+                    background: 'var(--color-cc-surface-3)',
                   }}
                 />
                 <div
@@ -754,7 +718,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     height: 4,
                     transform: 'translateY(-50%)',
                     borderRadius: 4,
-                    background: '#2563eb',
+                    background: 'var(--color-cc-accent)',
                     left: `${(timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
                     width: `${((timeEndIndex - timeStartIndex) / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
                   }}
@@ -767,8 +731,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     width: 12,
                     height: 12,
                     borderRadius: '50%',
-                    background: '#2563eb',
-                    border: '2px solid #fff',
+                    background: 'var(--color-cc-accent)',
+                    border: '2px solid var(--color-cc-surface-1)',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
                     transform: 'translate(-50%, -50%)',
                     pointerEvents: 'auto',
@@ -788,8 +752,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     width: 12,
                     height: 12,
                     borderRadius: '50%',
-                    background: '#2563eb',
-                    border: '2px solid #fff',
+                    background: 'var(--color-cc-accent)',
+                    border: '2px solid var(--color-cc-surface-1)',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
                     transform: 'translate(-50%, -50%)',
                     pointerEvents: 'auto',
@@ -802,13 +766,13 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                   }}
                 />
               </div>
-              <div className="d-flex justify-content-between" style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>
+              <div className="flex justify-between text-[11px] text-cc-text-muted mt-1">
                 <span>Start: {allTimeBlocks[timeStartIndex]?.label ?? '--'}</span>
                 <span>End: {allTimeBlocks[timeEndIndex]?.label ?? '--'}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#2563eb' }}>
+              <div className="text-xs text-cc-accent">
                 {allTimeBlocks[timeStartIndex]?.label} - {allTimeBlocks[timeEndIndex]?.label}
-                {' • '}
+                {' - '}
                 {selectedDayIds.length > 0 ? `${selectedDayIds.length} day(s) selected` : 'No days selected'}
               </div>
             </div>
@@ -816,32 +780,27 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
         </section>
       )}
 
-      <div style={{ marginTop: '0.9rem', marginBottom: '0.5rem' }}>
-        <ul className="nav nav-tabs">
-          {TAB_ITEMS.map((item) => {
-            if (item.key === 'import' && readonlyView) return null;
-            const disabled = item.key !== 'import' && !hasData;
-            return (
-              <li className="nav-item" key={item.key}>
-                <button
-                  type="button"
-                  className={`nav-link ${tab === item.key ? 'active' : ''}`}
-                  disabled={disabled}
-                  onClick={() => {
-                    setTab(item.key);
-                    if (item.key === 'map') setHasVisitedMap(true);
-                  }}
-                >
+      <div className="mt-4 mb-2">
+        <Tabs value={tab} onValueChange={(v) => {
+          setTab(v as TabKey);
+          if (v === 'map') setHasVisitedMap(true);
+        }}>
+          <TabsList>
+            {TAB_ITEMS.map((item) => {
+              if (item.key === 'import' && readonlyView) return null;
+              const disabled = item.key !== 'import' && !hasData;
+              return (
+                <TabsTrigger key={item.key} value={item.key} disabled={disabled}>
                   {item.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
       </div>
 
-      {status && <p style={{ color: '#065f46', marginBottom: '0.5rem' }}>{status}</p>}
-      {error && <p style={{ color: '#b91c1c', marginBottom: '0.5rem' }}>{error}</p>}
+      {status && <p className="text-cc-success mb-2">{status}</p>}
+      {error && <p className="text-cc-danger mb-2">{error}</p>}
 
       {tab === 'import' && (
         <ImportTab

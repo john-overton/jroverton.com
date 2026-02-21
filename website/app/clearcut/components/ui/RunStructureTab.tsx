@@ -2,6 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { Label } from '@/app/clearcut/components/shadcn/label';
+import { Slider } from '@/app/clearcut/components/shadcn/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/clearcut/components/shadcn/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/app/clearcut/components/shadcn/table';
 import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
 import { buildOptimizedRoutes, buildRunCutForDate, computeAvgShiftHours, getAvailableDates } from '@/lib/clearcut/run-structure';
 import type { OptimizationRow, RouteRow } from '@/lib/clearcut/types';
@@ -45,20 +62,17 @@ export default function RunStructureTab({
   intervalMinutes,
   onOptimizationChange,
 }: RunStructureTabProps) {
-  // Local slider overrides — null means "use prop value", non-null means "user is dragging"
   const [draftProductivity, setDraftProductivity] = useState<number | null>(null);
   const [draftMaxShift, setDraftMaxShift] = useState<number | null>(null);
   const [draftMinShift, setDraftMinShift] = useState<number | null>(null);
   const [draftRouteBias, setDraftRouteBias] = useState<number | null>(null);
 
-  // Resolved values: draft (if dragging) or persisted prop
   const runStructureSettings = parseRunStructureJson(optimization.run_structure_json);
   const localProductivity = draftProductivity ?? optimization.target_productivity ?? 2.0;
   const localMaxShift = draftMaxShift ?? optimization.max_driver_spread_hrs ?? 12;
   const localMinShift = draftMinShift ?? runStructureSettings.minShiftHrs;
   const localRouteBias = draftRouteBias ?? runStructureSettings.routeLengthBias;
 
-  // Refs to read latest value in pointer-up handlers without stale closures
   const productivityRef = useRef(localProductivity);
   productivityRef.current = localProductivity;
   const maxShiftRef = useRef(localMaxShift);
@@ -75,7 +89,6 @@ export default function RunStructureTab({
     [routes, selectedDays],
   );
 
-  // Auto-select first available date when filter changes
   useEffect(() => {
     if (availableDates.length > 0 && (!selectedRunCutDate || !availableDates.includes(selectedRunCutDate))) {
       setSelectedRunCutDate(availableDates[0]);
@@ -109,7 +122,6 @@ export default function RunStructureTab({
     [fullDayMetrics.blocks, fullDayMetrics.onBoardByBlock, localProductivity, localMaxShift, localMinShift, fullDayMetrics.avgStartDeadheadMinutes, fullDayMetrics.avgEndDeadheadMinutes, localRouteBias],
   );
 
-  // Compute vehicles-per-block from current run cut using full-day blocks
   const currentVehiclesByBlockFullDay = useMemo(() => {
     const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
     for (const row of currentRunCut) {
@@ -120,7 +132,6 @@ export default function RunStructureTab({
     return counts;
   }, [currentRunCut, fullDayMetrics.blocks.length]);
 
-  // Map full-day current vehicles onto the filtered view blocks for the chart
   const currentVehiclesByBlock = useMemo(() => {
     return metrics.blocks.map((viewBlock) => {
       const fullIdx = fullDayMetrics.blocks.findIndex(
@@ -130,7 +141,6 @@ export default function RunStructureTab({
     });
   }, [metrics.blocks, fullDayMetrics.blocks, currentVehiclesByBlockFullDay]);
 
-  // Compute vehicles-per-block from optimized routes using full-day blocks
   const optimizedVehiclesByBlockFullDay = useMemo(() => {
     const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
     for (const route of optimizedRoutes) {
@@ -141,7 +151,6 @@ export default function RunStructureTab({
     return counts;
   }, [optimizedRoutes, fullDayMetrics.blocks.length]);
 
-  // Map full-day optimized vehicles onto the filtered view blocks for the chart
   const optimizedVehiclesByBlock = useMemo(() => {
     return metrics.blocks.map((viewBlock) => {
       const fullIdx = fullDayMetrics.blocks.findIndex(
@@ -151,13 +160,11 @@ export default function RunStructureTab({
     });
   }, [metrics.blocks, fullDayMetrics.blocks, optimizedVehiclesByBlockFullDay]);
 
-  // Average daily trips = sum of pickupsByBlock (already day-averaged in computeClearcutMetrics)
   const avgDailyTrips = useMemo(
     () => Math.round(fullDayMetrics.pickupsByBlock.reduce((sum, v) => sum + v, 0) * 10) / 10,
     [fullDayMetrics.pickupsByBlock],
   );
 
-  // Stats for current run cut — productivity from avg daily trips / daily service hours
   const currentStats = useMemo(() => {
     const totalHours = currentRunCut.reduce((sum, r) => sum + r.durationHours, 0);
     const maxVehicles = Math.max(...currentVehiclesByBlockFullDay, 0);
@@ -171,7 +178,6 @@ export default function RunStructureTab({
     };
   }, [currentRunCut, currentVehiclesByBlockFullDay, avgDailyTrips]);
 
-  // Stats for optimized routes — productivity from avg daily trips / optimized service hours
   const optimizedStats = useMemo(() => {
     const totalHours = optimizedRoutes.reduce((sum, r) => sum + r.durationHours, 0);
     const maxVehicles = Math.max(...optimizedVehiclesByBlockFullDay, 0);
@@ -188,91 +194,83 @@ export default function RunStructureTab({
   return (
     <>
       <SectionCard title="Optimization Parameters">
-        <div className="row g-3">
-          <div className="col-md-3">
-            <label className="form-label">Target Productivity</label>
-            <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <Label>Target Productivity</Label>
+            <div className="text-xs text-cc-info mb-1">
               Actual: <strong>{fullDayMetrics.avgProductivity}</strong> &middot; Target: <strong>{localProductivity}</strong>
             </div>
-            <input
-              className="form-range"
+            <Slider
               disabled={readonlyView}
-              type="range"
               min={1.0}
               max={3.5}
               step={0.1}
-              value={localProductivity}
-              onChange={(e) => setDraftProductivity(Number(e.target.value))}
-              onPointerUp={() => { onOptimizationChange('target_productivity', productivityRef.current); setDraftProductivity(null); }}
+              value={[localProductivity]}
+              onValueChange={([v]) => setDraftProductivity(v)}
+              onValueCommit={() => { onOptimizationChange('target_productivity', productivityRef.current); setDraftProductivity(null); }}
             />
           </div>
-          <div className="col-md-3">
-            <label className="form-label">Min Shift Length</label>
-            <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
+          <div>
+            <Label>Min Shift Length</Label>
+            <div className="text-xs text-cc-info mb-1">
               Min: <strong>{localMinShift} hrs</strong>
             </div>
-            <input
-              className="form-range"
+            <Slider
               disabled={readonlyView}
-              type="range"
               min={2}
               max={8}
               step={0.5}
-              value={localMinShift}
-              onChange={(e) => setDraftMinShift(Number(e.target.value))}
-              onPointerUp={() => { onOptimizationChange('run_structure_json', JSON.stringify({ minShiftHrs: minShiftRef.current, routeLengthBias: routeBiasRef.current })); setDraftMinShift(null); }}
+              value={[localMinShift]}
+              onValueChange={([v]) => setDraftMinShift(v)}
+              onValueCommit={() => { onOptimizationChange('run_structure_json', JSON.stringify({ minShiftHrs: minShiftRef.current, routeLengthBias: routeBiasRef.current })); setDraftMinShift(null); }}
             />
           </div>
-          <div className="col-md-3">
-            <label className="form-label">Max Shift Length</label>
-            <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
+          <div>
+            <Label>Max Shift Length</Label>
+            <div className="text-xs text-cc-info mb-1">
               Actual avg: <strong>{avgShiftHours} hrs</strong> &middot; Max: <strong>{localMaxShift} hrs</strong>
             </div>
-            <input
-              className="form-range"
+            <Slider
               disabled={readonlyView}
-              type="range"
               min={8}
               max={14}
               step={0.5}
-              value={localMaxShift}
-              onChange={(e) => setDraftMaxShift(Number(e.target.value))}
-              onPointerUp={() => { onOptimizationChange('max_driver_spread_hrs', maxShiftRef.current); setDraftMaxShift(null); }}
+              value={[localMaxShift]}
+              onValueChange={([v]) => setDraftMaxShift(v)}
+              onValueCommit={() => { onOptimizationChange('max_driver_spread_hrs', maxShiftRef.current); setDraftMaxShift(null); }}
             />
           </div>
-          <div className="col-md-3">
-            <label className="form-label">Deadhead</label>
-            <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
+          <div>
+            <Label>Deadhead</Label>
+            <div className="text-xs text-cc-info mb-1">
               First Pick: <strong>{Math.round(fullDayMetrics.avgStartDeadheadMinutes * 10) / 10} min</strong>
             </div>
-            <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
+            <div className="text-xs text-cc-info mb-1">
               Return to Yard: <strong>{Math.round(fullDayMetrics.avgEndDeadheadMinutes * 10) / 10} min</strong>
             </div>
           </div>
         </div>
-        <div className="row g-3 mt-1">
-          <div className="col-md-3">
-            <label className="form-label">Route Length Bias</label>
-            <div style={{ fontSize: 12, color: '#2563eb', marginBottom: 4 }}>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+          <div>
+            <Label>Route Length Bias</Label>
+            <div className="text-xs text-cc-info mb-1">
               Short &larr; <strong>{localRouteBias}</strong> &rarr; Long
             </div>
-            <input
-              className="form-range"
+            <Slider
               disabled={readonlyView}
-              type="range"
               min={0}
               max={1}
               step={0.1}
-              value={localRouteBias}
-              onChange={(e) => setDraftRouteBias(Number(e.target.value))}
-              onPointerUp={() => { onOptimizationChange('run_structure_json', JSON.stringify({ minShiftHrs: minShiftRef.current, routeLengthBias: routeBiasRef.current })); setDraftRouteBias(null); }}
+              value={[localRouteBias]}
+              onValueChange={([v]) => setDraftRouteBias(v)}
+              onValueCommit={() => { onOptimizationChange('run_structure_json', JSON.stringify({ minShiftHrs: minShiftRef.current, routeLengthBias: routeBiasRef.current })); setDraftRouteBias(null); }}
             />
           </div>
         </div>
       </SectionCard>
 
       <SectionCard title="Demand & Vehicle Coverage">
-        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+        <div className="text-xs text-cc-text-muted mb-2">
           Demand shown as bars. Current vehicles (solid teal) and optimized vehicles (dashed amber) as line overlays.
         </div>
         <RunStructureChart
@@ -284,102 +282,101 @@ export default function RunStructureTab({
         />
       </SectionCard>
 
-      <div className="row">
-        <div className="col-lg-6 mb-3">
-          <SectionCard title="Imported Run Cut">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <select
-                className="form-select form-select-sm"
-                style={{ width: 'auto', minWidth: 200 }}
-                value={selectedRunCutDate ?? ''}
-                onChange={(e) => setSelectedRunCutDate(e.target.value || null)}
-              >
-                {availableDates.length === 0 && <option value="">No dates available</option>}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SectionCard title="Imported Run Cut">
+          <div className="flex items-center gap-3 mb-3">
+            <Select
+              value={selectedRunCutDate ?? ''}
+              onValueChange={(v) => setSelectedRunCutDate(v || null)}
+            >
+              <SelectTrigger className="w-auto min-w-[200px]">
+                <SelectValue placeholder="No dates available" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDates.length === 0 && <SelectItem value="">No dates available</SelectItem>}
                 {availableDates.map((dateStr) => {
                   const d = new Date(dateStr + 'T00:00:00');
                   const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-                  return <option key={dateStr} value={dateStr}>{label}</option>;
+                  return <SelectItem key={dateStr} value={dateStr}>{label}</SelectItem>;
                 })}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13, flexWrap: 'wrap' }}>
-              <span>Avg Daily Trips: <strong>{avgDailyTrips}</strong></span>
-              <span>Hours: <strong>{currentStats.totalHours}</strong></span>
-              <span>Peak Vehicles: <strong>{currentStats.maxVehicles}</strong></span>
-              <span>Productivity: <strong>{currentStats.productivity}</strong></span>
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-              Imported routes for the selected date, rounded up to {intervalMinutes}-min blocks.
-            </div>
-            <table className="table table-sm mb-0">
-              <thead>
-                <tr>
-                  <th>Route</th>
-                  <th>Shift Start</th>
-                  <th>Shift End</th>
-                  <th>Duration</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentRunCut.length === 0 && (
-                  <tr>
-                    <td colSpan={4} style={{ color: '#6b7280' }}>
-                      No routes for selected date
-                    </td>
-                  </tr>
-                )}
-                {currentRunCut.map((row, idx) => (
-                  <tr key={`${row.routeName}-${idx}`}>
-                    <td>{row.routeName}</td>
-                    <td>{row.shiftStart}</td>
-                    <td>{row.shiftEnd}</td>
-                    <td>{row.durationHours} hrs</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </SectionCard>
-        </div>
-        <div className="col-lg-6 mb-3">
-          <SectionCard title="Optimized Routes">
-            <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13, flexWrap: 'wrap' }}>
-              <span>Avg Daily Trips: <strong>{avgDailyTrips}</strong></span>
-              <span>Hours: <strong>{optimizedStats.totalHours}</strong></span>
-              <span>Peak Vehicles: <strong>{optimizedStats.maxVehicles}</strong></span>
-              <span>Productivity: <strong>{optimizedStats.productivity}</strong></span>
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-              Algorithmically built routes based on demand and optimization parameters.
-            </div>
-            <table className="table table-sm mb-0">
-              <thead>
-                <tr>
-                  <th>Vehicle</th>
-                  <th>Shift Start</th>
-                  <th>Shift End</th>
-                  <th>Duration</th>
-                </tr>
-              </thead>
-              <tbody>
-                {optimizedRoutes.length === 0 && (
-                  <tr>
-                    <td colSpan={4} style={{ color: '#6b7280' }}>
-                      No routes generated
-                    </td>
-                  </tr>
-                )}
-                {optimizedRoutes.map((row) => (
-                  <tr key={row.vehicleId}>
-                    <td>Vehicle {row.vehicleId}</td>
-                    <td>{row.shiftStart}</td>
-                    <td>{row.shiftEnd}</td>
-                    <td>{row.durationHours} hrs</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </SectionCard>
-        </div>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-4 mb-3 text-[13px] flex-wrap">
+            <span>Avg Daily Trips: <strong>{avgDailyTrips}</strong></span>
+            <span>Hours: <strong>{currentStats.totalHours}</strong></span>
+            <span>Peak Vehicles: <strong>{currentStats.maxVehicles}</strong></span>
+            <span>Productivity: <strong>{currentStats.productivity}</strong></span>
+          </div>
+          <div className="text-xs text-cc-text-muted mb-2">
+            Imported routes for the selected date, rounded up to {intervalMinutes}-min blocks.
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Route</TableHead>
+                <TableHead>Shift Start</TableHead>
+                <TableHead>Shift End</TableHead>
+                <TableHead>Duration</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {currentRunCut.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-cc-text-muted">
+                    No routes for selected date
+                  </TableCell>
+                </TableRow>
+              )}
+              {currentRunCut.map((row, idx) => (
+                <TableRow key={`${row.routeName}-${idx}`}>
+                  <TableCell>{row.routeName}</TableCell>
+                  <TableCell>{row.shiftStart}</TableCell>
+                  <TableCell>{row.shiftEnd}</TableCell>
+                  <TableCell>{row.durationHours} hrs</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+        <SectionCard title="Optimized Routes">
+          <div className="flex gap-4 mb-3 text-[13px] flex-wrap">
+            <span>Avg Daily Trips: <strong>{avgDailyTrips}</strong></span>
+            <span>Hours: <strong>{optimizedStats.totalHours}</strong></span>
+            <span>Peak Vehicles: <strong>{optimizedStats.maxVehicles}</strong></span>
+            <span>Productivity: <strong>{optimizedStats.productivity}</strong></span>
+          </div>
+          <div className="text-xs text-cc-text-muted mb-2">
+            Algorithmically built routes based on demand and optimization parameters.
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Vehicle</TableHead>
+                <TableHead>Shift Start</TableHead>
+                <TableHead>Shift End</TableHead>
+                <TableHead>Duration</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {optimizedRoutes.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-cc-text-muted">
+                    No routes generated
+                  </TableCell>
+                </TableRow>
+              )}
+              {optimizedRoutes.map((row) => (
+                <TableRow key={row.vehicleId}>
+                  <TableCell>Vehicle {row.vehicleId}</TableCell>
+                  <TableCell>{row.shiftStart}</TableCell>
+                  <TableCell>{row.shiftEnd}</TableCell>
+                  <TableCell>{row.durationHours} hrs</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
       </div>
     </>
   );
