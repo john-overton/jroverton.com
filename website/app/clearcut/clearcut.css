@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is([data-mode="dark"] *));
 
 @theme {
   --font-inter: "Inter", system-ui, sans-serif;
@@ -74,73 +74,36 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/*
+ * Map shadcn semantic vars from cc-tokens using var() references.
+ * When the theme provider overrides cc-vars via JS, these cascade automatically.
+ * On SSR (before JS), the @theme defaults (Revenue Run) apply.
+ */
 .clearcut {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.clearcut[data-mode="dark"] {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: var(--color-cc-bg);
+  --foreground: var(--color-cc-text);
+  --card: var(--color-cc-surface-1);
+  --card-foreground: var(--color-cc-text);
+  --popover: var(--color-cc-surface-1);
+  --popover-foreground: var(--color-cc-text);
+  --primary: var(--color-cc-accent);
+  --primary-foreground: var(--color-cc-accent-fg);
+  --secondary: var(--color-cc-surface-2);
+  --secondary-foreground: var(--color-cc-text);
+  --muted: var(--color-cc-surface-2);
+  --muted-foreground: var(--color-cc-text-muted);
+  --accent: var(--color-cc-surface-3);
+  --accent-foreground: var(--color-cc-text);
+  --destructive: var(--color-cc-danger);
+  --border: var(--color-cc-border);
+  --input: var(--color-cc-border);
+  --ring: var(--color-cc-accent);
+  --chart-1: var(--color-cc-chart-1);
+  --chart-2: var(--color-cc-chart-2);
+  --chart-3: var(--color-cc-chart-3);
+  --chart-4: var(--color-cc-chart-4);
+  --chart-5: var(--color-cc-chart-5);
 }
 
 @layer base {

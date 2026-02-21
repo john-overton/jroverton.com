@@ -162,8 +162,20 @@ export function MiniBars({ values, max }: { values: number[]; max?: number }) {
   );
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [
+    parseInt(h.substring(0, 2), 16),
+    parseInt(h.substring(2, 4), 16),
+    parseInt(h.substring(4, 6), 16),
+  ];
+}
+
 export function HeatStrip({ values, blocks }: { values: number[]; blocks?: Array<{ label: string }> }) {
+  const { chartColors, palette } = useClearcutTheme();
   const max = Math.max(...values, 1);
+  const [r, g, b] = hexToRgb(chartColors[0]);
+  const emptyColor = palette.tokens['--color-cc-surface-2'];
   const data = values.map((value, index) => ({
     idx: index,
     value: Math.round(value * 10) / 10,
@@ -191,8 +203,8 @@ export function HeatStrip({ values, blocks }: { values: number[]; blocks?: Array
           <Bar dataKey="unit" isAnimationActive={false}>
             {data.map((entry, index) => {
               const ratio = max > 0 ? entry.value / max : 0;
-              const intensity = Math.round(220 - ratio * 140);
-              const color = entry.value <= 0 ? '#eef2f7' : `rgb(${intensity}, ${intensity + 8}, 255)`;
+              const opacity = 0.12 + ratio * 0.88;
+              const color = entry.value <= 0 ? emptyColor : `rgba(${r}, ${g}, ${b}, ${opacity})`;
               return <Cell key={`heat-cell-${index}`} fill={color} />;
             })}
           </Bar>

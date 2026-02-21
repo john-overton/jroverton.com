@@ -7,8 +7,8 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mon
 
 export default function ClearcutLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`clearcut ${inter.variable} ${jetbrainsMono.variable}`}>
-      <ClearcutThemeProvider>{children}</ClearcutThemeProvider>
-    </div>
+    <ClearcutThemeProvider className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      {children}
+    </ClearcutThemeProvider>
   );
 }
