@@ -64,6 +64,7 @@ export interface ClearcutMetrics {
 
 interface ComputeMetricsOptions {
   selectedDays?: number[];
+  specificDate?: string;
   timeRangeStart?: string | null;
   timeRangeEnd?: string | null;
   blockSizeMinutes?: number;
@@ -206,12 +207,17 @@ function ensureDayBlockSets(
   return created;
 }
 
-function computeActualAvgRideTime(trips: TripRow[], selectedDays: Set<number>): number | null {
+function computeActualAvgRideTime(
+  trips: TripRow[],
+  selectedDays: Set<number> | null,
+  filterDate: string | null,
+): number | null {
   const rideTimes: number[] = [];
   for (const trip of trips) {
     const pickup = asDate(trip.pickup_leave_time ?? '') ?? asDate(trip.pickup_arrive_time ?? '');
     const dropoff = asDate(trip.dropoff_leave_time ?? '') ?? asDate(trip.dropoff_arrive_time ?? '');
-    if (!pickup || !dropoff || !selectedDays.has(pickup.getDay())) {
+    if (!pickup || !dropoff) continue;
+    if (filterDate ? dateKey(pickup) !== filterDate : !selectedDays!.has(pickup.getDay())) {
       continue;
     }
     const minutes = (dropoff.getTime() - pickup.getTime()) / 60_000;
@@ -384,19 +390,24 @@ export function computeClearcutMetrics(
   let totalDropoffOnTime = 0;
   let totalTripEligible = 0;
   let totalTripOnTime = 0;
-  const selectedDays = resolveSelectedDays(session, options.selectedDays);
+  const optSpecificDate = options.specificDate ?? null;
+  const selectedDays = optSpecificDate ? null : resolveSelectedDays(session, options.selectedDays);
   const dayKeys = new Set<string>();
 
   for (const trip of session.trips) {
     const pickupTimestamp = tripPickupTime(trip);
-    if (pickupTimestamp && selectedDays.has(pickupTimestamp.getDay())) {
-      dayKeys.add(dateKey(pickupTimestamp));
+    if (!pickupTimestamp) continue;
+    const dk = dateKey(pickupTimestamp);
+    if (optSpecificDate ? dk === optSpecificDate : selectedDays!.has(pickupTimestamp.getDay())) {
+      dayKeys.add(dk);
     }
   }
   for (const route of session.routes) {
     const routeStartDate = routeStart(route);
-    if (routeStartDate && selectedDays.has(routeStartDate.getDay())) {
-      dayKeys.add(dateKey(routeStartDate));
+    if (!routeStartDate) continue;
+    const dk = dateKey(routeStartDate);
+    if (optSpecificDate ? dk === optSpecificDate : selectedDays!.has(routeStartDate.getDay())) {
+      dayKeys.add(dk);
     }
   }
 
@@ -404,7 +415,9 @@ export function computeClearcutMetrics(
 
   for (const trip of session.trips) {
     const pickupTimestamp = tripPickupTime(trip);
-    if (!pickupTimestamp || !selectedDays.has(pickupTimestamp.getDay())) {
+    if (!pickupTimestamp) continue;
+    const tripDk = dateKey(pickupTimestamp);
+    if (optSpecificDate ? tripDk !== optSpecificDate : !selectedDays!.has(pickupTimestamp.getDay())) {
       continue;
     }
 
@@ -499,7 +512,9 @@ export function computeClearcutMetrics(
   for (const route of session.routes) {
     const start = routeStart(route);
     const end = routeEnd(route);
-    if (!start || !end || !selectedDays.has(start.getDay())) {
+    if (!start || !end) continue;
+    const routeDk = dateKey(start);
+    if (optSpecificDate ? routeDk !== optSpecificDate : !selectedDays!.has(start.getDay())) {
       continue;
     }
     const startM = dateToMinutes(start);
@@ -540,7 +555,7 @@ export function computeClearcutMetrics(
   }
 
   const avgRideTimeMin =
-    computeActualAvgRideTime(session.trips, selectedDays) ?? session.settings.avg_ride_time_min;
+    computeActualAvgRideTime(session.trips, selectedDays, optSpecificDate) ?? session.settings.avg_ride_time_min;
   // <15 min: current block only; 15-30: current + 1 previous; 30-45: current + 2 previous; etc.
   const lookBackBlocks = Math.floor(avgRideTimeMin / blockSizeMinutes);
 
@@ -662,7 +677,8 @@ export function computeClearcutMetrics(
   const tripsByRouteDay = new Map<string, TripRow[]>();
   for (const trip of session.trips) {
     const pickup = tripPickupTime(trip);
-    if (!pickup || !selectedDays.has(pickup.getDay())) continue;
+    if (!pickup) continue;
+    if (optSpecificDate ? dateKey(pickup) !== optSpecificDate : !selectedDays!.has(pickup.getDay())) continue;
     const key = `${trip.route_id}::${dateKey(pickup)}`;
     let arr = tripsByRouteDay.get(key);
     if (!arr) {

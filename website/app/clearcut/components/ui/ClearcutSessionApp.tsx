@@ -7,6 +7,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/clearcut/components/shadcn/button';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/clearcut/components/shadcn/select';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -35,6 +42,7 @@ import {
   formatMinutesToClock,
   formatMinutesToLabel,
   parseClockToMinutes,
+  parseDateTime,
 } from './shared';
 
 type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runstructure' | 'deadhead';
@@ -82,6 +90,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [draggingTimeHandle, setDraggingTimeHandle] = useState<'start' | 'end' | null>(null);
   const [intervalMinutes, setIntervalMinutes] = useState<15 | 30 | 60>(15);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [dayMode, setDayMode] = useState<'dow' | 'specific'>('dow');
+  const [specificDate, setSpecificDate] = useState<string | null>(null);
 
   const readonlyView = mode === 'readonly';
 
@@ -111,6 +121,32 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     }
     return output;
   }, [serviceStartMinutes, serviceEndMinutes]);
+  const availableDates = useMemo(() => {
+    if (!ready) return [];
+    const dates = new Set<string>();
+    for (const trip of ready.state.trips) {
+      const t =
+        parseDateTime(trip.pickup_arrive_time) ??
+        parseDateTime(trip.pickup_leave_time) ??
+        parseDateTime(trip.scheduled_pickup_time);
+      if (t) {
+        const y = t.getFullYear();
+        const m = `${t.getMonth() + 1}`.padStart(2, '0');
+        const d = `${t.getDate()}`.padStart(2, '0');
+        dates.add(`${y}-${m}-${d}`);
+      }
+    }
+    for (const route of ready.state.routes) {
+      const t = parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time);
+      if (t) {
+        const y = t.getFullYear();
+        const m = `${t.getMonth() + 1}`.padStart(2, '0');
+        const d = `${t.getDate()}`.padStart(2, '0');
+        dates.add(`${y}-${m}-${d}`);
+      }
+    }
+    return [...dates].sort();
+  }, [ready]);
   const selectedDayIds = useMemo(
     () => [...selectedWeekdayDays, ...selectedWeekendDays].sort((a, b) => a - b),
     [selectedWeekdayDays, selectedWeekendDays],
@@ -122,29 +158,36 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const rangeEndClock = allTimeBlocks[timeEndIndex]
     ? formatMinutesToClock(allTimeBlocks[timeEndIndex].minutes)
     : null;
+  const metricsOptions = useMemo(
+    () => ({
+      selectedDays: dayMode === 'dow' ? selectedDayIds : undefined,
+      specificDate: dayMode === 'specific' && specificDate ? specificDate : undefined,
+    }),
+    [dayMode, selectedDayIds, specificDate],
+  );
   const metrics = useMemo(
     () =>
       ready
         ? computeClearcutMetrics(ready.state, {
-            selectedDays: selectedDayIds,
+            ...metricsOptions,
             timeRangeStart: rangeStartClock,
             timeRangeEnd: rangeEndClock,
             blockSizeMinutes: intervalMinutes,
           })
         : null,
-    [rangeEndClock, rangeStartClock, ready, selectedDayIds, intervalMinutes],
+    [rangeEndClock, rangeStartClock, ready, metricsOptions, intervalMinutes],
   );
   const fullDayMetrics = useMemo(
     () =>
       ready
         ? computeClearcutMetrics(ready.state, {
-            selectedDays: selectedDayIds,
+            ...metricsOptions,
             timeRangeStart: null,
             timeRangeEnd: null,
             blockSizeMinutes: intervalMinutes,
           })
         : null,
-    [ready, selectedDayIds, intervalMinutes],
+    [ready, metricsOptions, intervalMinutes],
   );
   const hasData = ready ? ready.state.session.trip_count > 0 || ready.state.session.route_count > 0 : false;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -602,85 +645,105 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
               />
               Filters
             </CollapsibleTrigger>
-            <CollapsibleContent className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-2">
+            <CollapsibleContent className="grid grid-cols-1 lg:grid-cols-[1fr_1px_1fr_1px_1fr] gap-4 mt-2">
+            {/* Column 1: Interval */}
             <div>
-              <div className="flex flex-wrap items-center gap-3 mb-2">
-                <div>
-                  <div className="text-xs text-cc-text-muted mb-1">Interval</div>
-                  <div className="flex gap-1">
-                    {([15, 30, 60] as const).map((mins) => (
-                      <Button
-                        key={mins}
-                        type="button"
-                        size="sm"
-                        variant={intervalMinutes === mins ? 'default' : 'outline'}
-                        onClick={() => setIntervalMinutes(mins)}
-                      >
-                        {mins}m
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="mb-2">
-                <div className="text-xs text-cc-text-muted mb-1">Weekday</div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant={selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'default' : 'outline'}
-                    type="button"
-                    onClick={() =>
-                      setSelectedWeekdayDays((prev) =>
-                        prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
-                      )
-                    }
-                  >
-                    Weekday
-                  </Button>
-                  {WEEKDAY_DAY_IDS.map((day) => (
-                    <Button
-                      key={`weekday-pill-${day}`}
-                      type="button"
-                      size="sm"
-                      variant={selectedWeekdayDays.includes(day) ? 'default' : 'outline'}
-                      onClick={() => toggleWeekday(day)}
-                    >
-                      {DAY_LABELS[day]}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-cc-text-muted mb-1">Weekend</div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant={selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'default' : 'outline'}
-                    type="button"
-                    onClick={() =>
-                      setSelectedWeekendDays((prev) =>
-                        prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
-                      )
-                    }
-                  >
-                    Weekend
-                  </Button>
-                  {WEEKEND_DAY_IDS.map((day) => (
-                    <Button
-                      key={`weekend-pill-${day}`}
-                      type="button"
-                      size="sm"
-                      variant={selectedWeekendDays.includes(day) ? 'default' : 'outline'}
-                      onClick={() => toggleWeekend(day)}
-                    >
-                      {DAY_LABELS[day]}
-                    </Button>
-                  ))}
-                </div>
+              <div className="text-xs text-cc-text-muted mb-1">Interval</div>
+              <div className="flex gap-1 text-xs">
+                {([15, 30, 60] as const).map((mins) => (
+                  <button
+                    key={mins}
+                    className={`px-2 py-0.5 rounded ${intervalMinutes === mins ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                    onClick={() => setIntervalMinutes(mins)}
+                  >{mins}m</button>
+                ))}
               </div>
             </div>
+
+            <div className="hidden lg:block bg-cc-border" />
+            {/* Column 2: Day Selection */}
             <div>
-              <div className="text-xs text-cc-text-muted mb-1">Service Hour Time Selector</div>
+              <div className="flex items-center gap-1 mb-1.5">
+                <div className="text-xs text-cc-text-muted mr-1">Days</div>
+                <div className="flex gap-1 text-xs">
+                  <button
+                    className={`px-2 py-0.5 rounded ${dayMode === 'dow' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                    onClick={() => setDayMode('dow')}
+                  >Day of Week</button>
+                  <button
+                    className={`px-2 py-0.5 rounded ${dayMode === 'specific' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                    onClick={() => {
+                      setDayMode('specific');
+                      if (!specificDate && availableDates.length > 0) {
+                        setSpecificDate(availableDates[0]);
+                      }
+                    }}
+                  >Specific Day</button>
+                </div>
+              </div>
+              {dayMode === 'dow' ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-1 mb-1.5 text-xs">
+                    <button
+                      className={`px-2 py-0.5 rounded ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                      onClick={() =>
+                        setSelectedWeekdayDays((prev) =>
+                          prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
+                        )
+                      }
+                    >Weekday</button>
+                    {WEEKDAY_DAY_IDS.map((day) => (
+                      <button
+                        key={`weekday-pill-${day}`}
+                        className={`px-2 py-0.5 rounded ${selectedWeekdayDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                        onClick={() => toggleWeekday(day)}
+                      >{DAY_LABELS[day]}</button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1 text-xs">
+                    <button
+                      className={`px-2 py-0.5 rounded ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                      onClick={() =>
+                        setSelectedWeekendDays((prev) =>
+                          prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
+                        )
+                      }
+                    >Weekend</button>
+                    {WEEKEND_DAY_IDS.map((day) => (
+                      <button
+                        key={`weekend-pill-${day}`}
+                        className={`px-2 py-0.5 rounded ${selectedWeekendDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                        onClick={() => toggleWeekend(day)}
+                      >{DAY_LABELS[day]}</button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <Select
+                  value={specificDate ?? ''}
+                  onValueChange={(v) => setSpecificDate(v || null)}
+                >
+                  <SelectTrigger className="w-auto min-w-[200px]">
+                    <SelectValue placeholder="Select a date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDates.length === 0 && (
+                      <SelectItem value="">No dates available</SelectItem>
+                    )}
+                    {availableDates.map((dateStr) => {
+                      const d = new Date(dateStr + 'T12:00:00');
+                      const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                      return <SelectItem key={dateStr} value={dateStr}>{label}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            <div className="hidden lg:block bg-cc-border" />
+            {/* Column 3: Time Range */}
+            <div>
+              <div className="text-xs text-cc-text-muted mb-1">Time Range</div>
               <div
                 ref={timeRangeTrackRef}
                 style={{ position: 'relative', height: 30 }}
@@ -775,7 +838,9 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
               <div className="text-xs text-cc-accent">
                 {allTimeBlocks[timeStartIndex]?.label} - {allTimeBlocks[timeEndIndex]?.label}
                 {' - '}
-                {selectedDayIds.length > 0 ? `${selectedDayIds.length} day(s) selected` : 'No days selected'}
+                {dayMode === 'specific'
+                  ? specificDate ?? 'No date selected'
+                  : selectedDayIds.length > 0 ? `${selectedDayIds.length} day(s) selected` : 'No days selected'}
               </div>
             </div>
           </CollapsibleContent>
