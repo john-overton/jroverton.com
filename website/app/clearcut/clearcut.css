@@ -18,19 +18,19 @@
   --color-cc-text: #141B2D;
   --color-cc-text-secondary: #4A5468;
   --color-cc-text-muted: #7C8598;
-  --color-cc-accent: #4F46E5;
-  --color-cc-accent-hover: #4338CA;
+  --color-cc-accent: #059669;
+  --color-cc-accent-hover: #047857;
   --color-cc-accent-fg: #FFFFFF;
   --color-cc-success: #059669;
   --color-cc-warning: #D97706;
   --color-cc-danger: #DC2626;
   --color-cc-info: #0284C7;
-  --color-cc-chart-1: #4F46E5;
-  --color-cc-chart-2: #059669;
+  --color-cc-chart-1: #059669;
+  --color-cc-chart-2: #0284C7;
   --color-cc-chart-3: #DC2626;
   --color-cc-chart-4: #D97706;
-  --color-cc-chart-5: #0284C7;
-  --color-cc-chart-6: #7C3AED;
+  --color-cc-chart-5: #7C3AED;
+  --color-cc-chart-6: #4F46E5;
 }
 
 @theme inline {
