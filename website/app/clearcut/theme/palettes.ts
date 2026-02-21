@@ -82,6 +82,7 @@ export const palettes = [
       info: '#0284C7',
     }),
     chartColors: ['#059669', '#0284C7', '#DC2626', '#D97706', '#7C3AED', '#4F46E5'],
+    mapColors: { pickup: '#059669', dropoff: '#E8590C' },
   },
   {
     id: 'peak-hour' as const,
@@ -106,6 +107,7 @@ export const palettes = [
       info: '#0891B2',
     }),
     chartColors: ['#2563EB', '#059669', '#DC2626', '#EA580C', '#0891B2', '#9333EA'],
+    mapColors: { pickup: '#2563EB', dropoff: '#E11D48' },
   },
   {
     id: 'evening-rush' as const,
@@ -130,6 +132,7 @@ export const palettes = [
       info: '#38BDF8',
     }),
     chartColors: ['#22D3EE', '#34D399', '#F87171', '#FBBF24', '#38BDF8', '#A78BFA'],
+    mapColors: { pickup: '#22D3EE', dropoff: '#FB7185' },
   },
   {
     id: 'night-owl' as const,
@@ -154,6 +157,7 @@ export const palettes = [
       info: '#67E8F9',
     }),
     chartColors: ['#F59E0B', '#34D399', '#FB7185', '#FB923C', '#67E8F9', '#C084FC'],
+    mapColors: { pickup: '#F59E0B', dropoff: '#C084FC' },
   },
 ] as const;
 

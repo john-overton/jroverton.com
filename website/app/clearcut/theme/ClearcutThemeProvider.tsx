@@ -56,12 +56,24 @@ export function ClearcutThemeProvider({
     }
     wrapper.setAttribute('data-mode', palette.mode);
 
+    // Extend themed background to html + body so the full page matches.
+    // Also clear the noise-texture background-image from globals.css.
+    const bgColor = palette.tokens['--color-cc-bg'];
+    root.style.backgroundColor = bgColor;
+    document.body.style.backgroundColor = bgColor;
+    document.body.style.backgroundImage = 'none';
+    document.body.style.color = palette.tokens['--color-cc-text'];
+
     return () => {
       // Clean up root-level vars when ClearCut unmounts so they don't leak
       // to non-ClearCut pages during client-side navigation.
       for (const [prop] of tokenEntries) {
         root.style.removeProperty(prop);
       }
+      root.style.backgroundColor = '';
+      document.body.style.backgroundColor = '';
+      document.body.style.backgroundImage = '';
+      document.body.style.color = '';
     };
   }, [palette]);
 

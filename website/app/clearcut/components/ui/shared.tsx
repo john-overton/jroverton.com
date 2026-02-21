@@ -170,7 +170,9 @@ export function MiniBars({ values, max }: { values: number[]; max?: number }) {
           <Tooltip
             formatter={(value: number | string | undefined) => [Number(value ?? 0), 'Value']}
             labelFormatter={(label) => `Block ${Number(label) + 1}`}
-            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
+            contentStyle={{ borderRadius: 8, background: 'var(--color-cc-surface-1)', color: 'var(--color-cc-text)', borderColor: 'var(--color-cc-border)' }}
+            labelStyle={{ color: 'var(--color-cc-text)' }}
+            itemStyle={{ color: 'var(--color-cc-text-secondary)' }}
           />
           <Bar dataKey="value" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
         </BarChart>
@@ -179,7 +181,7 @@ export function MiniBars({ values, max }: { values: number[]; max?: number }) {
   );
 }
 
-function hexToRgb(hex: string): [number, number, number] {
+export function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
   return [
     parseInt(h.substring(0, 2), 16),
@@ -188,7 +190,7 @@ function hexToRgb(hex: string): [number, number, number] {
   ];
 }
 
-export function HeatStrip({ values, blocks }: { values: number[]; blocks?: Array<{ label: string }> }) {
+export function HeatStrip({ values, blocks, onBlockClick, activeIndex, valueLabel, valueSuffix }: { values: number[]; blocks?: Array<{ label: string }>; onBlockClick?: (index: number) => void; activeIndex?: number; valueLabel?: string; valueSuffix?: string }) {
   const { chartColors, palette } = useClearcutTheme();
   const max = Math.max(...values, 1);
   const [r, g, b] = hexToRgb(chartColors[0]);
@@ -200,27 +202,43 @@ export function HeatStrip({ values, blocks }: { values: number[]; blocks?: Array
     label: blocks?.[index]?.label ?? `Block ${index + 1}`,
   }));
   return (
-    <div className="h-[42px] rounded-md overflow-visible border border-cc-border">
+    <div className="h-[42px] rounded-md overflow-visible border border-cc-border" style={{ position: 'relative', zIndex: 10, cursor: onBlockClick ? 'pointer' : undefined }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barCategoryGap={0}>
+        <BarChart
+          data={data}
+          margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+          barCategoryGap={0}
+          onClick={onBlockClick ? (state) => {
+            if (state?.activeTooltipIndex != null) onBlockClick(Number(state.activeTooltipIndex));
+          } : undefined}
+        >
           <XAxis dataKey="idx" hide />
           <YAxis hide domain={[0, 1]} />
           <Tooltip
             allowEscapeViewBox={{ x: true, y: true }}
             formatter={(_value: number | string | undefined, _name, item) => {
               const payload = item?.payload as { value?: number; label?: string } | undefined;
-              return [`${payload?.value ?? 0}%`, 'Empty-time'];
+              return [`${payload?.value ?? 0}${valueSuffix ?? '%'}`, valueLabel ?? 'Empty-time'];
             }}
             labelFormatter={(_label, payload) => {
               const first = payload?.[0]?.payload as { label?: string } | undefined;
               return first?.label ?? '';
             }}
-            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
+            wrapperStyle={{ zIndex: 50 }}
+            contentStyle={{
+              borderRadius: 8,
+              background: 'var(--color-cc-surface-1)',
+              color: 'var(--color-cc-text)',
+              borderColor: 'var(--color-cc-border)',
+            }}
+            labelStyle={{ color: 'var(--color-cc-text)', fontWeight: 600 }}
+            itemStyle={{ color: 'var(--color-cc-text-secondary)' }}
           />
           <Bar dataKey="unit" isAnimationActive={false}>
             {data.map((entry, index) => {
               const ratio = max > 0 ? entry.value / max : 0;
-              const opacity = 0.12 + ratio * 0.88;
+              const dimmed = activeIndex != null && index !== activeIndex;
+              const opacity = (0.12 + ratio * 0.88) * (dimmed ? 0.4 : 1);
               const color = entry.value <= 0 ? emptyColor : `rgba(${r}, ${g}, ${b}, ${opacity})`;
               return <Cell key={`heat-cell-${index}`} fill={color} />;
             })}
@@ -290,7 +308,9 @@ export function DemandCompositeChart({
               return [normalizedValue, 'Pickups'];
             }}
             labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
+            contentStyle={{ borderRadius: 8, background: 'var(--color-cc-surface-1)', color: 'var(--color-cc-text)', borderColor: 'var(--color-cc-border)' }}
+            labelStyle={{ color: 'var(--color-cc-text)' }}
+            itemStyle={{ color: 'var(--color-cc-text-secondary)' }}
           />
           <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
           <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
@@ -348,7 +368,9 @@ export function PerformanceCompositeChart({
               return [v, 'Productivity'];
             }}
             labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
+            contentStyle={{ borderRadius: 8, background: 'var(--color-cc-surface-1)', color: 'var(--color-cc-text)', borderColor: 'var(--color-cc-border)' }}
+            labelStyle={{ color: 'var(--color-cc-text)' }}
+            itemStyle={{ color: 'var(--color-cc-text-secondary)' }}
           />
           <Legend
             formatter={(value) => {
@@ -464,7 +486,9 @@ export function RunStructureChart({
               return [v, 'Pickups'];
             }}
             labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, borderColor: 'var(--color-cc-border)' }}
+            contentStyle={{ borderRadius: 8, background: 'var(--color-cc-surface-1)', color: 'var(--color-cc-text)', borderColor: 'var(--color-cc-border)' }}
+            labelStyle={{ color: 'var(--color-cc-text)' }}
+            itemStyle={{ color: 'var(--color-cc-text-secondary)' }}
           />
           <Legend
             formatter={(value) => {

@@ -897,7 +897,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       )}
       {hasVisitedMap && (
         <div style={{ display: tab === 'map' ? undefined : 'none' }}>
-          <MapTab metrics={metrics} trips={ready?.state.trips ?? []} selectedDays={selectedDayIds} />
+          <MapTab metrics={metrics} trips={ready?.state.trips ?? []} selectedDays={selectedDayIds} specificDate={dayMode === 'specific' ? specificDate : null} />
         </div>
       )}
       {tab === 'runstructure' && (

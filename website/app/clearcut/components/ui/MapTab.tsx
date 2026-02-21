@@ -6,10 +6,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Label } from '@/app/clearcut/components/shadcn/label';
 import { Slider } from '@/app/clearcut/components/shadcn/slider';
+import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
 import type { ClearcutMetrics, TimeBlock } from '@/lib/clearcut/metrics';
 import type { TripRow } from '@/lib/clearcut/types';
 
-import { HeatStrip, SectionCard, parseDateTime } from './shared';
+import { HeatStrip, SectionCard, hexToRgb, parseDateTime } from './shared';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -19,6 +20,7 @@ interface MapTabProps {
   metrics: ClearcutMetrics;
   trips: TripRow[];
   selectedDays: number[];
+  specificDate?: string | null;
 }
 
 interface GeoTrip {
@@ -50,28 +52,50 @@ function pickBlockIndex(minutes: number, blocks: TimeBlock[]): number {
   return idx >= 0 ? idx : Math.max(0, blocks.length - 1);
 }
 
+function formatDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function tripDropoffTime(trip: TripRow): Date | null {
+  return (
+    parseDateTime(trip.dropoff_leave_time) ??
+    parseDateTime(trip.dropoff_arrive_time) ??
+    parseDateTime(trip.scheduled_appointment_time)
+  );
+}
+
 /** Convert trips to geo-located entries (both pickup and dropoff) with block assignment. */
-function tripsToGeoTrips(trips: TripRow[], blocks: TimeBlock[], selectedDays: Set<number>): GeoTrip[] {
+function tripsToGeoTrips(trips: TripRow[], blocks: TimeBlock[], selectedDays: Set<number>, specificDate?: string | null): GeoTrip[] {
   const result: GeoTrip[] = [];
   for (const trip of trips) {
     const pickup = tripPickupTime(trip);
     if (!pickup) continue;
-    if (!selectedDays.has(pickup.getDay())) continue;
+    if (specificDate) {
+      if (formatDateKey(pickup) !== specificDate) continue;
+    } else {
+      if (!selectedDays.has(pickup.getDay())) continue;
+    }
 
-    const minutes = dateToMinutes(pickup);
-    const blockIdx = pickBlockIndex(minutes, blocks);
+    const pickupMinutes = dateToMinutes(pickup);
+    const pickupBlockIdx = pickBlockIndex(pickupMinutes, blocks);
     const passengers = Math.max(1, parseInt(trip.passenger_count ?? '1', 10) || 1);
 
     const pickLat = parseFloat(trip.pickup_lat ?? '');
     const pickLon = parseFloat(trip.pickup_lon ?? '');
     if (Number.isFinite(pickLat) && Number.isFinite(pickLon)) {
-      result.push({ lon: pickLon, lat: pickLat, blockIndex: blockIdx, passengerCount: passengers, pointType: 'pickup' });
+      result.push({ lon: pickLon, lat: pickLat, blockIndex: pickupBlockIdx, passengerCount: passengers, pointType: 'pickup' });
     }
 
+    const dropoff = tripDropoffTime(trip);
+    const dropoffMinutes = dropoff ? dateToMinutes(dropoff) : pickupMinutes;
+    const dropoffBlockIdx = pickBlockIndex(dropoffMinutes, blocks);
     const dropLat = parseFloat(trip.dropoff_lat ?? '');
     const dropLon = parseFloat(trip.dropoff_lon ?? '');
     if (Number.isFinite(dropLat) && Number.isFinite(dropLon)) {
-      result.push({ lon: dropLon, lat: dropLat, blockIndex: blockIdx, passengerCount: passengers, pointType: 'dropoff' });
+      result.push({ lon: dropLon, lat: dropLat, blockIndex: dropoffBlockIdx, passengerCount: passengers, pointType: 'dropoff' });
     }
   }
   return result;
@@ -81,27 +105,37 @@ function buildGeoJSON(
   geoTrips: GeoTrip[],
   selectedBlock: number,
 ): GeoJSON.FeatureCollection<GeoJSON.Point> {
-  const SIGMA = 1.5;
-  const TWO_SIGMA_SQ = 2 * SIGMA * SIGMA;
-
-  const rawEntries: Array<{ t: GeoTrip; rawWeight: number }> = [];
-  let maxWeight = 0;
+  const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
   for (const t of geoTrips) {
-    const dist = Math.abs(t.blockIndex - selectedBlock);
-    const w = Math.exp(-(dist * dist) / TWO_SIGMA_SQ) * t.passengerCount;
-    if (w < 0.01) continue;
-    rawEntries.push({ t, rawWeight: w });
-    if (w > maxWeight) maxWeight = w;
+    if (t.blockIndex !== selectedBlock) continue;
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [t.lon, t.lat] },
+      properties: { weight: 1, passengers: t.passengerCount, pointType: t.pointType },
+    });
   }
-
-  const scale = maxWeight > 0 ? 1 / maxWeight : 1;
-  const features: GeoJSON.Feature<GeoJSON.Point>[] = rawEntries.map(({ t, rawWeight }) => ({
-    type: 'Feature',
-    geometry: { type: 'Point', coordinates: [t.lon, t.lat] },
-    properties: { weight: rawWeight * scale, passengers: t.passengerCount, pointType: t.pointType },
-  }));
-
   return { type: 'FeatureCollection', features };
+}
+
+/** Build a Mapbox heatmap-color ramp from a base hex color. */
+function buildHeatmapRamp(hex: string): mapboxgl.Expression {
+  const [r, g, b] = hexToRgb(hex);
+  // Progressively darken toward full density while keeping the hue
+  const dark = (f: number) => [Math.round(r * f), Math.round(g * f), Math.round(b * f)];
+  const [dr1, dg1, db1] = dark(0.8);
+  const [dr2, dg2, db2] = dark(0.65);
+  const [dr3, dg3, db3] = dark(0.5);
+  return [
+    'interpolate',
+    ['linear'],
+    ['heatmap-density'],
+    0, 'rgba(0,0,0,0)',
+    0.15, `rgba(${r},${g},${b},0.3)`,
+    0.35, `rgba(${r},${g},${b},0.5)`,
+    0.6, `rgba(${dr1},${dg1},${db1},0.7)`,
+    0.8, `rgba(${dr2},${dg2},${db2},0.85)`,
+    1, `rgb(${dr3},${dg3},${db3})`,
+  ] as mapboxgl.Expression;
 }
 
 function computeLegendLabels(blocks: TimeBlock[]): string[] {
@@ -123,26 +157,68 @@ function computeLegendLabels(blocks: TimeBlock[]): string[] {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
-  const [mapBlockIdx, setMapBlockIdx] = useState(0);
+export default function MapTab({ metrics, trips, selectedDays, specificDate }: MapTabProps) {
+  const [mapBlockIdx, setMapBlockIdx] = useState(() => Math.floor(metrics.blocks.length / 2));
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapLoadedRef = useRef(false);
   const boundsAppliedRef = useRef(false);
+  const geoTripsRef = useRef<GeoTrip[]>([]);
+  const mapBlockIdxRef = useRef(mapBlockIdx);
+  mapBlockIdxRef.current = mapBlockIdx;
 
   const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const { palette } = useClearcutTheme();
+  const pickupColor = palette.mapColors.pickup;
+  const dropoffColor = palette.mapColors.dropoff;
+  const pickupColorRef = useRef(pickupColor);
+  const dropoffColorRef = useRef(dropoffColor);
+  pickupColorRef.current = pickupColor;
+  dropoffColorRef.current = dropoffColor;
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-  const mapStyle = process.env.NEXT_PUBLIC_MAPBOX_STYLE || 'mapbox://styles/mapbox/dark-v11';
+  const mapStyleLight = process.env.NEXT_PUBLIC_MAPBOX_STYLE || 'mapbox://styles/mapbox/light-v11';
+  const mapStyleDark = process.env.NEXT_PUBLIC_MAPBOX_STYLE_DARK || 'mapbox://styles/mapbox/dark-v11';
+  const mapStyle = palette.mode === 'dark' ? mapStyleDark : mapStyleLight;
 
   const selectedDaySet = useMemo(() => new Set(selectedDays), [selectedDays]);
 
   const geoTrips = useMemo(
-    () => tripsToGeoTrips(trips, metrics.blocks, selectedDaySet),
-    [trips, metrics.blocks, selectedDaySet],
+    () => tripsToGeoTrips(trips, metrics.blocks, selectedDaySet, specificDate),
+    [trips, metrics.blocks, selectedDaySet, specificDate],
   );
+  geoTripsRef.current = geoTrips;
+
+  /** Per-block event counts — every pickup and every dropoff is 1 event, regardless of GPS. */
+  const eventsByBlock = useMemo(() => {
+    const counts = new Array(metrics.blocks.length).fill(0) as number[];
+    for (const trip of trips) {
+      const pickup = tripPickupTime(trip);
+      if (!pickup) continue;
+      if (specificDate) {
+        if (formatDateKey(pickup) !== specificDate) continue;
+      } else {
+        if (!selectedDaySet.has(pickup.getDay())) continue;
+      }
+      // Pickup event
+      const pickupIdx = pickBlockIndex(dateToMinutes(pickup), metrics.blocks);
+      if (pickupIdx >= 0) counts[pickupIdx] += 1;
+      // Dropoff event (separate time block)
+      const dropoff = tripDropoffTime(trip);
+      if (dropoff) {
+        const dropoffIdx = pickBlockIndex(dateToMinutes(dropoff), metrics.blocks);
+        if (dropoffIdx >= 0) counts[dropoffIdx] += 1;
+      }
+    }
+    return counts;
+  }, [trips, metrics.blocks, selectedDaySet, specificDate]);
 
   const legendLabels = useMemo(() => computeLegendLabels(metrics.blocks), [metrics.blocks]);
+
+  /* ---- Reset slider to middle when blocks change ---- */
+  useEffect(() => {
+    setMapBlockIdx(Math.floor(metrics.blocks.length / 2));
+  }, [metrics.blocks]);
 
   /* ---- Map initialization ---- */
   useEffect(() => {
@@ -165,7 +241,7 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
         data: { type: 'FeatureCollection', features: [] },
       });
 
-      // Pickup heatmap (blue)
+      // Pickup heatmap
       map.addLayer({
         id: 'trips-heat-pickup',
         type: 'heatmap',
@@ -176,28 +252,12 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
           'heatmap-weight': ['get', 'weight'],
           'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 15, 3],
           'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 4, 15, 24],
-          'heatmap-color': [
-            'interpolate',
-            ['linear'],
-            ['heatmap-density'],
-            0,
-            'rgba(0,0,0,0)',
-            0.15,
-            'rgba(65,139,212,0.3)',
-            0.35,
-            'rgba(65,139,212,0.5)',
-            0.6,
-            'rgba(45,112,192,0.7)',
-            0.8,
-            'rgba(30,90,170,0.85)',
-            1,
-            'rgb(20,70,150)',
-          ],
+          'heatmap-color': buildHeatmapRamp(pickupColorRef.current),
           'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 7, 1, 15, 0],
         },
       });
 
-      // Dropoff heatmap (red)
+      // Dropoff heatmap
       map.addLayer({
         id: 'trips-heat-dropoff',
         type: 'heatmap',
@@ -208,23 +268,7 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
           'heatmap-weight': ['get', 'weight'],
           'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 15, 3],
           'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 4, 15, 24],
-          'heatmap-color': [
-            'interpolate',
-            ['linear'],
-            ['heatmap-density'],
-            0,
-            'rgba(0,0,0,0)',
-            0.15,
-            'rgba(220,100,80,0.3)',
-            0.35,
-            'rgba(220,100,80,0.5)',
-            0.6,
-            'rgba(200,60,50,0.7)',
-            0.8,
-            'rgba(180,40,35,0.85)',
-            1,
-            'rgb(160,25,25)',
-          ],
+          'heatmap-color': buildHeatmapRamp(dropoffColorRef.current),
           'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 7, 1, 15, 0],
         },
       });
@@ -239,8 +283,8 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
           'circle-color': [
             'case',
             ['==', ['get', 'pointType'], 'pickup'],
-            'rgb(45,112,192)',
-            'rgb(200,60,50)',
+            pickupColorRef.current,
+            dropoffColorRef.current,
           ],
           'circle-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.8],
           'circle-stroke-width': 1,
@@ -264,6 +308,7 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
         closeButton: false,
         closeOnClick: false,
         maxWidth: '240px',
+        className: 'clearcut-map-popup',
       });
       popupRef.current = popup;
 
@@ -306,8 +351,8 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
           .setHTML(
             `<div style="font-size:13px;line-height:1.5">` +
               `<strong>${total} trip${total !== 1 ? 's' : ''}</strong><br/>` +
-              `<span style="color:rgb(45,112,192)">&#9679;</span> Pickups: ${pickups}<br/>` +
-              `<span style="color:rgb(200,60,50)">&#9679;</span> Dropoffs: ${dropoffs}` +
+              `<span style="color:${pickupColorRef.current}">&#9679;</span> <span style="color:var(--color-cc-text-secondary)">Pickups: ${pickups}</span><br/>` +
+              `<span style="color:${dropoffColorRef.current}">&#9679;</span> <span style="color:var(--color-cc-text-secondary)">Dropoffs: ${dropoffs}</span>` +
               `</div>`,
           )
           .addTo(map);
@@ -315,6 +360,22 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
 
       mapLoadedRef.current = true;
       mapRef.current = map;
+
+      // Push initial heatmap data now that the map is ready
+      if (geoTripsRef.current.length > 0) {
+        const source = map.getSource('trips') as mapboxgl.GeoJSONSource | undefined;
+        source?.setData(buildGeoJSON(geoTripsRef.current, mapBlockIdxRef.current));
+      }
+
+      // Fit bounds on initial load if geo data is already available
+      if (geoTripsRef.current.length > 0 && !boundsAppliedRef.current) {
+        const bounds = new mapboxgl.LngLatBounds();
+        for (const t of geoTripsRef.current) {
+          bounds.extend([t.lon, t.lat]);
+        }
+        map.fitBounds(bounds, { padding: 40, maxZoom: 13 });
+        boundsAppliedRef.current = true;
+      }
     });
 
     return () => {
@@ -347,6 +408,20 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
     map.fitBounds(bounds, { padding: 40, maxZoom: 13 });
     boundsAppliedRef.current = true;
   }, [geoTrips]);
+
+  /* ---- Update map layer colors when palette changes ---- */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoadedRef.current) return;
+    map.setPaintProperty('trips-heat-pickup', 'heatmap-color', buildHeatmapRamp(pickupColor));
+    map.setPaintProperty('trips-heat-dropoff', 'heatmap-color', buildHeatmapRamp(dropoffColor));
+    map.setPaintProperty('trips-point', 'circle-color', [
+      'case',
+      ['==', ['get', 'pointType'], 'pickup'],
+      pickupColor,
+      dropoffColor,
+    ]);
+  }, [pickupColor, dropoffColor]);
 
   if (!mapboxToken) {
     return (
@@ -385,7 +460,12 @@ export default function MapTab({ metrics, trips, selectedDays }: MapTabProps) {
 
         {/* Pickup intensity strip */}
         <HeatStrip
-          values={metrics.pickupsByBlock.map((v, i) => (i === mapBlockIdx ? v : v * 0.4))}
+          values={eventsByBlock}
+          blocks={metrics.blocks}
+          activeIndex={mapBlockIdx}
+          onBlockClick={(index) => setMapBlockIdx(index)}
+          valueLabel="Events"
+          valueSuffix=""
         />
 
         {/* Mapbox map */}
