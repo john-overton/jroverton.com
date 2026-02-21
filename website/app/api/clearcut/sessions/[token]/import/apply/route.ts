@@ -8,7 +8,7 @@ import {
 } from '@/lib/clearcut/http';
 import { applyImportMapping } from '@/lib/clearcut/import-mapper';
 import { updateSessionCounts } from '@/lib/clearcut/registry-db';
-import { countRoutes, countTrips, listRoutes, listTrips, replaceRoutes, replaceTrips } from '@/lib/clearcut/session-db';
+import { countRoutes, countTrips, listRoutes, listTrips, recalculateServiceWindow, replaceRoutes, replaceTrips } from '@/lib/clearcut/session-db';
 import type { ImportMappingConfig } from '@/lib/clearcut/types';
 
 export const runtime = 'nodejs';
@@ -96,6 +96,8 @@ export async function POST(
     replaceTrips(token, applied.trips);
     stage = 'replace_routes';
     replaceRoutes(token, applied.routes);
+    stage = 'recalculate_settings';
+    recalculateServiceWindow(token);
 
     stage = 'count_rows';
     const tripCount = countTrips(token);

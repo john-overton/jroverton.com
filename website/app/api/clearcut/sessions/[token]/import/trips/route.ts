@@ -8,7 +8,7 @@ import {
 } from '@/lib/clearcut/http';
 import { parseTripsFile } from '@/lib/clearcut/import-validators';
 import { updateSessionCounts } from '@/lib/clearcut/registry-db';
-import { countRoutes, countTrips, replaceTrips } from '@/lib/clearcut/session-db';
+import { countRoutes, countTrips, recalculateServiceWindow, replaceTrips } from '@/lib/clearcut/session-db';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +35,7 @@ export async function POST(
     const fileBuffer = await readUploadedFile(request);
     const { rows: trips, skipped } = parseTripsFile(fileBuffer);
     replaceTrips(token, trips);
+    recalculateServiceWindow(token);
 
     const tripCount = countTrips(token);
     const routeCount = countRoutes(token);

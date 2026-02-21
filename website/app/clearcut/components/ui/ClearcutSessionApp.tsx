@@ -77,6 +77,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const session = useClearcutSession(token, mode);
   const { paletteId, setPaletteId } = useClearcutTheme();
   const filterStateInitialized = useRef(false);
+  const prevDataCountsRef = useRef<{ trips: number; routes: number } | null>(null);
   const timeRangeTrackRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<TabKey>(mode === 'readonly' ? 'demand' : 'import');
   const [hasVisitedMap, setHasVisitedMap] = useState(false);
@@ -191,6 +192,16 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   );
   const hasData = ready ? ready.state.session.trip_count > 0 || ready.state.session.route_count > 0 : false;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  useEffect(() => {
+    if (!ready) return;
+    const currentCounts = { trips: ready.state.session.trip_count, routes: ready.state.session.route_count };
+    const prev = prevDataCountsRef.current;
+    if (prev !== null && (prev.trips !== currentCounts.trips || prev.routes !== currentCounts.routes)) {
+      filterStateInitialized.current = false;
+    }
+    prevDataCountsRef.current = currentCounts;
+  }, [ready]);
 
   useEffect(() => {
     if (!ready || filterStateInitialized.current) {

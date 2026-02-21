@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import { getSessionDbPath, getSessionsDirPath } from './config';
 import { ApiError } from './errors';
 import { SESSION_SCHEMA_SQL } from './schema';
+import { computeServiceDayWindow } from './metrics';
 import type {
   OptimizationRow,
   RouteRow,
@@ -331,5 +332,35 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
     });
 
     transaction();
+  });
+}
+
+export function recalculateServiceWindow(editToken: string): void {
+  withSessionDb(editToken, (db) => {
+    const trips = db
+      .prepare('SELECT * FROM trips ORDER BY scheduled_pickup_time, trip_id')
+      .all() as TripRow[];
+    const routes = db
+      .prepare('SELECT * FROM routes ORDER BY route_id')
+      .all() as RouteRow[];
+
+    const window = computeServiceDayWindow(trips, routes);
+    if (!window) {
+      return;
+    }
+
+    db.prepare(
+      `UPDATE settings
+       SET service_day_start = @service_day_start,
+           service_day_end = @service_day_end,
+           time_range_start = @time_range_start,
+           time_range_end = @time_range_end
+       WHERE id = 1`,
+    ).run({
+      service_day_start: window.start,
+      service_day_end: window.end,
+      time_range_start: window.start,
+      time_range_end: window.end,
+    });
   });
 }

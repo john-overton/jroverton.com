@@ -74,59 +74,44 @@ export function deriveSliderBounds(params: {
   fallbackStartMinutes: number;
   fallbackEndMinutes: number;
 }): { startMinutes: number; endMinutes: number } {
-  let earliest: Date | null = null;
-  let latest: Date | null = null;
+  // Compute the time-of-day envelope across all dates
+  let earliestMinutes = Infinity;
+  let latestMinutes = -Infinity;
+
+  function updateFromDate(d: Date | null) {
+    if (!d) return;
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (m < earliestMinutes) earliestMinutes = m;
+    if (m > latestMinutes) latestMinutes = m;
+  }
 
   for (const trip of params.trips) {
-    const pickup =
+    updateFromDate(
       parseDateTime(trip.pickup_arrive_time) ??
       parseDateTime(trip.pickup_leave_time) ??
-      parseDateTime(trip.scheduled_pickup_time);
-    const dropoff =
+      parseDateTime(trip.scheduled_pickup_time),
+    );
+    updateFromDate(
       parseDateTime(trip.dropoff_leave_time) ??
       parseDateTime(trip.dropoff_arrive_time) ??
-      parseDateTime(trip.scheduled_appointment_time);
-    if (pickup && (!earliest || pickup.getTime() < earliest.getTime())) {
-      earliest = pickup;
-    }
-    if (dropoff && (!latest || dropoff.getTime() > latest.getTime())) {
-      latest = dropoff;
-    }
+      parseDateTime(trip.scheduled_appointment_time),
+    );
   }
 
   for (const route of params.routes) {
-    const rStart = parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time);
-    const rEnd = parseDateTime(route.actual_end_time) ?? parseDateTime(route.scheduled_end_time);
-    if (rStart && (!earliest || rStart.getTime() < earliest.getTime())) {
-      earliest = rStart;
-    }
-    if (rEnd && (!latest || rEnd.getTime() > latest.getTime())) {
-      latest = rEnd;
-    }
+    updateFromDate(parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time));
+    updateFromDate(parseDateTime(route.actual_end_time) ?? parseDateTime(route.scheduled_end_time));
   }
 
-  if (!earliest || !latest) {
+  if (earliestMinutes === Infinity || latestMinutes === -Infinity) {
     return {
       startMinutes: params.fallbackStartMinutes,
       endMinutes: params.fallbackEndMinutes,
     };
   }
 
-  if (earliest.toDateString() !== latest.toDateString()) {
-    return {
-      startMinutes: 0,
-      endMinutes: 24 * 60,
-    };
-  }
-
-  const earliestMinutes = earliest.getHours() * 60 + earliest.getMinutes();
-  const latestMinutes = latest.getHours() * 60 + latest.getMinutes();
-  const derivedStart = Math.max(0, earliestMinutes - 30);
-  const derivedEnd = Math.min(24 * 60, Math.max(derivedStart + 60, latestMinutes + 30));
-
-  if (derivedEnd > 23 * 60 + 59) {
-    return { startMinutes: 0, endMinutes: 24 * 60 };
-  }
+  const derivedStart = Math.max(0, Math.floor((earliestMinutes - 30) / 15) * 15);
+  const derivedEnd = Math.min(24 * 60, Math.ceil((Math.max(derivedStart + 60, latestMinutes + 30)) / 15) * 15);
 
   return { startMinutes: derivedStart, endMinutes: derivedEnd };
 }

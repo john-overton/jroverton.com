@@ -254,37 +254,37 @@ function isOnTimeWithWindow(params: {
 function deriveServiceWindow(trips: TripRow[], routes: RouteRow[]): ClearcutMetrics['derivedServiceWindow'] {
   let earliest: Date | null = null;
   let latest: Date | null = null;
+  let earliestTodMinutes = Infinity;
+  let latestTodMinutes = -Infinity;
+
+  function track(d: Date | null) {
+    if (!d) return;
+    if (!earliest || d.getTime() < earliest.getTime()) earliest = d;
+    if (!latest || d.getTime() > latest.getTime()) latest = d;
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (m < earliestTodMinutes) earliestTodMinutes = m;
+    if (m > latestTodMinutes) latestTodMinutes = m;
+  }
 
   for (const trip of trips) {
-    const startCandidate =
+    track(
       asDate(trip.pickup_arrive_time ?? '') ??
       asDate(trip.pickup_leave_time ?? '') ??
-      asDate(trip.scheduled_pickup_time);
-    const endCandidate =
+      asDate(trip.scheduled_pickup_time),
+    );
+    track(
       asDate(trip.dropoff_leave_time ?? '') ??
       asDate(trip.dropoff_arrive_time ?? '') ??
-      asDate(trip.scheduled_appointment_time);
-
-    if (startCandidate && (!earliest || startCandidate.getTime() < earliest.getTime())) {
-      earliest = startCandidate;
-    }
-    if (endCandidate && (!latest || endCandidate.getTime() > latest.getTime())) {
-      latest = endCandidate;
-    }
+      asDate(trip.scheduled_appointment_time),
+    );
   }
 
   for (const route of routes) {
-    const rStart = routeStart(route);
-    const rEnd = routeEnd(route);
-    if (rStart && (!earliest || rStart.getTime() < earliest.getTime())) {
-      earliest = rStart;
-    }
-    if (rEnd && (!latest || rEnd.getTime() > latest.getTime())) {
-      latest = rEnd;
-    }
+    track(routeStart(route));
+    track(routeEnd(route));
   }
 
-  if (!earliest || !latest) {
+  if (!earliest || !latest || earliestTodMinutes === Infinity) {
     return {
       startLabel: '--:--',
       endLabel: '--:--',
@@ -296,40 +296,74 @@ function deriveServiceWindow(trips: TripRow[], routes: RouteRow[]): ClearcutMetr
     };
   }
 
-  const derivedStart = new Date(earliest.getTime() - 30 * 60 * 1000);
-  const derivedEnd = new Date(latest.getTime() + 30 * 60 * 1000);
-  const rawDurationMinutes = Math.max(0, Math.round((derivedEnd.getTime() - derivedStart.getTime()) / 60000));
-  const endMinutesOfDay = derivedEnd.getHours() * 60 + derivedEnd.getMinutes();
-  const crossesMidnight =
-    derivedStart.toDateString() !== derivedEnd.toDateString() ||
-    rawDurationMinutes >= 24 * 60 ||
-    endMinutesOfDay > 23 * 60 + 59;
+  const startMinutes = Math.max(0, Math.floor((earliestTodMinutes - 30) / 15) * 15);
+  const endMinutes = Math.min(24 * 60, Math.ceil((latestTodMinutes + 30) / 15) * 15);
+  const durationMinutes = endMinutes - startMinutes;
 
-  if (crossesMidnight) {
-    return {
-      startLabel: '00:00',
-      endLabel: '24:00',
-      durationLabel: '24:00',
-      isTwentyFourHours: true,
-      source: 'actual_preferred',
-      earliestDataTime: formatDateTimeLabel(earliest),
-      latestDataTime: formatDateTimeLabel(latest),
-    };
-  }
+  const formatClock = (m: number) => {
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  };
 
-  const hours = Math.floor(rawDurationMinutes / 60);
-  const minutes = rawDurationMinutes % 60;
-  const durationLabel = `${`${hours}`.padStart(2, '0')}:${`${minutes}`.padStart(2, '0')}`;
+  const hours = Math.floor(durationMinutes / 60);
+  const mins = durationMinutes % 60;
 
   return {
-    startLabel: formatClockLabel(derivedStart),
-    endLabel: formatClockLabel(derivedEnd),
-    durationLabel,
-    isTwentyFourHours: false,
+    startLabel: formatClock(startMinutes),
+    endLabel: formatClock(endMinutes),
+    durationLabel: `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`,
+    isTwentyFourHours: durationMinutes >= 24 * 60,
     source: 'actual_preferred',
     earliestDataTime: formatDateTimeLabel(earliest),
     latestDataTime: formatDateTimeLabel(latest),
   };
+}
+
+export function computeServiceDayWindow(
+  trips: TripRow[],
+  routes: RouteRow[],
+): { start: string; end: string } | null {
+  let earliestMinutes: number | null = null;
+  let latestMinutes: number | null = null;
+
+  function updateFromDate(d: Date | null) {
+    if (!d) return;
+    const minutes = d.getHours() * 60 + d.getMinutes();
+    if (earliestMinutes === null || minutes < earliestMinutes) earliestMinutes = minutes;
+    if (latestMinutes === null || minutes > latestMinutes) latestMinutes = minutes;
+  }
+
+  for (const trip of trips) {
+    updateFromDate(
+      asDate(trip.pickup_arrive_time ?? '') ??
+      asDate(trip.pickup_leave_time ?? '') ??
+      asDate(trip.scheduled_pickup_time),
+    );
+    updateFromDate(
+      asDate(trip.dropoff_leave_time ?? '') ??
+      asDate(trip.dropoff_arrive_time ?? '') ??
+      asDate(trip.scheduled_appointment_time),
+    );
+  }
+
+  for (const route of routes) {
+    updateFromDate(routeStart(route));
+    updateFromDate(routeEnd(route));
+  }
+
+  if (earliestMinutes === null || latestMinutes === null) return null;
+
+  const startMinutes = Math.max(0, Math.floor((earliestMinutes - 30) / 15) * 15);
+  const endMinutes = Math.min(24 * 60, Math.ceil((latestMinutes + 30) / 15) * 15);
+
+  const formatClock = (m: number) => {
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  };
+
+  return { start: formatClock(startMinutes), end: formatClock(endMinutes) };
 }
 
 export function computeClearcutMetrics(
