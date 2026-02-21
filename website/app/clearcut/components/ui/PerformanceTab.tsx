@@ -12,7 +12,7 @@ interface PerformanceTabProps {
 export default function PerformanceTab({ metrics, intervalMinutes }: PerformanceTabProps) {
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <MetricCard label="Pickup OTP" value={`${metrics.pickupOtpPct}%`} />
         <MetricCard label="Dropoff OTP" value={`${metrics.dropoffOtpPct}%`} />
         <MetricCard label="Average Productivity" value={`${metrics.avgProductivity}`} />

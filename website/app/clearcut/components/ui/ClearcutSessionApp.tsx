@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Settings } from 'lucide-react';
+import { ChevronRight, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/app/clearcut/components/shadcn/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/clearcut/components/shadcn/collapsible';
 import { Tabs, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/tabs';
 import { ClearcutClientError } from '@/lib/clearcut/client';
 import { buildDemoTripsAndRoutes } from '@/lib/clearcut/demo-data';
@@ -590,17 +591,17 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       </header>
 
       {hasData && allTimeBlocks.length > 0 && (
-        <section className="mt-3 mb-1 border border-cc-border rounded-[10px] bg-cc-surface-1 p-3">
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full"
-            style={{ marginBottom: filtersOpen ? '0.5rem' : 0 }}
-          >
-            <span style={{ transform: filtersOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', display: 'inline-block' }}>&#9654;</span>
-            Filters
-          </button>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" style={{ display: filtersOpen ? undefined : 'none' }}>
+        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen} asChild>
+          <section className="mt-3 mb-1 border border-cc-border rounded-[10px] bg-cc-surface-1 p-3">
+            <CollapsibleTrigger className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full">
+              <ChevronRight
+                size={14}
+                className="transition-transform duration-150 data-[state=open]:rotate-90"
+                data-state={filtersOpen ? 'open' : 'closed'}
+              />
+              Filters
+            </CollapsibleTrigger>
+            <CollapsibleContent className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-2">
             <div>
               <div className="flex flex-wrap items-center gap-3 mb-2">
                 <div>
@@ -776,8 +777,9 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 {selectedDayIds.length > 0 ? `${selectedDayIds.length} day(s) selected` : 'No days selected'}
               </div>
             </div>
-          </div>
+          </CollapsibleContent>
         </section>
+      </Collapsible>
       )}
 
       <div className="mt-4 mb-2">
