@@ -325,6 +325,11 @@ export function parseRoutesFile(fileBuffer: Buffer): ParseResult<RouteRow> {
       actual_end_time: normalizedActualEnd,
       break1: getCellValue(row, 'break1'),
       break2: getCellValue(row, 'break2'),
+      depot_address: getCellValue(row, 'depot_address'),
+      depot_lat: getCellValue(row, 'depot_lat'),
+      depot_lon: getCellValue(row, 'depot_lon'),
+      distance_to_first_pick: getCellValue(row, 'distance_to_first_pick'),
+      distance_from_last_drop: getCellValue(row, 'distance_from_last_drop'),
     });
   }
 

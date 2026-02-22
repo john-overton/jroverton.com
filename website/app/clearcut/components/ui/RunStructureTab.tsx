@@ -62,6 +62,7 @@ export default function RunStructureTab({
   intervalMinutes,
   onOptimizationChange,
 }: RunStructureTabProps) {
+  const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
   const [draftProductivity, setDraftProductivity] = useState<number | null>(null);
   const [draftMaxShift, setDraftMaxShift] = useState<number | null>(null);
   const [draftMinShift, setDraftMinShift] = useState<number | null>(null);
@@ -107,11 +108,13 @@ export default function RunStructureTab({
     [routes, selectedRunCutDate, fullDayMetrics.blocks, intervalMinutes],
   );
 
+  const activeTripsForOptimizer = demandMode === 'max' ? fullDayMetrics.maxOnBoardByBlock : fullDayMetrics.onBoardByBlock;
+
   const optimizedRoutes = useMemo(
     () =>
       buildOptimizedRoutes({
         blocks: fullDayMetrics.blocks,
-        activeTripsPerBlock: fullDayMetrics.onBoardByBlock,
+        activeTripsPerBlock: activeTripsForOptimizer,
         targetProductivity: localProductivity,
         maxShiftHours: localMaxShift,
         minShiftHours: localMinShift,
@@ -119,7 +122,7 @@ export default function RunStructureTab({
         endDeadheadMinutes: fullDayMetrics.avgEndDeadheadMinutes,
         routeLengthBias: localRouteBias,
       }),
-    [fullDayMetrics.blocks, fullDayMetrics.onBoardByBlock, localProductivity, localMaxShift, localMinShift, fullDayMetrics.avgStartDeadheadMinutes, fullDayMetrics.avgEndDeadheadMinutes, localRouteBias],
+    [fullDayMetrics.blocks, activeTripsForOptimizer, localProductivity, localMaxShift, localMinShift, fullDayMetrics.avgStartDeadheadMinutes, fullDayMetrics.avgEndDeadheadMinutes, localRouteBias],
   );
 
   const currentVehiclesByBlockFullDay = useMemo(() => {
@@ -160,9 +163,11 @@ export default function RunStructureTab({
     });
   }, [metrics.blocks, fullDayMetrics.blocks, optimizedVehiclesByBlockFullDay]);
 
+  const activePickups = demandMode === 'max' ? fullDayMetrics.maxPickupsByBlock : fullDayMetrics.pickupsByBlock;
+
   const avgDailyTrips = useMemo(
-    () => Math.round(fullDayMetrics.pickupsByBlock.reduce((sum, v) => sum + v, 0) * 10) / 10,
-    [fullDayMetrics.pickupsByBlock],
+    () => Math.round(activePickups.reduce((sum, v) => sum + v, 0) * 10) / 10,
+    [activePickups],
   );
 
   const currentStats = useMemo(() => {
@@ -270,12 +275,24 @@ export default function RunStructureTab({
       </SectionCard>
 
       <SectionCard title="Demand & Vehicle Coverage">
-        <div className="text-xs text-cc-text-muted mb-2">
-          Demand shown as bars. Current vehicles (solid teal) and optimized vehicles (dashed amber) as line overlays.
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs text-cc-text-muted">
+            Demand shown as bars. Current vehicles (solid teal) and optimized vehicles (dashed amber) as line overlays.
+          </div>
+          <div className="flex gap-1 text-xs shrink-0 ml-3">
+            <button
+              className={`px-2 py-0.5 rounded ${demandMode === 'max' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+              onClick={() => setDemandMode('max')}
+            >Max</button>
+            <button
+              className={`px-2 py-0.5 rounded ${demandMode === 'avg' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+              onClick={() => setDemandMode('avg')}
+            >Avg</button>
+          </div>
         </div>
         <RunStructureChart
-          pickups={metrics.pickupsByBlock}
-          onBoard={metrics.onBoardByBlock}
+          pickups={demandMode === 'max' ? metrics.maxPickupsByBlock : metrics.pickupsByBlock}
+          onBoard={demandMode === 'max' ? metrics.maxOnBoardByBlock : metrics.onBoardByBlock}
           currentVehicles={currentVehiclesByBlock}
           optimizedVehicles={optimizedVehiclesByBlock}
           blocks={metrics.blocks}
