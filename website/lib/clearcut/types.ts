@@ -68,6 +68,11 @@ export interface RouteRow {
   actual_end_time: string | null;
   break1: string | null;
   break2: string | null;
+  depot_address: string | null;
+  depot_lat: string | null;
+  depot_lon: string | null;
+  distance_to_first_pick: string | null;
+  distance_from_last_drop: string | null;
 }
 
 export interface SettingsRow {

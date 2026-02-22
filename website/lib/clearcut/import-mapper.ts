@@ -450,6 +450,11 @@ function coerceRouteDefaults(value: Partial<RouteRow>): RouteRow {
     actual_end_time: value.actual_end_time ?? null,
     break1: value.break1 ?? null,
     break2: value.break2 ?? null,
+    depot_address: value.depot_address ?? null,
+    depot_lat: value.depot_lat ?? null,
+    depot_lon: value.depot_lon ?? null,
+    distance_to_first_pick: value.distance_to_first_pick ?? null,
+    distance_from_last_drop: value.distance_from_last_drop ?? null,
   };
 }
 

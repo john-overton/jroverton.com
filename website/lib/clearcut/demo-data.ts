@@ -80,6 +80,11 @@ export function buildDemoTripsAndRoutes(): { trips: TripRow[]; routes: RouteRow[
         actual_end_time: fmtDate(actualEnd),
         break1: fmtDate(atDayMinutes(dayDate, break1Minute)),
         break2: fmtDate(atDayMinutes(dayDate, break2Minute)),
+        depot_address: null,
+        depot_lat: null,
+        depot_lon: null,
+        distance_to_first_pick: null,
+        distance_from_last_drop: null,
       };
       dayRoutes.push(route);
       routes.push(route);

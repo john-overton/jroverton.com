@@ -52,7 +52,12 @@ type RouteDataColumnKey =
   | 'actual_start_time'
   | 'actual_end_time'
   | 'break1'
-  | 'break2';
+  | 'break2'
+  | 'depot_address'
+  | 'depot_lat'
+  | 'depot_lon'
+  | 'distance_to_first_pick'
+  | 'distance_from_last_drop';
 
 const TRIP_DATA_PAGE_SIZE = 10;
 const ROUTE_DATA_PAGE_SIZE = 10;
@@ -99,6 +104,11 @@ const ROUTE_DATA_COLUMNS: Array<{
   { key: 'actual_end_time', label: 'Actual End', getValue: (route) => route.actual_end_time ?? '-' },
   { key: 'break1', label: 'Break 1', getValue: (route) => route.break1 ?? '-' },
   { key: 'break2', label: 'Break 2', getValue: (route) => route.break2 ?? '-' },
+  { key: 'depot_address', label: 'Depot Address', getValue: (route) => route.depot_address ?? '-' },
+  { key: 'depot_lat', label: 'Depot Lat', getValue: (route) => route.depot_lat ?? '-' },
+  { key: 'depot_lon', label: 'Depot Lon', getValue: (route) => route.depot_lon ?? '-' },
+  { key: 'distance_to_first_pick', label: 'Dist to 1st Pick', getValue: (route) => route.distance_to_first_pick ?? '-' },
+  { key: 'distance_from_last_drop', label: 'Dist from Last Drop', getValue: (route) => route.distance_from_last_drop ?? '-' },
 ];
 
 interface ImportTabProps {
@@ -173,6 +183,11 @@ export default function ImportTab({
     actual_end_time: true,
     break1: true,
     break2: true,
+    depot_address: true,
+    depot_lat: true,
+    depot_lon: true,
+    distance_to_first_pick: true,
+    distance_from_last_drop: true,
   });
 
   const activeTripColumns = TRIP_DATA_COLUMNS.filter((column) => tripVisibleColumns[column.key]);
@@ -198,8 +213,8 @@ export default function ImportTab({
       'TRIP-001,2026-02-01,2026-02-01 08:00:00,2026-02-01 08:30:00,2026-02-01 07:58:00,2026-02-01 08:02:00,2026-02-01 08:27:00,2026-02-01 08:31:00,ROUTE-001,123 Main St,,,456 Oak St,,,completed,ambulatory,1,1000,1010',
     ].join('\n');
     const routeSample = [
-      'route_id,route_date,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1,break2',
-      'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 14:00:00',
+      'route_id,route_date,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1,break2,depot_address,depot_lat,depot_lon,distance_to_first_pick,distance_from_last_drop',
+      'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 14:00:00,100 Depot Way,40.7128,-74.0060,3.2,4.5',
     ].join('\n');
 
     const content = kind === 'trips' ? tripSample : routeSample;

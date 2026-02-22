@@ -66,7 +66,12 @@ CREATE TABLE IF NOT EXISTS routes (
   actual_start_time TEXT,
   actual_end_time TEXT,
   break1 TEXT,
-  break2 TEXT
+  break2 TEXT,
+  depot_address TEXT,
+  depot_lat TEXT,
+  depot_lon TEXT,
+  distance_to_first_pick TEXT,
+  distance_from_last_drop TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (

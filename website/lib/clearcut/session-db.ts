@@ -53,6 +53,11 @@ const ROUTE_COLUMNS = [
   'actual_end_time',
   'break1',
   'break2',
+  'depot_address',
+  'depot_lat',
+  'depot_lon',
+  'distance_to_first_pick',
+  'distance_from_last_drop',
 ] as const;
 
 function ensureSessionsDirectory(): void {
@@ -106,6 +111,21 @@ function ensureRouteColumns(db: Database.Database): void {
   }
   if (!existing.has('route_date')) {
     db.exec('ALTER TABLE routes ADD COLUMN route_date TEXT;');
+  }
+  if (!existing.has('depot_address')) {
+    db.exec('ALTER TABLE routes ADD COLUMN depot_address TEXT;');
+  }
+  if (!existing.has('depot_lat')) {
+    db.exec('ALTER TABLE routes ADD COLUMN depot_lat TEXT;');
+  }
+  if (!existing.has('depot_lon')) {
+    db.exec('ALTER TABLE routes ADD COLUMN depot_lon TEXT;');
+  }
+  if (!existing.has('distance_to_first_pick')) {
+    db.exec('ALTER TABLE routes ADD COLUMN distance_to_first_pick TEXT;');
+  }
+  if (!existing.has('distance_from_last_drop')) {
+    db.exec('ALTER TABLE routes ADD COLUMN distance_from_last_drop TEXT;');
   }
 }
 
