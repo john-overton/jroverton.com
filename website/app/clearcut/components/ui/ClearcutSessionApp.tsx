@@ -964,6 +964,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           metrics={metrics}
           intervalMinutes={intervalMinutes}
           routes={filteredRoutes}
+          trips={ready?.state.trips ?? []}
           sessionState={ready?.state ?? null}
           metricsOptions={{
             ...metricsOptions,

@@ -45,6 +45,9 @@ export interface ClearcutMetrics {
   maxTripsPerDay: number;
   avgPassengersPerDay: number;
   maxPassengersPerDay: number;
+  avgUtilizationPct: number;
+  avgServiceHours: number;
+  avgRevenueHours: number;
   currentRuns: number;
   optimizedRuns: number;
   importedServiceHours: number;
@@ -65,6 +68,19 @@ export interface ClearcutMetrics {
     earliestDataTime: string | null;
     latestDataTime: string | null;
   };
+}
+
+export interface PerRouteMetrics {
+  routeName: string;
+  trips: number;
+  passengers: number;
+  pickupOtpPct: number;
+  dropoffOtpPct: number;
+  productivity: number;
+  serviceHours: number;
+  revenueHours: number;
+  occupiedMinutes: number;
+  utilizationPct: number;
 }
 
 export interface ComputeMetricsOptions {
@@ -121,6 +137,26 @@ function blockLabel(minutes: number): string {
   const period = h24 >= 12 ? 'PM' : 'AM';
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   return `${h12}:${`${m}`.padStart(2, '0')} ${period}`;
+}
+
+/** Merge overlapping [start, end] intervals and return total covered duration in ms. */
+function mergedIntervalDuration(intervals: [number, number][]): number {
+  if (intervals.length === 0) return 0;
+  intervals.sort((a, b) => a[0] - b[0]);
+  let total = 0;
+  let [curStart, curEnd] = intervals[0];
+  for (let i = 1; i < intervals.length; i++) {
+    const [s, e] = intervals[i];
+    if (s <= curEnd) {
+      curEnd = Math.max(curEnd, e);
+    } else {
+      total += curEnd - curStart;
+      curStart = s;
+      curEnd = e;
+    }
+  }
+  total += curEnd - curStart;
+  return total;
 }
 
 function average(values: number[]): number {
@@ -370,6 +406,207 @@ export function computeServiceDayWindow(
   };
 
   return { start: formatClock(startMinutes), end: formatClock(endMinutes) };
+}
+
+export interface PerRouteMetricsOptions {
+  selectedDays?: number[];
+  specificDate?: string;
+  selectedRouteIds?: string[];
+  pickupOtpWindowBefore: number;
+  pickupOtpWindowAfter: number;
+  dropoffOtpWindowBefore: number;
+  dropoffOtpWindowAfter: number;
+}
+
+export function computePerRouteMetrics(
+  routes: RouteRow[],
+  trips: TripRow[],
+  options: PerRouteMetricsOptions,
+): PerRouteMetrics[] {
+  const optSpecificDate = options.specificDate ?? null;
+  const selectedDaysSet = optSpecificDate
+    ? null
+    : options.selectedDays
+      ? new Set(options.selectedDays)
+      : null;
+
+  // Group route instances by name, filtered by day
+  const routesByName = new Map<string, RouteRow[]>();
+  for (const route of routes) {
+    const start = routeStart(route);
+    if (!start) continue;
+    if (optSpecificDate) {
+      if (dateKey(start) !== optSpecificDate) continue;
+    } else if (selectedDaysSet && !selectedDaysSet.has(start.getDay())) {
+      continue;
+    }
+    if (options.selectedRouteIds?.length && !options.selectedRouteIds.includes(route.route_id)) {
+      continue;
+    }
+    const name = route.route_name ?? route.route_id;
+    if (!routesByName.has(name)) routesByName.set(name, []);
+    routesByName.get(name)!.push(route);
+  }
+
+  // Group trips by route_id, filtered by day
+  const tripsByRouteId = new Map<string, TripRow[]>();
+  for (const trip of trips) {
+    const pickup = tripPickupTime(trip);
+    if (!pickup) continue;
+    if (optSpecificDate) {
+      if (dateKey(pickup) !== optSpecificDate) continue;
+    } else if (selectedDaysSet && !selectedDaysSet.has(pickup.getDay())) {
+      continue;
+    }
+    if (options.selectedRouteIds?.length && !options.selectedRouteIds.includes(trip.route_id)) {
+      continue;
+    }
+    if (!tripsByRouteId.has(trip.route_id)) tripsByRouteId.set(trip.route_id, []);
+    tripsByRouteId.get(trip.route_id)!.push(trip);
+  }
+
+  const results: PerRouteMetrics[] = [];
+
+  for (const [routeName, routeInstances] of routesByName) {
+    // Collect all route_ids for this name
+    const routeIds = new Set(routeInstances.map((r) => r.route_id));
+    const dayCount = Math.max(1, new Set(routeInstances.map((r) => {
+      const s = routeStart(r);
+      return s ? dateKey(s) : '';
+    }).filter(Boolean)).size);
+
+    // Aggregate trips across all route_ids for this name
+    let totalTrips = 0;
+    let totalPassengers = 0;
+    let pickupEligible = 0;
+    let pickupOnTime = 0;
+    let dropoffEligible = 0;
+    let dropoffOnTime = 0;
+
+    // Per route-instance tracking: revenue span and trip intervals for occupied time
+    const perInstance = new Map<string, {
+      serviceMs: number;
+      firstPickupMs: number;
+      lastDropMs: number;
+      tripIntervals: [number, number][];
+    }>();
+
+    // Initialize each route instance with service hours
+    for (const r of routeInstances) {
+      const s = asDate(r.scheduled_start_time);
+      const e = asDate(r.scheduled_end_time);
+      const serviceMs = s && e ? Math.max(0, e.getTime() - s.getTime()) : 0;
+      perInstance.set(r.route_id, {
+        serviceMs,
+        firstPickupMs: Infinity,
+        lastDropMs: -Infinity,
+        tripIntervals: [],
+      });
+    }
+
+    for (const routeId of routeIds) {
+      const inst = perInstance.get(routeId);
+      const routeTrips = tripsByRouteId.get(routeId) ?? [];
+      for (const trip of routeTrips) {
+        totalTrips += 1;
+        totalPassengers += parsePassengerCount(trip.passenger_count);
+
+        const pickupTime = tripPickupTime(trip);
+        const dropoffTime = tripDropoffTime(trip);
+
+        if (inst) {
+          // Track first pickup and last drop per route instance
+          if (pickupTime) {
+            inst.firstPickupMs = Math.min(inst.firstPickupMs, pickupTime.getTime());
+          }
+          if (dropoffTime) {
+            inst.lastDropMs = Math.max(inst.lastDropMs, dropoffTime.getTime());
+          }
+          // Collect trip interval for merged occupied time calculation
+          // (handles shared rides — overlapping intervals are merged later)
+          if (pickupTime && dropoffTime) {
+            inst.tripIntervals.push([pickupTime.getTime(), dropoffTime.getTime()]);
+          }
+        }
+
+        // Pickup OTP
+        const scheduledPickup = asDate(trip.scheduled_pickup_time);
+        const actualPickup = asDate(trip.pickup_arrive_time ?? '') ?? asDate(trip.pickup_leave_time ?? '');
+        if (scheduledPickup && actualPickup) {
+          pickupEligible += 1;
+          if (isOnTimeWithWindow({
+            actual: actualPickup,
+            scheduled: scheduledPickup,
+            beforeMin: options.pickupOtpWindowBefore,
+            afterMin: options.pickupOtpWindowAfter,
+          })) {
+            pickupOnTime += 1;
+          }
+        }
+
+        // Dropoff OTP
+        const hasScheduledAppt = Boolean(trip.scheduled_appointment_time);
+        const scheduledDropoff = hasScheduledAppt ? asDate(trip.scheduled_appointment_time) : null;
+        const actualDropoff = asDate(trip.dropoff_arrive_time ?? '') ?? asDate(trip.dropoff_leave_time ?? '');
+        if (scheduledDropoff && actualDropoff) {
+          dropoffEligible += 1;
+          if (isOnTimeWithWindow({
+            actual: actualDropoff,
+            scheduled: scheduledDropoff,
+            beforeMin: options.dropoffOtpWindowBefore,
+            afterMin: options.dropoffOtpWindowAfter,
+          })) {
+            dropoffOnTime += 1;
+          }
+        }
+      }
+    }
+
+    // Aggregate per-instance metrics across days
+    let totalServiceMs = 0;
+    let totalRevenueMs = 0;
+    let totalOccupiedMs = 0;
+    for (const [, inst] of perInstance) {
+      totalServiceMs += inst.serviceMs;
+      if (inst.firstPickupMs < Infinity && inst.lastDropMs > -Infinity) {
+        totalRevenueMs += Math.max(0, inst.lastDropMs - inst.firstPickupMs);
+      }
+      // Merge overlapping trip intervals so shared rides aren't double-counted
+      totalOccupiedMs += mergedIntervalDuration(inst.tripIntervals);
+    }
+
+    const serviceHours = Math.round((totalServiceMs / dayCount / 3_600_000) * 10) / 10;
+    const revenueHours = Math.round((totalRevenueMs / dayCount / 3_600_000) * 10) / 10;
+    const occupiedMinutes = Math.round((totalOccupiedMs / dayCount / 60_000) * 10) / 10;
+
+    // Utilization = time with passengers on board / total service time
+    // Merged intervals ensure shared rides only count once
+    const serviceMinutesTotal = serviceHours * 60;
+    const utilizationPct = serviceMinutesTotal > 0
+      ? Math.round(Math.min(100, (occupiedMinutes / serviceMinutesTotal) * 100) * 10) / 10
+      : 0;
+
+    // Productivity: avg trips per day / service hours
+    const avgTripsPerDay = totalTrips / dayCount;
+    const productivity = serviceHours > 0
+      ? Math.round((avgTripsPerDay / serviceHours) * 100) / 100
+      : 0;
+
+    results.push({
+      routeName,
+      trips: Math.round((totalTrips / dayCount) * 10) / 10,
+      passengers: Math.round((totalPassengers / dayCount) * 10) / 10,
+      pickupOtpPct: pickupEligible > 0 ? Math.round((pickupOnTime / pickupEligible) * 1000) / 10 : 0,
+      dropoffOtpPct: dropoffEligible > 0 ? Math.round((dropoffOnTime / dropoffEligible) * 1000) / 10 : 0,
+      productivity,
+      serviceHours,
+      revenueHours,
+      occupiedMinutes,
+      utilizationPct,
+    });
+  }
+
+  return results.sort((a, b) => a.routeName.localeCompare(b.routeName));
 }
 
 export function computeClearcutMetrics(
@@ -838,6 +1075,24 @@ export function computeClearcutMetrics(
         if (dayTotal > max) max = dayTotal;
       }
       return max;
+    })(),
+    ...(() => {
+      const perRoute = computePerRouteMetrics(session.routes, session.trips, {
+        selectedDays: options.selectedDays,
+        specificDate: options.specificDate,
+        selectedRouteIds: options.selectedRouteIds,
+        pickupOtpWindowBefore: session.settings.pickup_otp_window_before_min,
+        pickupOtpWindowAfter: session.settings.pickup_otp_window_after_min,
+        dropoffOtpWindowBefore: session.settings.dropoff_otp_window_before_min,
+        dropoffOtpWindowAfter: session.settings.dropoff_otp_window_after_min,
+      });
+      const count = perRoute.length || 1;
+      return {
+        avgUtilizationPct: Math.round((perRoute.reduce((s, r) => s + r.utilizationPct, 0) / count) * 10) / 10,
+        // Sum across routes (each is already a per-day average) to get total per day
+        avgServiceHours: Math.round(perRoute.reduce((s, r) => s + r.serviceHours, 0) * 10) / 10,
+        avgRevenueHours: Math.round(perRoute.reduce((s, r) => s + r.revenueHours, 0) * 10) / 10,
+      };
     })(),
     currentRuns: session.routes.length,
     optimizedRuns: Math.max(1, session.routes.length - Math.ceil(session.routes.length * 0.12)),
