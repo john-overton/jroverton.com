@@ -99,4 +99,25 @@ CREATE TABLE IF NOT EXISTS optimization (
   peak_vehicles INTEGER,
   run_structure_json TEXT
 );
+
+CREATE TABLE IF NOT EXISTS runs (
+  run_id TEXT NOT NULL PRIMARY KEY,
+  run_name TEXT NOT NULL,
+  split_number INTEGER NOT NULL DEFAULT 0,
+  depot TEXT,
+  service_days TEXT NOT NULL DEFAULT '["M","T","W","Th","F"]',
+  route_area TEXT,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  platform_hours TEXT NOT NULL DEFAULT '0',
+  pay_hours TEXT NOT NULL DEFAULT '0',
+  break_1_start TEXT,
+  break_1_end TEXT,
+  break_2_start TEXT,
+  break_2_end TEXT,
+  break_3_start TEXT,
+  break_3_end TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_name ON runs(run_name);
 `;

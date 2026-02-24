@@ -75,6 +75,27 @@ export interface RouteRow {
   distance_from_last_drop: string | null;
 }
 
+export type ServiceDay = 'M' | 'T' | 'W' | 'Th' | 'F' | 'Sa' | 'Su';
+
+export interface RunRow {
+  run_id: string;
+  run_name: string;
+  split_number: number;
+  depot: string | null;
+  service_days: string;
+  route_area: string | null;
+  start_time: string;
+  end_time: string;
+  platform_hours: string;
+  pay_hours: string;
+  break_1_start: string | null;
+  break_1_end: string | null;
+  break_2_start: string | null;
+  break_2_end: string | null;
+  break_3_start: string | null;
+  break_3_end: string | null;
+}
+
 export interface SettingsRow {
   id: 1;
   avg_ride_time_min: number;
@@ -117,6 +138,7 @@ export interface SessionState {
   optimization: OptimizationRow;
   trips: TripRow[];
   routes: RouteRow[];
+  runs: RunRow[];
 }
 
 export interface SessionStateUpdateInput {
@@ -124,6 +146,7 @@ export interface SessionStateUpdateInput {
   optimization?: Partial<Omit<OptimizationRow, 'id'>>;
   trips?: TripRow[];
   routes?: RouteRow[];
+  runs?: RunRow[];
 }
 
 export type ImportEventType =

@@ -9,6 +9,7 @@ import { computeServiceDayWindow } from './metrics';
 import type {
   OptimizationRow,
   RouteRow,
+  RunRow,
   SessionStateUpdateInput,
   SettingsRow,
   TripRow,
@@ -58,6 +59,25 @@ const ROUTE_COLUMNS = [
   'depot_lon',
   'distance_to_first_pick',
   'distance_from_last_drop',
+] as const;
+
+const RUN_COLUMNS = [
+  'run_id',
+  'run_name',
+  'split_number',
+  'depot',
+  'service_days',
+  'route_area',
+  'start_time',
+  'end_time',
+  'platform_hours',
+  'pay_hours',
+  'break_1_start',
+  'break_1_end',
+  'break_2_start',
+  'break_2_end',
+  'break_3_start',
+  'break_3_end',
 ] as const;
 
 function ensureSessionsDirectory(): void {
@@ -139,6 +159,35 @@ function ensureTripColumns(db: Database.Database): void {
   }
 }
 
+function ensureRunsTable(db: Database.Database): void {
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='runs'")
+    .all() as Array<{ name: string }>;
+  if (tables.length === 0) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS runs (
+        run_id TEXT NOT NULL PRIMARY KEY,
+        run_name TEXT NOT NULL,
+        split_number INTEGER NOT NULL DEFAULT 0,
+        depot TEXT,
+        service_days TEXT NOT NULL DEFAULT '["M","T","W","Th","F"]',
+        route_area TEXT,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        platform_hours TEXT NOT NULL DEFAULT '0',
+        pay_hours TEXT NOT NULL DEFAULT '0',
+        break_1_start TEXT,
+        break_1_end TEXT,
+        break_2_start TEXT,
+        break_2_end TEXT,
+        break_3_start TEXT,
+        break_3_end TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_runs_name ON runs(run_name);
+    `);
+  }
+}
+
 function normalizePassengerType(value: string | null | undefined): TripRow['passenger_type'] {
   if (value && PASSENGER_TYPES.has(value as TripRow['passenger_type'])) {
     return value as TripRow['passenger_type'];
@@ -163,6 +212,7 @@ function openSessionDb(editToken: string): Database.Database {
   ensureTripPassengerTypeColumn(db);
   ensureSettingsOtpWindowColumns(db);
   ensureRouteColumns(db);
+  ensureRunsTable(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
   db.prepare('INSERT OR IGNORE INTO optimization (id) VALUES (1)').run();
   return db;
@@ -242,6 +292,12 @@ export function listTrips(editToken: string, limit?: number, offset?: number): T
 export function listRoutes(editToken: string): RouteRow[] {
   return withSessionDb(editToken, (db) => {
     return db.prepare('SELECT * FROM routes ORDER BY route_id').all() as RouteRow[];
+  });
+}
+
+export function listRuns(editToken: string): RunRow[] {
+  return withSessionDb(editToken, (db) => {
+    return db.prepare('SELECT * FROM runs ORDER BY run_name, split_number').all() as RunRow[];
   });
 }
 
@@ -347,6 +403,17 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
         db.prepare('DELETE FROM routes').run();
         for (const row of input.routes) {
           insertRoute.run(...ROUTE_COLUMNS.map((column) => row[column]));
+        }
+      }
+
+      if (input.runs) {
+        const insertRun = db.prepare(
+          `INSERT INTO runs (${RUN_COLUMNS.join(',')})
+           VALUES (${RUN_COLUMNS.map(() => '?').join(',')})`,
+        );
+        db.prepare('DELETE FROM runs').run();
+        for (const row of input.runs) {
+          insertRun.run(...RUN_COLUMNS.map((column) => row[column as keyof RunRow]));
         }
       }
     });

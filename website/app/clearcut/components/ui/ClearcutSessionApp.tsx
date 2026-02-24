@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/ta
 import { ClearcutClientError } from '@/lib/clearcut/client';
 import { buildDemoTripsAndRoutes } from '@/lib/clearcut/demo-data';
 import { computeClearcutMetrics } from '@/lib/clearcut/metrics';
+import type { RunRow } from '@/lib/clearcut/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/clearcut/use-clearcut-session';
 import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
 import { palettes, type PaletteId } from '@/app/clearcut/theme/palettes';
@@ -522,6 +523,15 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     });
   }
 
+  function onRunsChange(runs: RunRow[]) {
+    if (!ready || readonlyView) {
+      return;
+    }
+    session.saveState({ runs }).catch((saveError) => {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save runs.');
+    });
+  }
+
   if (session.loadState.status === 'loading') {
     return (
       <main className="max-w-[1100px] mx-auto px-5 pt-16 pb-8">
@@ -917,10 +927,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           fullDayMetrics={fullDayMetrics!}
           optimization={ready.state.optimization}
           routes={ready.state.routes}
+          runs={ready.state.runs}
           selectedDays={selectedDayIds}
           readonlyView={readonlyView}
           intervalMinutes={intervalMinutes}
           onOptimizationChange={onOptimizationChange}
+          onRunsChange={onRunsChange}
         />
       )}
       {tab === 'deadhead' && <DeadheadTab metrics={metrics} />}

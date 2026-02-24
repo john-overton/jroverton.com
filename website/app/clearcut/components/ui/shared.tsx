@@ -433,13 +433,13 @@ export function RunStructureChart({
   pickups,
   onBoard,
   currentVehicles,
-  optimizedVehicles,
+  runVehicles,
   blocks,
 }: {
   pickups: number[];
   onBoard: number[];
   currentVehicles: number[];
-  optimizedVehicles: number[];
+  runVehicles: number[];
   blocks: Array<{ label: string }>;
 }) {
   const { chartColors } = useClearcutTheme();
@@ -450,9 +450,9 @@ export function RunStructureChart({
         pickups: Math.round((pickups[index] ?? 0) * 10) / 10,
         onBoard: Math.round((onBoard[index] ?? 0) * 10) / 10,
         currentVehicles: Math.round((currentVehicles[index] ?? 0) * 10) / 10,
-        optimizedVehicles: Math.round((optimizedVehicles[index] ?? 0) * 10) / 10,
+        runVehicles: Math.round((runVehicles[index] ?? 0) * 10) / 10,
       })),
-    [blocks, onBoard, pickups, currentVehicles, optimizedVehicles],
+    [blocks, onBoard, pickups, currentVehicles, runVehicles],
   );
 
   return (
@@ -466,7 +466,7 @@ export function RunStructureChart({
             formatter={(value: number | string | undefined, name: string | undefined) => {
               const v = typeof value === 'number' ? value : Number(value ?? 0);
               if (name === 'currentVehicles') return [v, 'Current Vehicles'];
-              if (name === 'optimizedVehicles') return [v, 'Optimized Vehicles'];
+              if (name === 'runVehicles') return [v, 'Run Vehicles'];
               if (name === 'onBoard') return [v, 'Active Trips'];
               return [v, 'Pickups'];
             }}
@@ -478,7 +478,7 @@ export function RunStructureChart({
           <Legend
             formatter={(value) => {
               if (value === 'currentVehicles') return 'Current Vehicles';
-              if (value === 'optimizedVehicles') return 'Optimized Vehicles';
+              if (value === 'runVehicles') return 'Run Vehicles';
               if (value === 'onBoard') return 'Active Trips';
               return 'Pickups';
             }}
@@ -486,7 +486,7 @@ export function RunStructureChart({
           <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
           <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
           <Line type="monotone" dataKey="currentVehicles" stroke={chartColors[1]} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-          <Line type="monotone" dataKey="optimizedVehicles" stroke={chartColors[3]} strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="runVehicles" stroke={chartColors[3]} strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4 }} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
