@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { CircleHelp, Pencil, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
 import { Button } from '@/app/clearcut/components/shadcn/button';
@@ -22,8 +23,10 @@ import {
   TableRow,
 } from '@/app/clearcut/components/shadcn/table';
 import type { ImportResponse } from '@/lib/clearcut/client';
+import { extractNewDepotsFromRoutes } from '@/lib/clearcut/depot-utils';
 import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
 import type {
+  DepotRow,
   ImportApplyResponse,
   ImportMappingConfig,
   ImportPreviewResponse,
@@ -35,6 +38,34 @@ import type {
 } from '@/lib/clearcut/types';
 
 import { SectionCard } from './shared';
+
+function SettingLabel({ children, tip }: { children: React.ReactNode; tip: string }) {
+  return (
+    <Label className="text-xs text-cc-text-muted mb-1 inline-flex items-center gap-1">
+      {children}
+      <span className="relative group cursor-help">
+        <CircleHelp size={12} className="text-cc-text-muted" />
+        <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-48 p-1.5 rounded-md bg-cc-surface-1 border border-cc-border shadow-lg text-[11px] text-cc-text-secondary leading-snug hidden group-hover:block">
+          {tip}
+        </span>
+      </span>
+    </Label>
+  );
+}
+
+function InfoLabel({ children, tip }: { children: React.ReactNode; tip: string }) {
+  return (
+    <div className="text-[13px] text-cc-text-muted inline-flex items-center gap-1">
+      {children}
+      <span className="relative group cursor-help">
+        <CircleHelp size={12} className="text-cc-text-muted" />
+        <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-48 p-1.5 rounded-md bg-cc-surface-1 border border-cc-border shadow-lg text-[11px] text-cc-text-secondary leading-snug hidden group-hover:block">
+          {tip}
+        </span>
+      </span>
+    </div>
+  );
+}
 
 type ImportViewMode = 'main' | 'wizard' | 'flat';
 type TripDataColumnKey =
@@ -145,6 +176,8 @@ interface ImportTabProps {
       | 'dropoff_otp_window_after_min',
     value: number,
   ) => void;
+  depots: DepotRow[];
+  onDepotsChange: (depots: DepotRow[]) => void;
 }
 
 export default function ImportTab({
@@ -156,6 +189,8 @@ export default function ImportTab({
   setError,
   onLoadDemo,
   onOtpWindowChange,
+  depots,
+  onDepotsChange,
 }: ImportTabProps) {
   const [importViewMode, setImportViewMode] = useState<ImportViewMode>('main');
   const [wizardKey, setWizardKey] = useState(0);
@@ -346,18 +381,25 @@ export default function ImportTab({
         )}
       </SectionCard>
 
+      <DepotSettings
+        readonlyView={readonlyView}
+        routes={state.routes}
+        depots={depots}
+        onDepotsChange={onDepotsChange}
+      />
+
       <SectionCard title="System Settings">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <div className="text-[13px] text-cc-text-muted">Derived Service Start</div>
+            <InfoLabel tip="Auto-derived from imported data with a 30-minute buffer before the earliest trip or shift start.">Derived Service Start</InfoLabel>
             <div className="font-semibold">{metrics.derivedServiceWindow.startLabel}</div>
           </div>
           <div>
-            <div className="text-[13px] text-cc-text-muted">Derived Service End</div>
+            <InfoLabel tip="Auto-derived from imported data with a 30-minute buffer after the latest trip or shift end.">Derived Service End</InfoLabel>
             <div className="font-semibold">{metrics.derivedServiceWindow.endLabel}</div>
           </div>
           <div>
-            <div className="text-[13px] text-cc-text-muted">Service Hours</div>
+            <InfoLabel tip="Total hours between the derived service start and end times.">Service Hours</InfoLabel>
             <div className="font-semibold">
               {metrics.derivedServiceWindow.isTwentyFourHours
                 ? '24:00'
@@ -367,28 +409,22 @@ export default function ImportTab({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
           <div>
-            <div className="text-[13px] text-cc-text-muted">Earliest Data Time</div>
+            <InfoLabel tip="The earliest actual or scheduled time found across all imported trips and routes.">Earliest Data Time</InfoLabel>
             <div className="font-semibold">
               {metrics.derivedServiceWindow.earliestDataTime ?? 'No trip data'}
             </div>
           </div>
           <div>
-            <div className="text-[13px] text-cc-text-muted">Latest Data Time</div>
+            <InfoLabel tip="The latest actual or scheduled time found across all imported trips and routes.">Latest Data Time</InfoLabel>
             <div className="font-semibold">
               {metrics.derivedServiceWindow.latestDataTime ?? 'No trip data'}
             </div>
           </div>
         </div>
-        <div className="text-xs text-cc-text-muted mt-3">
-          Service window is auto-derived from imported data (actual times preferred, fallback to scheduled), with a 30-minute buffer before the earliest trip or shift start and after the latest trip or shift end.
-        </div>
         <hr className="my-3 border-cc-border" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <Label>Pickup OTP: minutes before</Label>
-            <div className="text-xs text-cc-text-muted mb-1.5">
-              Minutes before scheduled pickup that is on time.
-            </div>
+            <SettingLabel tip="Minutes before the scheduled pickup time that still counts as on-time.">Pickup OTP: before</SettingLabel>
             <Input
               type="number"
               min={0}
@@ -402,10 +438,7 @@ export default function ImportTab({
             />
           </div>
           <div>
-            <Label>Pickup OTP: minutes after</Label>
-            <div className="text-xs text-cc-text-muted mb-1.5">
-              Minutes after scheduled pickup that is on time.
-            </div>
+            <SettingLabel tip="Minutes after the scheduled pickup time that still counts as on-time.">Pickup OTP: after</SettingLabel>
             <Input
               type="number"
               min={0}
@@ -419,10 +452,7 @@ export default function ImportTab({
             />
           </div>
           <div>
-            <Label>Dropoff OTP: minutes before</Label>
-            <div className="text-xs text-cc-text-muted mb-1.5">
-              Minutes before dropoff that is on time.
-            </div>
+            <SettingLabel tip="Minutes before the scheduled dropoff time that still counts as on-time.">Dropoff OTP: before</SettingLabel>
             <Input
               type="number"
               min={0}
@@ -436,10 +466,7 @@ export default function ImportTab({
             />
           </div>
           <div>
-            <Label>Dropoff OTP: minutes after</Label>
-            <div className="text-xs text-cc-text-muted mb-1.5">
-              Minutes after dropoff that is on time.
-            </div>
+            <SettingLabel tip="Minutes after the scheduled dropoff time that still counts as on-time.">Dropoff OTP: after</SettingLabel>
             <Input
               type="number"
               min={0}
@@ -829,5 +856,154 @@ function FlatImportLogModal(props: {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Depot Settings component ────────────────────────────────────────
+
+function DepotSettings({
+  readonlyView,
+  routes,
+  depots,
+  onDepotsChange,
+}: {
+  readonlyView: boolean;
+  routes: RouteRow[];
+  depots: DepotRow[];
+  onDepotsChange: (depots: DepotRow[]) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<DepotRow[]>(depots);
+
+  // Sync draft when saved depots change from outside (e.g. page load)
+  useEffect(() => {
+    if (!editing) setDraft(depots);
+  }, [depots, editing]);
+
+  function extractFromRoutes() {
+    const base = editing ? draft : depots;
+    const newDepots = extractNewDepotsFromRoutes(routes, base);
+    if (newDepots.length === 0) return;
+    const updated = [...base, ...newDepots];
+    setDraft(updated);
+    if (!editing) setEditing(true);
+  }
+
+  function addCustomDepot() {
+    const base = editing ? draft : depots;
+    const newDepot: DepotRow = {
+      depot_id: crypto.randomUUID(),
+      depot_name: `Depot ${base.length + 1}`,
+      depot_address: null,
+      depot_lat: null,
+      depot_lon: null,
+    };
+    const updated = [...base, newDepot];
+    setDraft(updated);
+    if (!editing) setEditing(true);
+  }
+
+  function updateDepotName(depotId: string, name: string) {
+    setDraft((prev) => prev.map((d) => (d.depot_id === depotId ? { ...d, depot_name: name } : d)));
+  }
+
+  function deleteDepot(depotId: string) {
+    setDraft((prev) => prev.filter((d) => d.depot_id !== depotId));
+  }
+
+  function handleSave() {
+    onDepotsChange(draft);
+    setEditing(false);
+  }
+
+  function handleCancel() {
+    setDraft(depots);
+    setEditing(false);
+  }
+
+  const displayDepots = editing ? draft : depots;
+
+  return (
+    <SectionCard title="Depot Settings">
+      <div className="flex flex-col gap-2 mb-3">
+        {!readonlyView && (
+          <>
+            <div className="flex items-center gap-2">
+              {!editing && depots.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => { setDraft(depots); setEditing(true); }} type="button">
+                  <Pencil size={14} className="mr-1.5" /> Edit Depots
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={extractFromRoutes} type="button">
+                <Wand2 size={14} className="mr-1.5" /> Extract from Routes
+              </Button>
+              <Button variant="outline" size="sm" onClick={addCustomDepot} type="button">
+                <Plus size={14} className="mr-1.5" /> Add Custom Depot
+              </Button>
+            </div>
+            {editing && (
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={handleSave} type="button">
+                  <Save size={14} className="mr-1.5" /> Save
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCancel} type="button">
+                  <X size={14} className="mr-1.5" /> Cancel
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {displayDepots.length === 0 ? (
+        <div className="text-xs text-cc-text-muted py-3">
+          No depots configured. Extract from imported route data or add a custom depot.
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="min-w-[150px]">Name</TableHead>
+              <TableHead className="min-w-[200px]">Address</TableHead>
+              {editing && <TableHead className="min-w-[60px]">Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayDepots.map((depot) => (
+              <TableRow key={depot.depot_id}>
+                <TableCell>
+                  {editing ? (
+                    <Input
+                      value={depot.depot_name}
+                      className="h-7 text-xs"
+                      onChange={(e) => updateDepotName(depot.depot_id, e.target.value)}
+                    />
+                  ) : (
+                    <span className="text-xs">{depot.depot_name}</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-xs text-cc-text-muted">
+                  {depot.depot_address || '(custom)'}
+                </TableCell>
+                {editing && (
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-cc-danger"
+                      onClick={() => deleteDepot(depot.depot_id)}
+                      title="Delete depot"
+                      type="button"
+                    >
+                      <Trash2 size={13} />
+                    </Button>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </SectionCard>
   );
 }

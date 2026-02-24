@@ -96,6 +96,65 @@ export interface RunRow {
   break_3_end: string | null;
 }
 
+// ── Bid system types ─────────────────────────────────────────────────
+
+export type BidType = 'FTE' | 'PT';
+
+export interface BidConfig {
+  fte_min_hours: number;
+  fte_max_hours: number;
+  min_rest_hours: number;
+  max_consecutive_days: number;
+  depot_match_required: boolean;
+  consistency_weight: 'low' | 'medium' | 'high';
+  rank_priority: 'hours' | 'consistency' | 'days_off';
+  max_allowable_variance: number;
+}
+
+export interface DailyBlock {
+  run_name: string;
+  day: ServiceDay;
+  run_ids: string[];
+  depot: string | null;
+  pay_hours: number;
+  start_time_minutes: number;
+  end_time_minutes: number;
+  span_minutes: number;
+}
+
+export interface BidPackage {
+  bid_id: string;
+  bid_rank: number;
+  type: BidType;
+  assigned_runs: string[];
+  daily_blocks: DailyBlock[];
+  weekly_pay_hours: number;
+  days_on: ServiceDay[];
+  days_off: ServiceDay[];
+  consecutive_days_off: number;
+  max_consecutive_work: number;
+  start_time_variance: number;
+  end_time_variance: number;
+  consistency_score: number;
+  depot: string | null;
+}
+
+export interface BidResult {
+  config: BidConfig;
+  packages: BidPackage[];
+  fte_count: number;
+  pt_count: number;
+  unassigned_blocks: DailyBlock[];
+}
+
+export interface DepotRow {
+  depot_id: string;
+  depot_name: string;
+  depot_address: string | null;
+  depot_lat: string | null;
+  depot_lon: string | null;
+}
+
 export interface SettingsRow {
   id: 1;
   avg_ride_time_min: number;
@@ -139,6 +198,7 @@ export interface SessionState {
   trips: TripRow[];
   routes: RouteRow[];
   runs: RunRow[];
+  depots: DepotRow[];
 }
 
 export interface SessionStateUpdateInput {
@@ -147,6 +207,7 @@ export interface SessionStateUpdateInput {
   trips?: TripRow[];
   routes?: RouteRow[];
   runs?: RunRow[];
+  depots?: DepotRow[];
 }
 
 export type ImportEventType =

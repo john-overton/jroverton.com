@@ -16,6 +16,7 @@ import {
   deleteSessionDb,
   getOptimization,
   getSettings,
+  listDepots,
   listRoutes,
   listRuns,
   listTrips,
@@ -80,6 +81,7 @@ export function getSessionState(record: SessionRecord): SessionState {
     trips: listTrips(record.edit_token),
     routes: listRoutes(record.edit_token),
     runs: listRuns(record.edit_token),
+    depots: listDepots(record.edit_token),
   };
 }
 

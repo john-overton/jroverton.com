@@ -24,8 +24,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/clear
 import { Tabs, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/tabs';
 import { ClearcutClientError } from '@/lib/clearcut/client';
 import { buildDemoTripsAndRoutes } from '@/lib/clearcut/demo-data';
+import { extractNewDepotsFromRoutes } from '@/lib/clearcut/depot-utils';
 import { computeClearcutMetrics } from '@/lib/clearcut/metrics';
-import type { RunRow } from '@/lib/clearcut/types';
+import type { DepotRow, RunRow } from '@/lib/clearcut/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/clearcut/use-clearcut-session';
 import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
 import { palettes, type PaletteId } from '@/app/clearcut/theme/palettes';
@@ -203,6 +204,23 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     }
     prevDataCountsRef.current = currentCounts;
   }, [ready]);
+
+  // Auto-extract new depots when routes change (e.g. after import)
+  const prevRouteCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!ready || readonlyView) return;
+    const routeCount = ready.state.routes.length;
+    const prev = prevRouteCountRef.current;
+    prevRouteCountRef.current = routeCount;
+    // Only run when route count actually increases (new import)
+    if (prev === null || routeCount <= prev) return;
+    const newDepots = extractNewDepotsFromRoutes(ready.state.routes, ready.state.depots);
+    if (newDepots.length === 0) return;
+    const merged = [...ready.state.depots, ...newDepots];
+    session.saveState({ depots: merged }).catch(() => {
+      // silent — manual extraction is still available as fallback
+    });
+  }, [ready, readonlyView, session]);
 
   useEffect(() => {
     if (!ready || filterStateInitialized.current) {
@@ -529,6 +547,15 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     }
     session.saveState({ runs }).catch((saveError) => {
       setError(saveError instanceof Error ? saveError.message : 'Failed to save runs.');
+    });
+  }
+
+  function onDepotsChange(depots: DepotRow[]) {
+    if (!ready || readonlyView) {
+      return;
+    }
+    session.saveState({ depots }).catch((saveError) => {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save depots.');
     });
   }
 
@@ -910,6 +937,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           setError={setError}
           onLoadDemo={onLoadDemo}
           onOtpWindowChange={onOtpWindowChange}
+          depots={ready.state.depots}
+          onDepotsChange={onDepotsChange}
         />
       )}
       {tab === 'demand' && <DemandTab metrics={metrics} intervalMinutes={intervalMinutes} />}
@@ -933,6 +962,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           intervalMinutes={intervalMinutes}
           onOptimizationChange={onOptimizationChange}
           onRunsChange={onRunsChange}
+          depots={ready.state.depots}
         />
       )}
       {tab === 'deadhead' && <DeadheadTab metrics={metrics} />}

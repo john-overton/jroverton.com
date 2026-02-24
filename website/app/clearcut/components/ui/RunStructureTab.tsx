@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleHelp, Copy, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleHelp, Copy, Plus, SquareSplitHorizontal, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/clearcut/components/shadcn/button';
@@ -22,14 +22,17 @@ import {
 } from '@/app/clearcut/components/shadcn/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/tabs';
 import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
+import { estimateFtePtCounts } from '@/lib/clearcut/bid-algorithm';
 import { buildRunCutForDate, getAvailableDates } from '@/lib/clearcut/run-structure';
-import type { OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/clearcut/types';
+import type { DepotRow, OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/clearcut/types';
 
+import ShiftBidsPanel from './ShiftBidsPanel';
 import { RunStructureChart, SectionCard, parseClockToMinutes, formatMinutesToClock } from './shared';
 
 const ALL_SERVICE_DAYS: ServiceDay[] = ['M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'];
 const SERVICE_DAY_TO_DOW: Record<ServiceDay, number> = { Su: 0, M: 1, T: 2, W: 3, Th: 4, F: 5, Sa: 6 };
 const DOW_TO_SERVICE_DAY: Record<number, ServiceDay> = { 0: 'Su', 1: 'M', 2: 'T', 3: 'W', 4: 'Th', 5: 'F', 6: 'Sa' };
+const SERVICE_DAY_FULL_NAME: Record<ServiceDay, string> = { M: 'Monday', T: 'Tuesday', W: 'Wednesday', Th: 'Thursday', F: 'Friday', Sa: 'Saturday', Su: 'Sunday' };
 
 function parseServiceDays(json: string): ServiceDay[] {
   try {
@@ -244,6 +247,7 @@ interface RunStructureTabProps {
     value: number | string | null,
   ) => void;
   onRunsChange: (runs: RunRow[]) => void;
+  depots: DepotRow[];
 }
 
 export default function RunStructureTab({
@@ -255,12 +259,14 @@ export default function RunStructureTab({
   readonlyView,
   intervalMinutes,
   onRunsChange,
+  depots,
 }: RunStructureTabProps) {
   const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
-  const [subTab, setSubTab] = useState<'imported' | 'runeditor'>('runeditor');
+  const [subTab, setSubTab] = useState<'imported' | 'bids' | 'runeditor'>('runeditor');
   const [localRuns, setLocalRuns] = useState<RunRow[]>(runs);
   const [selectedRunCutDate, setSelectedRunCutDate] = useState<string | null>(null);
   const [runDayFilter, setRunDayFilter] = useState<ServiceDay | 'all'>('all');
+  const [depotFilter, setDepotFilter] = useState<string>('all');
   const [sortKey, setSortKey] = useState<SortColumn>('run_name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [breaksExpanded, setBreaksExpanded] = useState(false);
@@ -388,11 +394,14 @@ export default function RunStructureTab({
     const productivity = totalServiceHours > 0
       ? Math.round((avgDailyTrips / totalServiceHours) * 100) / 100
       : 0;
+    const { fte: estFTE, pt: estPT } = estimateFtePtCounts(localRuns);
     return {
       count: localRuns.length,
       totalServiceHours: Math.round(totalServiceHours * 10) / 10,
       maxVehicles,
       productivity,
+      estFTE,
+      estPT,
     };
   }, [localRuns, runVehiclesByBlockFullDay, avgDailyTrips]);
 
@@ -430,12 +439,18 @@ export default function RunStructureTab({
   // ── Filtered + sorted runs for display ───────────────────────────
 
   const filteredRuns = useMemo(() => {
-    if (runDayFilter === 'all') return localRuns;
-    return localRuns.filter((run) => {
-      const days = parseServiceDays(run.service_days);
-      return days.includes(runDayFilter);
-    });
-  }, [localRuns, runDayFilter]);
+    let result = localRuns;
+    if (runDayFilter !== 'all') {
+      result = result.filter((run) => {
+        const days = parseServiceDays(run.service_days);
+        return days.includes(runDayFilter);
+      });
+    }
+    if (depotFilter !== 'all') {
+      result = result.filter((run) => run.depot === depotFilter);
+    }
+    return result;
+  }, [localRuns, runDayFilter, depotFilter]);
 
   function toggleSort(key: typeof sortKey) {
     if (sortKey === key) {
@@ -540,6 +555,16 @@ export default function RunStructureTab({
 
   function deleteRun(runId: string) {
     updateLocalRuns(localRuns.filter((r) => r.run_id !== runId));
+  }
+
+  function duplicateRun(run: RunRow) {
+    const copy: RunRow = {
+      ...run,
+      run_id: crypto.randomUUID(),
+      run_name: `${run.run_name} copy`,
+      split_number: 0,
+    };
+    updateLocalRuns([...localRuns, copy]);
   }
 
   function updateRun(runId: string, field: keyof RunRow, value: string | number | null) {
@@ -700,9 +725,10 @@ export default function RunStructureTab({
       </SectionCard>
 
       <SectionCard title="Run Structure">
-        <Tabs value={subTab} onValueChange={(v) => setSubTab(v as 'imported' | 'runeditor')}>
+        <Tabs value={subTab} onValueChange={(v) => setSubTab(v as 'imported' | 'bids' | 'runeditor')}>
           <TabsList>
             <TabsTrigger value="runeditor">Run Editor</TabsTrigger>
+            <TabsTrigger value="bids">Shift Bids</TabsTrigger>
             <TabsTrigger value="imported">Imported Runs</TabsTrigger>
           </TabsList>
 
@@ -784,6 +810,11 @@ export default function RunStructureTab({
             </Table>
           </TabsContent>
 
+          {/* ── Shift Bids sub-tab ────────────────────────────────── */}
+          <TabsContent value="bids">
+            <ShiftBidsPanel runs={localRuns} depots={depots} readonlyView={readonlyView} />
+          </TabsContent>
+
           {/* ── Run Editor sub-tab ────────────────────────────────── */}
           <TabsContent value="runeditor">
             <div className="flex items-center justify-between mb-3 mt-3 flex-wrap gap-2">
@@ -792,6 +823,8 @@ export default function RunStructureTab({
                 <span>Service Hrs: <strong>{runStats.totalServiceHours}</strong></span>
                 <span>Peak Vehicles: <strong>{runStats.maxVehicles}</strong></span>
                 <span>Productivity: <strong>{runStats.productivity}</strong></span>
+                <span>Est. FTE: <strong>{runStats.estFTE}</strong></span>
+                <span>Est. PT: <strong>{runStats.estPT}</strong></span>
               </div>
               <div className="flex items-center gap-2">
                 {/* Day filter */}
@@ -809,6 +842,19 @@ export default function RunStructureTab({
                     >{day}</button>
                   ))}
                 </div>
+                {depots.length > 0 && (
+                  <Select value={depotFilter} onValueChange={setDepotFilter}>
+                    <SelectTrigger className="h-7 text-xs w-auto min-w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Depots</SelectItem>
+                      {depots.map((d) => (
+                        <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 {!readonlyView && (
                   <Button size="sm" onClick={addRun} type="button">
                     <Plus size={14} className="mr-1.5" /> Add Run
@@ -819,7 +865,7 @@ export default function RunStructureTab({
 
             {runDayFilter !== 'all' && filteredRuns.length !== localRuns.length && (
               <div className="text-xs text-cc-text-muted mb-2">
-                Showing {filteredRuns.length} of {localRuns.length} runs for {runDayFilter}
+                Showing {filteredRuns.length} of {localRuns.length} runs for {SERVICE_DAY_FULL_NAME[runDayFilter]}
               </div>
             )}
 
@@ -843,6 +889,7 @@ export default function RunStructureTab({
                 <TableHeader>
                   <TableRow>
                     <SortableHead column="run_name" label="Run Name" className="min-w-[120px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    {depots.length > 0 && <TableHead className="min-w-[100px]">Depot</TableHead>}
                     <SortableHead column="split_number" label="Split" className="min-w-[50px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     <SortableHead column="start_time" label="Start" className="min-w-[90px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     <SortableHead column="end_time" label="End" className="min-w-[90px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -899,6 +946,25 @@ export default function RunStructureTab({
                             onChange={(e) => updateRun(run.run_id, 'run_name', e.target.value)}
                           />
                         </TableCell>
+                        {depots.length > 0 && (
+                          <TableCell>
+                            <Select
+                              value={run.depot ?? 'none'}
+                              onValueChange={(v) => updateRun(run.run_id, 'depot', v === 'none' ? null : v)}
+                              disabled={disabled}
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">{'\u2014'}</SelectItem>
+                                {depots.map((d) => (
+                                  <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-cc-text-muted">
@@ -1023,6 +1089,16 @@ export default function RunStructureTab({
                                   className="h-7 w-7"
                                   onClick={() => addSplit(run)}
                                   title="Add split"
+                                  type="button"
+                                >
+                                  <SquareSplitHorizontal size={13} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => duplicateRun(run)}
+                                  title="Copy run"
                                   type="button"
                                 >
                                   <Copy size={13} />

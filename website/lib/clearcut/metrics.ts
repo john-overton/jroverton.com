@@ -610,7 +610,10 @@ export function computeClearcutMetrics(
       dropoffEligibleCounts[i] > 0 ? (dropoffOnTimeCounts[i] / dropoffEligibleCounts[i]) * 100 : 0;
     tripOtpByBlock[i] = tripEligibleCounts[i] > 0 ? (tripOnTimeCounts[i] / tripEligibleCounts[i]) * 100 : 0;
     otpByBlock[i] = tripOtpByBlock[i];
-    productivityByBlock[i] = vehiclesByBlock[i] > 0 ? trips / vehiclesByBlock[i] : 0;
+    const vehicleHours = (vehiclesByBlock[i] * blockSizeMinutes) / 60;
+    productivityByBlock[i] = vehicleHours > 0
+      ? Math.round((trips / vehicleHours) * 100) / 100
+      : 0;
     const activeVehiclesRaw = activeVehiclesRawByBlock[i];
     const occupiedVehiclesRaw = Math.min(occupiedVehiclesRawByBlock[i], activeVehiclesRaw);
     // Only show deadhead when there are meaningful active vehicles in this block (after averaging)

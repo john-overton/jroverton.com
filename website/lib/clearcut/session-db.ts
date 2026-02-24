@@ -7,6 +7,7 @@ import { ApiError } from './errors';
 import { SESSION_SCHEMA_SQL } from './schema';
 import { computeServiceDayWindow } from './metrics';
 import type {
+  DepotRow,
   OptimizationRow,
   RouteRow,
   RunRow,
@@ -78,6 +79,14 @@ const RUN_COLUMNS = [
   'break_2_end',
   'break_3_start',
   'break_3_end',
+] as const;
+
+const DEPOT_COLUMNS = [
+  'depot_id',
+  'depot_name',
+  'depot_address',
+  'depot_lat',
+  'depot_lon',
 ] as const;
 
 function ensureSessionsDirectory(): void {
@@ -188,6 +197,23 @@ function ensureRunsTable(db: Database.Database): void {
   }
 }
 
+function ensureDepotsTable(db: Database.Database): void {
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='depots'")
+    .all() as Array<{ name: string }>;
+  if (tables.length === 0) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS depots (
+        depot_id TEXT NOT NULL PRIMARY KEY,
+        depot_name TEXT NOT NULL,
+        depot_address TEXT,
+        depot_lat TEXT,
+        depot_lon TEXT
+      );
+    `);
+  }
+}
+
 function normalizePassengerType(value: string | null | undefined): TripRow['passenger_type'] {
   if (value && PASSENGER_TYPES.has(value as TripRow['passenger_type'])) {
     return value as TripRow['passenger_type'];
@@ -213,6 +239,7 @@ function openSessionDb(editToken: string): Database.Database {
   ensureSettingsOtpWindowColumns(db);
   ensureRouteColumns(db);
   ensureRunsTable(db);
+  ensureDepotsTable(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
   db.prepare('INSERT OR IGNORE INTO optimization (id) VALUES (1)').run();
   return db;
@@ -298,6 +325,12 @@ export function listRoutes(editToken: string): RouteRow[] {
 export function listRuns(editToken: string): RunRow[] {
   return withSessionDb(editToken, (db) => {
     return db.prepare('SELECT * FROM runs ORDER BY run_name, split_number').all() as RunRow[];
+  });
+}
+
+export function listDepots(editToken: string): DepotRow[] {
+  return withSessionDb(editToken, (db) => {
+    return db.prepare('SELECT * FROM depots ORDER BY depot_name').all() as DepotRow[];
   });
 }
 
@@ -414,6 +447,17 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
         db.prepare('DELETE FROM runs').run();
         for (const row of input.runs) {
           insertRun.run(...RUN_COLUMNS.map((column) => row[column as keyof RunRow]));
+        }
+      }
+
+      if (input.depots) {
+        const insertDepot = db.prepare(
+          `INSERT INTO depots (${DEPOT_COLUMNS.join(',')})
+           VALUES (${DEPOT_COLUMNS.map(() => '?').join(',')})`,
+        );
+        db.prepare('DELETE FROM depots').run();
+        for (const row of input.depots) {
+          insertDepot.run(...DEPOT_COLUMNS.map((column) => row[column as keyof DepotRow]));
         }
       }
     });
