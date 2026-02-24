@@ -997,6 +997,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onOptimizationChange={onOptimizationChange}
           onRunsChange={onRunsChange}
           depots={ready.state.depots}
+          filteredRoutes={filteredRoutes}
         />
       )}
       {tab === 'deadhead' && <DeadheadTab metrics={metrics} />}

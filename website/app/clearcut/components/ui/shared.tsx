@@ -389,10 +389,13 @@ export function PerformanceCompositeChart({
   );
 }
 
-export function SectionCard({ title, children }: { title: string; children: ReactNode }) {
+export function SectionCard({ title, headerRight, children }: { title: string; headerRight?: ReactNode; children: ReactNode }) {
   return (
     <section className="border border-cc-border rounded-[10px] bg-cc-surface-1 p-4 mb-4">
-      <h3 className="text-[17px] font-semibold mb-3">{title}</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[17px] font-semibold">{title}</h3>
+        {headerRight}
+      </div>
       {children}
     </section>
   );

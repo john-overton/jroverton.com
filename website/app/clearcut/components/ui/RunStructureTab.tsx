@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleHelp, Copy, Plus, SquareSplitHorizontal, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleHelp, Copy, Plus, Redo2, SquareSplitHorizontal, Trash2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/clearcut/components/shadcn/button';
@@ -26,6 +26,10 @@ import { estimateFtePtCounts } from '@/lib/clearcut/bid-algorithm';
 import type { CurrentRunCutRow } from '@/lib/clearcut/run-structure';
 import { buildRunCutForDate, getAvailableDates } from '@/lib/clearcut/run-structure';
 import type { DepotRow, OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/clearcut/types';
+
+import { Toast, ToastClose, ToastProvider, ToastTitle, ToastViewport } from '@/app/clearcut/components/shadcn/toast';
+import { useToast } from '@/app/clearcut/hooks/useToast';
+import { useUndoRedo } from '@/app/clearcut/hooks/useUndoRedo';
 
 import ShiftBidsPanel from './ShiftBidsPanel';
 import { RunStructureChart, SectionCard, parseClockToMinutes, formatMinutesToClock } from './shared';
@@ -299,6 +303,7 @@ interface RunStructureTabProps {
   ) => void;
   onRunsChange: (runs: RunRow[]) => void;
   depots: DepotRow[];
+  filteredRoutes: RouteRow[];
 }
 
 export default function RunStructureTab({
@@ -308,6 +313,7 @@ export default function RunStructureTab({
   runs,
   selectedDays,
   readonlyView,
+  filteredRoutes,
   intervalMinutes,
   onRunsChange,
   depots,
@@ -326,11 +332,19 @@ export default function RunStructureTab({
   const [importedSortDir, setImportedSortDir] = useState<'asc' | 'desc'>('asc');
   const [importedBreaksExpanded, setImportedBreaksExpanded] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ownPersistRef = useRef(false);
+  const { pushState, undo, redo, clearHistory, canUndo, canRedo } = useUndoRedo<RunRow[]>();
+  const { toasts, showToast, dismissToast } = useToast();
 
-  // Sync from server when runs prop changes
+  // Sync from server when runs prop changes (skip if it's our own save bouncing back)
   useEffect(() => {
+    if (ownPersistRef.current) {
+      ownPersistRef.current = false;
+      return;
+    }
     setLocalRuns(runs);
-  }, [runs]);
+    clearHistory();
+  }, [runs, clearHistory]);
 
   // Debounced save
   const persistRuns = useCallback(
@@ -338,6 +352,7 @@ export default function RunStructureTab({
       if (readonlyView) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
+        ownPersistRef.current = true;
         onRunsChange(nextRuns);
       }, 500);
     },
@@ -345,9 +360,20 @@ export default function RunStructureTab({
   );
 
   function updateLocalRuns(nextRuns: RunRow[]) {
+    pushState(localRuns);
     const withSplits = applySplitDetection(nextRuns);
     setLocalRuns(withSplits);
     persistRuns(withSplits);
+  }
+
+  function handleUndo() {
+    const previous = undo(localRuns);
+    if (previous) { setLocalRuns(previous); persistRuns(previous); }
+  }
+
+  function handleRedo() {
+    const next = redo(localRuns);
+    if (next) { setLocalRuns(next); persistRuns(next); }
   }
 
   // ── Imported run cut data ────────────────────────────────────────
@@ -391,8 +417,25 @@ export default function RunStructureTab({
     });
   }, [currentRunCut, importedSortKey, importedSortDir]);
 
+  // ── Filtered runs for display + chart ────────────────────────────
+
+  const filteredRuns = useMemo(() => {
+    let result = localRuns;
+    if (runDayFilter !== 'all') {
+      result = result.filter((run) => {
+        const days = parseServiceDays(run.service_days);
+        return days.includes(runDayFilter);
+      });
+    }
+    if (depotFilter !== 'all') {
+      result = result.filter((run) => run.depot === depotFilter);
+    }
+    return result;
+  }, [localRuns, runDayFilter, depotFilter]);
+
   // ── Vehicle counts by block ──────────────────────────────────────
 
+  // Current routes from imported data (date-specific, for imported-routes stats)
   const currentVehiclesByBlockFullDay = useMemo(() => {
     const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
     for (const row of currentRunCut) {
@@ -403,20 +446,46 @@ export default function RunStructureTab({
     return counts;
   }, [currentRunCut, fullDayMetrics.blocks.length]);
 
-  const currentVehiclesByBlock = useMemo(() => {
+  // Current routes for the chart — derived from globally-filtered routes, averaged per date
+  const chartCurrentVehiclesByBlockFullDay = useMemo(() => {
+    const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
+    const dateSet = new Set<string>();
+    for (const route of filteredRoutes) {
+      const startDt = asDate(route.actual_start_time) ?? asDate(route.scheduled_start_time);
+      const endDt = asDate(route.actual_end_time) ?? asDate(route.scheduled_end_time);
+      if (!startDt || !endDt) continue;
+      const y = startDt.getFullYear();
+      const m = `${startDt.getMonth() + 1}`.padStart(2, '0');
+      const d = `${startDt.getDate()}`.padStart(2, '0');
+      dateSet.add(`${y}-${m}-${d}`);
+      const startMin = dateToMinutesOfDay(startDt);
+      const endMin = dateToMinutesOfDay(endDt);
+      if (endMin <= startMin) continue;
+      for (let i = 0; i < fullDayMetrics.blocks.length; i++) {
+        if (startMin < fullDayMetrics.blocks[i].endMinutes && endMin > fullDayMetrics.blocks[i].startMinutes) {
+          counts[i] += 1;
+        }
+      }
+    }
+    const numDates = Math.max(1, dateSet.size);
+    return counts.map((c) => Math.round((c / numDates) * 10) / 10);
+  }, [filteredRoutes, fullDayMetrics.blocks]);
+
+  const chartCurrentVehiclesByBlock = useMemo(() => {
     return metrics.blocks.map((viewBlock) => {
       const fullIdx = fullDayMetrics.blocks.findIndex(
         (b) => b.startMinutes === viewBlock.startMinutes,
       );
-      return fullIdx >= 0 ? currentVehiclesByBlockFullDay[fullIdx] : 0;
+      return fullIdx >= 0 ? chartCurrentVehiclesByBlockFullDay[fullIdx] : 0;
     });
-  }, [metrics.blocks, fullDayMetrics.blocks, currentVehiclesByBlockFullDay]);
+  }, [metrics.blocks, fullDayMetrics.blocks, chartCurrentVehiclesByBlockFullDay]);
 
   const selectedDaySet = useMemo(() => new Set(selectedDays), [selectedDays]);
 
+  // New routes for the chart — from locally-filtered runs, checked against global day selection
   const runVehiclesByBlockFullDay = useMemo(() => {
     const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
-    for (const run of localRuns) {
+    for (const run of filteredRuns) {
       const runDays = parseServiceDays(run.service_days);
       const matchesDays = selectedDays.length === 0 || runDays.some((d) => selectedDaySet.has(SERVICE_DAY_TO_DOW[d]));
       if (!matchesDays) continue;
@@ -431,7 +500,7 @@ export default function RunStructureTab({
       }
     }
     return counts;
-  }, [localRuns, fullDayMetrics.blocks, selectedDays.length, selectedDaySet]);
+  }, [filteredRuns, fullDayMetrics.blocks, selectedDays.length, selectedDaySet]);
 
   const runVehiclesByBlock = useMemo(() => {
     return metrics.blocks.map((viewBlock) => {
@@ -510,21 +579,7 @@ export default function RunStructureTab({
     return overlapping;
   }, [localRuns]);
 
-  // ── Filtered + sorted runs for display ───────────────────────────
-
-  const filteredRuns = useMemo(() => {
-    let result = localRuns;
-    if (runDayFilter !== 'all') {
-      result = result.filter((run) => {
-        const days = parseServiceDays(run.service_days);
-        return days.includes(runDayFilter);
-      });
-    }
-    if (depotFilter !== 'all') {
-      result = result.filter((run) => run.depot === depotFilter);
-    }
-    return result;
-  }, [localRuns, runDayFilter, depotFilter]);
+  // ── Sorted runs for display ─────────────────────────────────────
 
   function toggleSort(key: typeof sortKey) {
     if (sortKey === key) {
@@ -756,6 +811,7 @@ export default function RunStructureTab({
 
     // Append to existing runs instead of replacing
     updateLocalRuns([...localRuns, ...newRuns]);
+    showToast(`Day copied to ${copyDaysSelection.join(', ')}`);
   }
 
   function toggleCopyDay(day: ServiceDay) {
@@ -805,12 +861,13 @@ export default function RunStructureTab({
     };
 
     updateLocalRuns([...localRuns, newRun]);
+    showToast(`Route copied to ${copyDaysSelection.join(', ')}`);
   }
 
   // ── Render ───────────────────────────────────────────────────────
 
   return (
-    <>
+    <ToastProvider>
       <SectionCard title="Demand & Vehicle Coverage">
         <div className="flex items-center justify-between mb-2">
           <div className="text-xs text-cc-text-muted">
@@ -830,13 +887,22 @@ export default function RunStructureTab({
         <RunStructureChart
           pickups={demandMode === 'max' ? metrics.maxPickupsByBlock : metrics.pickupsByBlock}
           onBoard={demandMode === 'max' ? metrics.maxOnBoardByBlock : metrics.onBoardByBlock}
-          currentVehicles={currentVehiclesByBlock}
+          currentVehicles={chartCurrentVehiclesByBlock}
           runVehicles={runVehiclesByBlock}
           blocks={metrics.blocks}
         />
       </SectionCard>
 
-      <SectionCard title="Route Structure">
+      <SectionCard title="Route Structure" headerRight={!readonlyView ? (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-sm" onClick={handleUndo} disabled={!canUndo} title="Undo" type="button">
+            <Undo2 size={16} />
+          </Button>
+          <Button variant="ghost" size="icon-sm" onClick={handleRedo} disabled={!canRedo} title="Redo" type="button">
+            <Redo2 size={16} />
+          </Button>
+        </div>
+      ) : undefined}>
         <Tabs value={subTab} onValueChange={(v) => setSubTab(v as 'imported' | 'bids' | 'runeditor')}>
           <TabsList>
             <TabsTrigger value="runeditor">Route Editor</TabsTrigger>
@@ -1295,6 +1361,13 @@ export default function RunStructureTab({
           </TabsContent>
         </Tabs>
       </SectionCard>
-    </>
+      {toasts.map((t) => (
+        <Toast key={t.id} onOpenChange={(open) => { if (!open) dismissToast(t.id); }}>
+          <ToastTitle>{t.message}</ToastTitle>
+          <ToastClose />
+        </Toast>
+      ))}
+      <ToastViewport />
+    </ToastProvider>
   );
 }
