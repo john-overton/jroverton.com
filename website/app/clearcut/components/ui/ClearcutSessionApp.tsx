@@ -54,7 +54,7 @@ const TAB_ITEMS: Array<{ key: TabKey; label: string }> = [
   { key: 'demand', label: 'Demand' },
   { key: 'performance', label: 'Performance' },
   { key: 'map', label: 'Trip Map' },
-  { key: 'runstructure', label: 'Run Structure' },
+  { key: 'runstructure', label: 'Route Structure' },
   { key: 'deadhead', label: 'Deadhead' },
 ];
 const WEEKDAY_DAY_IDS = [1, 2, 3, 4, 5] as const;

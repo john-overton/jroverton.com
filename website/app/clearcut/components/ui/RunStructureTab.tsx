@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/tabs';
 import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
 import { estimateFtePtCounts } from '@/lib/clearcut/bid-algorithm';
+import type { CurrentRunCutRow } from '@/lib/clearcut/run-structure';
 import { buildRunCutForDate, getAvailableDates } from '@/lib/clearcut/run-structure';
 import type { DepotRow, OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/clearcut/types';
 
@@ -153,6 +154,18 @@ function applySplitDetection(runs: RunRow[]): RunRow[] {
   });
 }
 
+/** Parse a 12-hour "H:MM AM/PM" label back to minutes-of-day for sorting */
+function parseClockFromLabel(label: string): number {
+  const match = label.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return 0;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && h !== 12) h += 12;
+  if (period === 'AM' && h === 12) h = 0;
+  return h * 60 + m;
+}
+
 function dateToMinutesOfDay(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
 }
@@ -231,6 +244,44 @@ function SortableHead({
   );
 }
 
+// ── Sortable header for imported runs table ─────────────────────────
+
+type ImportedSortColumn = 'routeName' | 'shiftStart' | 'shiftEnd' | 'durationHours';
+
+function ImportedSortableHead({
+  column,
+  label,
+  className,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  column: ImportedSortColumn;
+  label: string;
+  className?: string;
+  sortKey: ImportedSortColumn;
+  sortDir: 'asc' | 'desc';
+  onSort: (key: ImportedSortColumn) => void;
+}) {
+  const active = sortKey === column;
+  return (
+    <TableHead className={className}>
+      <button
+        className="inline-flex items-center gap-1 hover:text-cc-accent transition-colors"
+        onClick={() => onSort(column)}
+        type="button"
+      >
+        {label}
+        {active ? (
+          sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+        ) : (
+          <span className="w-3" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────
 
 interface RunStructureTabProps {
@@ -270,8 +321,10 @@ export default function RunStructureTab({
   const [sortKey, setSortKey] = useState<SortColumn>('run_name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [breaksExpanded, setBreaksExpanded] = useState(false);
-  const [copyDaysSelection, setCopyDaysSelection] = useState<ServiceDay[]>([...ALL_SERVICE_DAYS.slice(0, 5)]);
-  const [showCopyDays, setShowCopyDays] = useState(false);
+  const [copyDaysSelection, setCopyDaysSelection] = useState<ServiceDay[]>([...ALL_SERVICE_DAYS]);
+  const [importedSortKey, setImportedSortKey] = useState<ImportedSortColumn>('shiftStart');
+  const [importedSortDir, setImportedSortDir] = useState<'asc' | 'desc'>('asc');
+  const [importedBreaksExpanded, setImportedBreaksExpanded] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync from server when runs prop changes
@@ -316,6 +369,27 @@ export default function RunStructureTab({
     () => selectedRunCutDate ? buildRunCutForDate(routes, selectedRunCutDate, fullDayMetrics.blocks, intervalMinutes) : [],
     [routes, selectedRunCutDate, fullDayMetrics.blocks, intervalMinutes],
   );
+
+  const sortedRunCut = useMemo(() => {
+    const dir = importedSortDir === 'asc' ? 1 : -1;
+    return [...currentRunCut].sort((a, b) => {
+      let cmp: number;
+      switch (importedSortKey) {
+        case 'shiftStart':
+        case 'shiftEnd':
+          cmp = parseClockFromLabel(a[importedSortKey]) - parseClockFromLabel(b[importedSortKey]);
+          break;
+        case 'durationHours':
+          cmp = a.durationHours - b.durationHours;
+          break;
+        case 'routeName':
+        default:
+          cmp = a.routeName.localeCompare(b.routeName);
+          break;
+      }
+      return cmp !== 0 ? cmp * dir : a.routeName.localeCompare(b.routeName);
+    });
+  }, [currentRunCut, importedSortKey, importedSortDir]);
 
   // ── Vehicle counts by block ──────────────────────────────────────
 
@@ -461,6 +535,15 @@ export default function RunStructureTab({
     }
   }
 
+  function toggleImportedSort(key: ImportedSortColumn) {
+    if (importedSortKey === key) {
+      setImportedSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setImportedSortKey(key);
+      setImportedSortDir('asc');
+    }
+  }
+
   const sortedRuns = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
     return [...filteredRuns].sort((a, b) => {
@@ -500,7 +583,7 @@ export default function RunStructureTab({
     const id = crypto.randomUUID();
     const newRun: RunRow = {
       run_id: id,
-      run_name: `Run ${localRuns.length + 1}`,
+      run_name: `Route ${localRuns.length + 1}`,
       split_number: 0,
       depot: null,
       service_days: defaultDays,
@@ -598,20 +681,8 @@ export default function RunStructureTab({
     updateRun(runId, 'service_days', JSON.stringify(sorted));
   }
 
-  // Copy from live day — opens day picker, then appends
-  function startCopyFromLiveDay() {
-    if (!selectedRunCutDate) return;
-    // Default the copy days to the DOW of the selected date
-    const d = new Date(selectedRunCutDate + 'T12:00:00');
-    const dow = d.getDay();
-    const sd = DOW_TO_SERVICE_DAY[dow];
-    setCopyDaysSelection(sd ? [sd] : [...ALL_SERVICE_DAYS.slice(0, 5)]);
-    setShowCopyDays(true);
-  }
-
-  function confirmCopyFromLiveDay() {
+  function copyAllFromLiveDay() {
     if (!selectedRunCutDate || copyDaysSelection.length === 0) return;
-    setShowCopyDays(false);
 
     const dateRoutes = routes.filter((r) => {
       const dateStr = r.route_date ?? (() => {
@@ -631,7 +702,7 @@ export default function RunStructureTab({
       const startMin = start ? dateToMinutesOfDay(start) : 360;
       const endMin = end ? dateToMinutesOfDay(end) : 840;
       const durationHrs = Math.round(((endMin - startMin) / 60) * 10) / 10;
-      const originalName = route.route_name ?? route.route_id ?? `Run ${localRuns.length + idx + 1}`;
+      const originalName = route.route_name ?? route.route_id ?? `Route ${localRuns.length + idx + 1}`;
 
       return {
         run_id: crypto.randomUUID(),
@@ -695,6 +766,47 @@ export default function RunStructureTab({
     );
   }
 
+  function copySingleImportedRun(row: CurrentRunCutRow) {
+    if (!selectedRunCutDate || copyDaysSelection.length === 0) return;
+
+    const dateRoutes = routes.filter((r) => {
+      const dateStr = r.route_date ?? (() => {
+        const dt = asDate(r.actual_start_time) ?? asDate(r.scheduled_start_time);
+        if (!dt) return null;
+        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      })();
+      return dateStr === selectedRunCutDate;
+    });
+
+    const matchedRoute = dateRoutes.find((r) => (r.route_name ?? r.route_id) === row.routeName);
+
+    const startMin = parseClockFromLabel(row.shiftStart);
+    const endMin = parseClockFromLabel(row.shiftEnd);
+
+    const serviceDaysJson = JSON.stringify(ALL_SERVICE_DAYS.filter((d) => copyDaysSelection.includes(d)));
+
+    const newRun: RunRow = {
+      run_id: crypto.randomUUID(),
+      run_name: row.routeName,
+      split_number: 0,
+      depot: matchedRoute?.depot_address ?? null,
+      service_days: serviceDaysJson,
+      route_area: null,
+      start_time: formatMinutesToClock(startMin),
+      end_time: formatMinutesToClock(endMin),
+      platform_hours: String(row.durationHours),
+      pay_hours: String(row.durationHours),
+      break_1_start: null,
+      break_1_end: null,
+      break_2_start: null,
+      break_2_end: null,
+      break_3_start: null,
+      break_3_end: null,
+    };
+
+    updateLocalRuns([...localRuns, newRun]);
+  }
+
   // ── Render ───────────────────────────────────────────────────────
 
   return (
@@ -702,7 +814,7 @@ export default function RunStructureTab({
       <SectionCard title="Demand & Vehicle Coverage">
         <div className="flex items-center justify-between mb-2">
           <div className="text-xs text-cc-text-muted">
-            Demand shown as bars. Current vehicles (solid line) and run vehicles (dashed line) as overlays.
+            Demand shown as bars. Current routes (solid line) and new routes (dashed line) as overlays.
           </div>
           <div className="flex gap-1 text-xs shrink-0 ml-3">
             <button
@@ -724,15 +836,15 @@ export default function RunStructureTab({
         />
       </SectionCard>
 
-      <SectionCard title="Run Structure">
+      <SectionCard title="Route Structure">
         <Tabs value={subTab} onValueChange={(v) => setSubTab(v as 'imported' | 'bids' | 'runeditor')}>
           <TabsList>
-            <TabsTrigger value="runeditor">Run Editor</TabsTrigger>
+            <TabsTrigger value="runeditor">Route Editor</TabsTrigger>
             <TabsTrigger value="bids">Shift Bids</TabsTrigger>
-            <TabsTrigger value="imported">Imported Runs</TabsTrigger>
+            <TabsTrigger value="imported">Imported Routes</TabsTrigger>
           </TabsList>
 
-          {/* ── Imported Runs sub-tab ─────────────────────────────── */}
+          {/* ── Imported Routes sub-tab ───────────────────────────── */}
           <TabsContent value="imported">
             <div className="flex items-center gap-3 mb-3 mt-3">
               <Select
@@ -752,23 +864,23 @@ export default function RunStructureTab({
                 </SelectContent>
               </Select>
               {!readonlyView && currentRunCut.length > 0 && (
-                <Button variant="outline" size="sm" onClick={startCopyFromLiveDay} type="button">
-                  <Copy size={14} className="mr-1.5" /> Copy to Runs
+                <Button variant="outline" size="sm" onClick={copyAllFromLiveDay} disabled={copyDaysSelection.length === 0} type="button">
+                  <Copy size={14} className="mr-1.5" /> Copy Day to Route Editor
                 </Button>
               )}
             </div>
 
-            {/* Copy days picker — shown inline after clicking "Copy to Runs" */}
-            {showCopyDays && (
-              <div className="flex items-center gap-3 mb-3 p-2 border border-cc-border rounded-lg bg-cc-surface-2">
-                <span className="text-xs text-cc-text-secondary shrink-0">Apply to days:</span>
-                <CopyDaysPicker selectedDays={copyDaysSelection} onToggle={toggleCopyDay} />
-                <Button size="sm" onClick={confirmCopyFromLiveDay} disabled={copyDaysSelection.length === 0} type="button">
-                  Confirm
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowCopyDays(false)} type="button">
-                  Cancel
-                </Button>
+            {!readonlyView && (
+              <div className="flex gap-0.5 items-center mb-3">
+                <span className="text-xs text-cc-text-muted mr-1">Copy to:</span>
+                {ALL_SERVICE_DAYS.map((day) => (
+                  <button
+                    key={day}
+                    className={`px-1.5 py-0.5 text-[10px] rounded ${copyDaysSelection.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                    onClick={() => toggleCopyDay(day)}
+                    type="button"
+                  >{day}</button>
+                ))}
               </div>
             )}
 
@@ -781,33 +893,90 @@ export default function RunStructureTab({
             <div className="text-xs text-cc-text-muted mb-2">
               Imported routes for the selected date, rounded up to {intervalMinutes}-min blocks.
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Route</TableHead>
-                  <TableHead>Shift Start</TableHead>
-                  <TableHead>Shift End</TableHead>
-                  <TableHead>Duration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentRunCut.length === 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="text-cc-text-muted">
-                      No routes for selected date
-                    </TableCell>
+                    <ImportedSortableHead column="routeName" label="Route" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
+                    <ImportedSortableHead column="shiftStart" label="Shift Start" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
+                    <ImportedSortableHead column="shiftEnd" label="Shift End" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
+                    <ImportedSortableHead column="durationHours" label="Duration" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
+                    {importedBreaksExpanded ? (
+                      <>
+                        <TableHead>
+                          <button
+                            className="inline-flex items-center gap-1 hover:text-cc-accent transition-colors"
+                            onClick={() => setImportedBreaksExpanded(false)}
+                            type="button"
+                          >
+                            <ChevronDown size={13} /> Break 1
+                          </button>
+                        </TableHead>
+                        <TableHead>Break 2</TableHead>
+                      </>
+                    ) : (
+                      <TableHead>
+                        <button
+                          className="inline-flex items-center gap-1 hover:text-cc-accent transition-colors"
+                          onClick={() => setImportedBreaksExpanded(true)}
+                          type="button"
+                        >
+                          <ChevronRight size={13} /> Breaks
+                        </button>
+                      </TableHead>
+                    )}
+                    {!readonlyView && <TableHead>Actions</TableHead>}
                   </TableRow>
-                )}
-                {currentRunCut.map((row, idx) => (
-                  <TableRow key={`${row.routeName}-${idx}`}>
-                    <TableCell>{row.routeName}</TableCell>
-                    <TableCell>{row.shiftStart}</TableCell>
-                    <TableCell>{row.shiftEnd}</TableCell>
-                    <TableCell>{row.durationHours} hrs</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {sortedRunCut.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={importedBreaksExpanded ? (readonlyView ? 6 : 7) : (readonlyView ? 5 : 6)} className="text-cc-text-muted">
+                        No routes for selected date
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {sortedRunCut.map((row, idx) => (
+                    <TableRow key={`${row.routeName}-${idx}`}>
+                      <TableCell>{row.routeName}</TableCell>
+                      <TableCell>{row.shiftStart}</TableCell>
+                      <TableCell>{row.shiftEnd}</TableCell>
+                      <TableCell>{row.durationHours} hrs</TableCell>
+                      {importedBreaksExpanded ? (
+                        <>
+                          <TableCell>
+                            <span className="text-xs text-cc-text-muted">{row.break1 ?? '\u2014'}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-cc-text-muted">{row.break2 ?? '\u2014'}</span>
+                          </TableCell>
+                        </>
+                      ) : (
+                        <TableCell>
+                          <span className="text-xs text-cc-text-muted">
+                            {row.break1 && row.break2 ? `${row.break1}, ${row.break2}` : row.break1 ?? row.break2 ?? '\u2014'}
+                          </span>
+                        </TableCell>
+                      )}
+                      {!readonlyView && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => copySingleImportedRun(row)}
+                            title="Copy to route editor"
+                            type="button"
+                          >
+                            <Copy size={13} />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </TabsContent>
 
           {/* ── Shift Bids sub-tab ────────────────────────────────── */}
@@ -815,11 +984,11 @@ export default function RunStructureTab({
             <ShiftBidsPanel runs={localRuns} depots={depots} readonlyView={readonlyView} />
           </TabsContent>
 
-          {/* ── Run Editor sub-tab ────────────────────────────────── */}
+          {/* ── Route Editor sub-tab ──────────────────────────────── */}
           <TabsContent value="runeditor">
             <div className="flex items-center justify-between mb-3 mt-3 flex-wrap gap-2">
               <div className="flex gap-4 text-[13px] flex-wrap items-center">
-                <span>Runs: <strong>{runStats.count}</strong></span>
+                <span>Routes: <strong>{runStats.count}</strong></span>
                 <span>Service Hrs: <strong>{runStats.totalServiceHours}</strong></span>
                 <span>Peak Vehicles: <strong>{runStats.maxVehicles}</strong></span>
                 <span>Productivity: <strong>{runStats.productivity}</strong></span>
@@ -857,7 +1026,7 @@ export default function RunStructureTab({
                 )}
                 {!readonlyView && (
                   <Button size="sm" onClick={addRun} type="button">
-                    <Plus size={14} className="mr-1.5" /> Add Run
+                    <Plus size={14} className="mr-1.5" /> Add Route
                   </Button>
                 )}
               </div>
@@ -865,7 +1034,7 @@ export default function RunStructureTab({
 
             {runDayFilter !== 'all' && filteredRuns.length !== localRuns.length && (
               <div className="text-xs text-cc-text-muted mb-2">
-                Showing {filteredRuns.length} of {localRuns.length} runs for {SERVICE_DAY_FULL_NAME[runDayFilter]}
+                Showing {filteredRuns.length} of {localRuns.length} routes for {SERVICE_DAY_FULL_NAME[runDayFilter]}
               </div>
             )}
 
@@ -873,9 +1042,9 @@ export default function RunStructureTab({
             <div className="flex items-center gap-1.5 mb-2 text-xs text-cc-text-muted">
               <span className="relative group inline-flex items-center gap-1 cursor-help">
                 <CircleHelp size={13} />
-                <span className="text-cc-text-secondary">Split runs</span>
+                <span className="text-cc-text-secondary">Split routes</span>
                 <span className="absolute z-50 top-full left-0 mt-1 w-60 p-2 rounded-md bg-cc-surface-1 border border-cc-border shadow-lg text-[11px] text-cc-text-secondary leading-snug hidden group-hover:block">
-                  Splits are auto-detected from run names. Name two or more runs with the same base and a suffix:
+                  Splits are auto-detected from route names. Name two or more routes with the same base and a suffix:
                   <br /><strong>105a / 105b</strong>
                   <br /><strong>105-1 / 105-2</strong>
                   <br /><strong>105-am / 105-pm</strong>
@@ -888,7 +1057,7 @@ export default function RunStructureTab({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableHead column="run_name" label="Run Name" className="min-w-[120px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <SortableHead column="run_name" label="Route Name" className="min-w-[120px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     {depots.length > 0 && <TableHead className="min-w-[100px]">Depot</TableHead>}
                     <SortableHead column="split_number" label="Split" className="min-w-[50px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     <SortableHead column="start_time" label="Start" className="min-w-[90px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -927,8 +1096,8 @@ export default function RunStructureTab({
                     <TableRow>
                       <TableCell colSpan={breaksExpanded ? 9 : 8} className="text-cc-text-muted">
                         {runDayFilter !== 'all'
-                          ? `No runs for ${runDayFilter}. Add a run or copy from an imported day.`
-                          : 'No runs defined. Add a run or copy from an imported day.'}
+                          ? `No routes for ${runDayFilter}. Add a route or copy from an imported day.`
+                          : 'No routes defined. Add a route or copy from an imported day.'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -1098,7 +1267,7 @@ export default function RunStructureTab({
                                   size="icon"
                                   className="h-7 w-7"
                                   onClick={() => duplicateRun(run)}
-                                  title="Copy run"
+                                  title="Copy route"
                                   type="button"
                                 >
                                   <Copy size={13} />
@@ -1108,7 +1277,7 @@ export default function RunStructureTab({
                                   size="icon"
                                   className="h-7 w-7 text-cc-danger"
                                   onClick={() => deleteRun(run.run_id)}
-                                  title="Delete run"
+                                  title="Delete route"
                                   type="button"
                                 >
                                   <Trash2 size={13} />

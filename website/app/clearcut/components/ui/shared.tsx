@@ -465,8 +465,8 @@ export function RunStructureChart({
           <Tooltip
             formatter={(value: number | string | undefined, name: string | undefined) => {
               const v = typeof value === 'number' ? value : Number(value ?? 0);
-              if (name === 'currentVehicles') return [v, 'Current Vehicles'];
-              if (name === 'runVehicles') return [v, 'Run Vehicles'];
+              if (name === 'currentVehicles') return [v, 'Current Routes'];
+              if (name === 'runVehicles') return [v, 'New Routes'];
               if (name === 'onBoard') return [v, 'Active Trips'];
               return [v, 'Pickups'];
             }}
@@ -477,8 +477,8 @@ export function RunStructureChart({
           />
           <Legend
             formatter={(value) => {
-              if (value === 'currentVehicles') return 'Current Vehicles';
-              if (value === 'runVehicles') return 'Run Vehicles';
+              if (value === 'currentVehicles') return 'Current Routes';
+              if (value === 'runVehicles') return 'New Routes';
               if (value === 'onBoard') return 'Active Trips';
               return 'Pickups';
             }}
