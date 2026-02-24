@@ -1,7 +1,7 @@
 'use client';
 
 import { CircleHelp, Pencil, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
 import { Button } from '@/app/clearcut/components/shadcn/button';
@@ -169,12 +169,13 @@ interface ImportTabProps {
   setError: (msg: string | null) => void;
   onLoadDemo: () => void;
   onOtpWindowChange: (
-    key:
+    changes: Partial<Record<
       | 'pickup_otp_window_before_min'
       | 'pickup_otp_window_after_min'
       | 'dropoff_otp_window_before_min'
       | 'dropoff_otp_window_after_min',
-    value: number,
+      number
+    >>,
   ) => void;
   depots: DepotRow[];
   onDepotsChange: (depots: DepotRow[]) => void;
@@ -224,6 +225,81 @@ export default function ImportTab({
     distance_to_first_pick: true,
     distance_from_last_drop: true,
   });
+
+  // ── Debounced OTP settings ─────────────────────────────────────────
+  type OtpKey = 'pickup_otp_window_before_min' | 'pickup_otp_window_after_min'
+    | 'dropoff_otp_window_before_min' | 'dropoff_otp_window_after_min';
+  const OTP_KEYS: OtpKey[] = [
+    'pickup_otp_window_before_min', 'pickup_otp_window_after_min',
+    'dropoff_otp_window_before_min', 'dropoff_otp_window_after_min',
+  ];
+  const [localOtp, setLocalOtp] = useState<Record<OtpKey, string>>({
+    pickup_otp_window_before_min: String(state.settings.pickup_otp_window_before_min),
+    pickup_otp_window_after_min: String(state.settings.pickup_otp_window_after_min),
+    dropoff_otp_window_before_min: String(state.settings.dropoff_otp_window_before_min),
+    dropoff_otp_window_after_min: String(state.settings.dropoff_otp_window_after_min),
+  });
+  const otpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const otpDirty = useRef<Set<OtpKey>>(new Set());
+  // Values we flushed to parent but parent state hasn't confirmed yet
+  const otpPending = useRef<Partial<Record<OtpKey, number>>>({});
+
+  // Sync local state when settings change externally, but only for fields
+  // the user isn't actively editing and that aren't waiting on a pending save
+  useEffect(() => {
+    setLocalOtp((prev) => {
+      const next = { ...prev };
+      for (const k of OTP_KEYS) {
+        // Clear pending once parent state catches up
+        if (k in otpPending.current && state.settings[k] === otpPending.current[k]) {
+          delete otpPending.current[k];
+        }
+        // Only sync from parent if not dirty and not pending
+        if (!otpDirty.current.has(k) && !(k in otpPending.current)) {
+          next[k] = String(state.settings[k]);
+        }
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    state.settings.pickup_otp_window_before_min,
+    state.settings.pickup_otp_window_after_min,
+    state.settings.dropoff_otp_window_before_min,
+    state.settings.dropoff_otp_window_after_min,
+  ]);
+
+  const handleOtpChange = useCallback(
+    (key: OtpKey, raw: string) => {
+      setLocalOtp((prev) => ({ ...prev, [key]: raw }));
+      otpDirty.current.add(key);
+      if (otpTimer.current) clearTimeout(otpTimer.current);
+      otpTimer.current = setTimeout(() => {
+        // Flush all dirty fields in one batch call
+        setLocalOtp((prev) => {
+          const changes: Partial<Record<OtpKey, number>> = {};
+          const next = { ...prev };
+          for (const k of otpDirty.current) {
+            const num = Number(prev[k]) || 0;
+            changes[k] = num;
+            next[k] = String(num);
+          }
+          otpDirty.current.clear();
+          otpPending.current = { ...otpPending.current, ...changes };
+          onOtpWindowChange(changes);
+          return next;
+        });
+      }, 2000);
+    },
+    [onOtpWindowChange],
+  );
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (otpTimer.current) clearTimeout(otpTimer.current);
+    };
+  }, []);
 
   const activeTripColumns = TRIP_DATA_COLUMNS.filter((column) => tripVisibleColumns[column.key]);
   const activeRouteColumns = ROUTE_DATA_COLUMNS.filter((column) => routeVisibleColumns[column.key]);
@@ -431,9 +507,9 @@ export default function ImportTab({
               max={180}
               step={1}
               disabled={readonlyView}
-              value={state.settings.pickup_otp_window_before_min}
+              value={localOtp.pickup_otp_window_before_min}
               onChange={(event) =>
-                onOtpWindowChange('pickup_otp_window_before_min', Number(event.target.value))
+                handleOtpChange('pickup_otp_window_before_min', event.target.value)
               }
             />
           </div>
@@ -445,9 +521,9 @@ export default function ImportTab({
               max={180}
               step={1}
               disabled={readonlyView}
-              value={state.settings.pickup_otp_window_after_min}
+              value={localOtp.pickup_otp_window_after_min}
               onChange={(event) =>
-                onOtpWindowChange('pickup_otp_window_after_min', Number(event.target.value))
+                handleOtpChange('pickup_otp_window_after_min', event.target.value)
               }
             />
           </div>
@@ -459,9 +535,9 @@ export default function ImportTab({
               max={180}
               step={1}
               disabled={readonlyView}
-              value={state.settings.dropoff_otp_window_before_min}
+              value={localOtp.dropoff_otp_window_before_min}
               onChange={(event) =>
-                onOtpWindowChange('dropoff_otp_window_before_min', Number(event.target.value))
+                handleOtpChange('dropoff_otp_window_before_min', event.target.value)
               }
             />
           </div>
@@ -473,9 +549,9 @@ export default function ImportTab({
               max={180}
               step={1}
               disabled={readonlyView}
-              value={state.settings.dropoff_otp_window_after_min}
+              value={localOtp.dropoff_otp_window_after_min}
               onChange={(event) =>
-                onOtpWindowChange('dropoff_otp_window_after_min', Number(event.target.value))
+                handleOtpChange('dropoff_otp_window_after_min', event.target.value)
               }
             />
           </div>

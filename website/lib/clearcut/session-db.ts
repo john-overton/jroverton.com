@@ -385,6 +385,23 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
   withSessionDb(editToken, (db) => {
     const transaction = db.transaction(() => {
       if (input.settings) {
+        // Pad with null so every named SQL parameter exists; COALESCE keeps existing values for nulls
+        const settingsParams = {
+          avg_ride_time_min: null,
+          otp_target_pct: null,
+          pickup_otp_window_before_min: null,
+          pickup_otp_window_after_min: null,
+          dropoff_otp_window_before_min: null,
+          dropoff_otp_window_after_min: null,
+          productivity_baseline: null,
+          deadhead_threshold_pct: null,
+          service_day_start: null,
+          service_day_end: null,
+          day_type: null,
+          time_range_start: null,
+          time_range_end: null,
+          ...input.settings,
+        };
         db.prepare(
           `UPDATE settings
            SET avg_ride_time_min = COALESCE(@avg_ride_time_min, avg_ride_time_min),
@@ -401,10 +418,18 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
                time_range_start = COALESCE(@time_range_start, time_range_start),
                time_range_end = COALESCE(@time_range_end, time_range_end)
            WHERE id = 1`,
-        ).run(input.settings);
+        ).run(settingsParams);
       }
 
       if (input.optimization) {
+        const optimizationParams = {
+          target_productivity: null,
+          min_otp_target: null,
+          max_driver_spread_hrs: null,
+          peak_vehicles: null,
+          run_structure_json: null,
+          ...input.optimization,
+        };
         db.prepare(
           `UPDATE optimization
            SET target_productivity = COALESCE(@target_productivity, target_productivity),
@@ -413,7 +438,7 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
                peak_vehicles = COALESCE(@peak_vehicles, peak_vehicles),
                run_structure_json = COALESCE(@run_structure_json, run_structure_json)
            WHERE id = 1`,
-        ).run(input.optimization);
+        ).run(optimizationParams);
       }
 
       if (input.trips) {

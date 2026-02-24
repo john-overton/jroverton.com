@@ -77,6 +77,9 @@ interface Props {
 export default function ClearcutSessionApp({ token, mode }: Props) {
   const router = useRouter();
   const session = useClearcutSession(token, mode);
+  const saveStateRef = useRef(session.saveState);
+  saveStateRef.current = session.saveState;
+  const readyRef = useRef(session.loadState.status === 'ready' ? session.loadState : null);
   const { paletteId, setPaletteId } = useClearcutTheme();
   const filterStateInitialized = useRef(false);
   const prevDataCountsRef = useRef<{ trips: number; routes: number } | null>(null);
@@ -99,6 +102,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const readonlyView = mode === 'readonly';
 
   const ready = session.loadState.status === 'ready' ? session.loadState : null;
+  readyRef.current = ready;
   const fallbackServiceStartMinutes = parseClockToMinutes(ready?.state.settings.service_day_start, 4 * 60);
   const fallbackServiceEndMinutes = parseClockToMinutes(ready?.state.settings.service_day_end, 21 * 60);
   const sliderBounds = useMemo(
@@ -327,17 +331,19 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   }, [draggingTimeHandle, updateTimeHandleFromClientX]);
 
   useEffect(() => {
-    if (!ready || readonlyView || !filterStateInitialized.current || allTimeBlocks.length === 0) {
+    if (!readyRef.current || readonlyView || !filterStateInitialized.current || allTimeBlocks.length === 0) {
       return;
     }
     const timer = window.setTimeout(() => {
+      const currentReady = readyRef.current;
+      if (!currentReady) return;
       const dayType =
         selectedWeekdayDays.length > 0 && selectedWeekendDays.length === 0
           ? 'weekday'
           : selectedWeekendDays.length > 0 && selectedWeekdayDays.length === 0
             ? 'weekend'
             : 'custom';
-      const currentSettings = ready.state.settings;
+      const currentSettings = currentReady.state.settings;
       if (
         currentSettings.day_type === dayType &&
         (currentSettings.time_range_start ?? null) === (rangeStartClock ?? null) &&
@@ -345,26 +351,25 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       ) {
         return;
       }
-      const nextSettings = {
-        ...currentSettings,
-        day_type: dayType,
-        time_range_start: rangeStartClock,
-        time_range_end: rangeEndClock,
-      };
-      session.saveState({ settings: nextSettings }).catch((saveError) => {
+      saveStateRef.current({
+        settings: {
+          day_type: dayType,
+          time_range_start: rangeStartClock,
+          time_range_end: rangeEndClock,
+        },
+      }).catch((saveError) => {
         setError(saveError instanceof Error ? saveError.message : 'Failed to persist demand filters.');
       });
     }, 250);
     return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     allTimeBlocks.length,
     rangeEndClock,
     rangeStartClock,
-    ready,
     readonlyView,
     selectedWeekdayDays,
     selectedWeekendDays,
-    session,
   ]);
 
   function toggleWeekday(day: number) {
@@ -517,23 +522,23 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   }
 
   function onOtpWindowChange(
-    key:
+    changes: Partial<Record<
       | 'pickup_otp_window_before_min'
       | 'pickup_otp_window_after_min'
       | 'dropoff_otp_window_before_min'
       | 'dropoff_otp_window_after_min',
-    value: number,
+      number
+    >>,
   ) {
     if (!ready || readonlyView) {
       return;
     }
-    const sanitizedValue = Math.max(0, Math.min(180, Number.isFinite(value) ? value : 0));
-    const nextSettings = {
-      ...ready.state.settings,
-      [key]: sanitizedValue,
-    };
+    const partialSettings: Record<string, number> = {};
+    for (const [key, value] of Object.entries(changes) as [keyof typeof changes, number | undefined][]) {
+      partialSettings[key] = Math.max(0, Math.min(180, Number.isFinite(value) ? value! : 0));
+    }
     session
-      .saveState({ settings: nextSettings })
+      .saveState({ settings: partialSettings })
       .catch((saveError) => {
         setError(saveError instanceof Error ? saveError.message : 'Failed to update OTP windows.');
       });
