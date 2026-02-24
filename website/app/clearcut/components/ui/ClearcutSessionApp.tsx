@@ -98,6 +98,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [dayMode, setDayMode] = useState<'dow' | 'specific'>('dow');
   const [specificDate, setSpecificDate] = useState<string | null>(null);
+  const [selectedDepot, setSelectedDepot] = useState<string>('all');
 
   const readonlyView = mode === 'readonly';
 
@@ -165,16 +166,38 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const rangeEndClock = allTimeBlocks[timeEndIndex]
     ? formatMinutesToClock(allTimeBlocks[timeEndIndex].minutes)
     : null;
+  // Depots that actually appear in imported routes (not custom depots only used for runs)
+  const routeLinkedDepots = useMemo(() => {
+    if (!ready) return [];
+    const routeAddresses = new Set(
+      ready.state.routes.map((r) => r.depot_address?.toLowerCase()).filter(Boolean) as string[],
+    );
+    return ready.state.depots.filter(
+      (d) => d.depot_address && routeAddresses.has(d.depot_address.toLowerCase()),
+    );
+  }, [ready]);
+  const depotFilteredRouteIds = useMemo(() => {
+    if (selectedDepot === 'all' || !ready) return undefined;
+    const depot = ready.state.depots.find((d) => d.depot_id === selectedDepot);
+    if (!depot?.depot_address) return undefined;
+    const addr = depot.depot_address.toLowerCase();
+    return ready.state.routes
+      .filter((r) => r.depot_address?.toLowerCase() === addr)
+      .map((r) => r.route_id);
+  }, [selectedDepot, ready]);
   const metricsOptions = useMemo(
     () => ({
       selectedDays: dayMode === 'dow' ? selectedDayIds : undefined,
       specificDate: dayMode === 'specific' && specificDate ? specificDate : undefined,
+      selectedRouteIds: depotFilteredRouteIds,
     }),
-    [dayMode, selectedDayIds, specificDate],
+    [dayMode, selectedDayIds, specificDate, depotFilteredRouteIds],
   );
   const filteredRoutes = useMemo(() => {
     if (!ready) return [];
+    const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;
     return ready.state.routes.filter((route) => {
+      if (depotRouteIdSet && !depotRouteIdSet.has(route.route_id)) return false;
       const t = parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time);
       if (!t) return false;
       if (metricsOptions.specificDate) {
@@ -188,7 +211,13 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
       return true;
     });
-  }, [ready, metricsOptions]);
+  }, [ready, metricsOptions, depotFilteredRouteIds]);
+  const filteredTrips = useMemo(() => {
+    if (!ready) return [];
+    const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;
+    if (!depotRouteIdSet) return ready.state.trips;
+    return ready.state.trips.filter((trip) => depotRouteIdSet.has(trip.route_id));
+  }, [ready, depotFilteredRouteIds]);
   const metrics = useMemo(
     () =>
       ready
@@ -715,7 +744,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
               />
               Filters
             </CollapsibleTrigger>
-            <CollapsibleContent className="grid grid-cols-1 lg:grid-cols-[1fr_1px_1fr_1px_1fr] gap-4 mt-2">
+            <CollapsibleContent className="grid grid-cols-1 lg:grid-cols-[1fr_1px_1fr_1px_1fr_1px_1fr] gap-4 mt-2">
             {/* Column 1: Interval */}
             <div>
               <div className="text-xs text-cc-text-muted mb-1">Interval</div>
@@ -731,7 +760,24 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             </div>
 
             <div className="hidden lg:block bg-cc-border" />
-            {/* Column 2: Day Selection */}
+            {/* Column 2: Depot */}
+            <div>
+              <div className="text-xs text-cc-text-muted mb-1">Depot</div>
+              <Select value={selectedDepot} onValueChange={setSelectedDepot} disabled={routeLinkedDepots.length <= 1}>
+                <SelectTrigger className="w-auto min-w-[140px] h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Depots</SelectItem>
+                  {routeLinkedDepots.map((d) => (
+                    <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="hidden lg:block bg-cc-border" />
+            {/* Column 3: Day Selection */}
             <div>
               <div className="flex items-center gap-1 mb-1.5">
                 <div className="text-xs text-cc-text-muted mr-1">Days</div>
@@ -969,7 +1015,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           metrics={metrics}
           intervalMinutes={intervalMinutes}
           routes={filteredRoutes}
-          trips={ready?.state.trips ?? []}
+          trips={filteredTrips}
           sessionState={ready?.state ?? null}
           metricsOptions={{
             ...metricsOptions,
@@ -981,7 +1027,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       )}
       {hasVisitedMap && (
         <div style={{ display: tab === 'map' ? undefined : 'none' }}>
-          <MapTab metrics={metrics} trips={ready?.state.trips ?? []} selectedDays={selectedDayIds} specificDate={dayMode === 'specific' ? specificDate : null} />
+          <MapTab metrics={metrics} trips={filteredTrips} selectedDays={selectedDayIds} specificDate={dayMode === 'specific' ? specificDate : null} />
         </div>
       )}
       {tab === 'runstructure' && (
