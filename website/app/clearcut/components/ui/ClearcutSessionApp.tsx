@@ -168,6 +168,23 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     }),
     [dayMode, selectedDayIds, specificDate],
   );
+  const filteredRoutes = useMemo(() => {
+    if (!ready) return [];
+    return ready.state.routes.filter((route) => {
+      const t = parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time);
+      if (!t) return false;
+      if (metricsOptions.specificDate) {
+        const y = t.getFullYear();
+        const m = `${t.getMonth() + 1}`.padStart(2, '0');
+        const d = `${t.getDate()}`.padStart(2, '0');
+        return `${y}-${m}-${d}` === metricsOptions.specificDate;
+      }
+      if (metricsOptions.selectedDays) {
+        return metricsOptions.selectedDays.includes(t.getDay());
+      }
+      return true;
+    });
+  }, [ready, metricsOptions]);
   const metrics = useMemo(
     () =>
       ready
@@ -943,7 +960,18 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       )}
       {tab === 'demand' && <DemandTab metrics={metrics} intervalMinutes={intervalMinutes} />}
       {tab === 'performance' && (
-        <PerformanceTab metrics={metrics} intervalMinutes={intervalMinutes} />
+        <PerformanceTab
+          metrics={metrics}
+          intervalMinutes={intervalMinutes}
+          routes={filteredRoutes}
+          sessionState={ready?.state ?? null}
+          metricsOptions={{
+            ...metricsOptions,
+            timeRangeStart: rangeStartClock,
+            timeRangeEnd: rangeEndClock,
+            blockSizeMinutes: intervalMinutes,
+          }}
+        />
       )}
       {hasVisitedMap && (
         <div style={{ display: tab === 'map' ? undefined : 'none' }}>

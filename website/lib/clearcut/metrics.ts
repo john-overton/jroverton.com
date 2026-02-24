@@ -40,6 +40,11 @@ export interface ClearcutMetrics {
   avgProductivity: number;
   peakProductivity: number;
   totalTrips: number;
+  totalPassengers: number;
+  avgTripsPerDay: number;
+  maxTripsPerDay: number;
+  avgPassengersPerDay: number;
+  maxPassengersPerDay: number;
   currentRuns: number;
   optimizedRuns: number;
   importedServiceHours: number;
@@ -62,12 +67,13 @@ export interface ClearcutMetrics {
   };
 }
 
-interface ComputeMetricsOptions {
+export interface ComputeMetricsOptions {
   selectedDays?: number[];
   specificDate?: string;
   timeRangeStart?: string | null;
   timeRangeEnd?: string | null;
   blockSizeMinutes?: number;
+  selectedRouteIds?: string[];
 }
 
 function parseMinutes(value: string | null | undefined, fallback: number): number {
@@ -454,6 +460,9 @@ export function computeClearcutMetrics(
     if (optSpecificDate ? tripDk !== optSpecificDate : !selectedDays!.has(pickupTimestamp.getDay())) {
       continue;
     }
+    if (options.selectedRouteIds?.length && !options.selectedRouteIds.includes(trip.route_id)) {
+      continue;
+    }
 
     const passengers = parsePassengerCount(trip.passenger_count);
     const tripDayKey = dateKey(pickupTimestamp);
@@ -549,6 +558,9 @@ export function computeClearcutMetrics(
     if (!start || !end) continue;
     const routeDk = dateKey(start);
     if (optSpecificDate ? routeDk !== optSpecificDate : !selectedDays!.has(start.getDay())) {
+      continue;
+    }
+    if (options.selectedRouteIds?.length && !options.selectedRouteIds.includes(route.route_id)) {
       continue;
     }
     const startM = dateToMinutes(start);
@@ -808,6 +820,25 @@ export function computeClearcutMetrics(
     })(),
     peakProductivity: Math.round(Math.max(...productivityByBlock, 0) * 100) / 100,
     totalTrips: session.trips.length,
+    totalPassengers: Math.round(pickupsPassengersByBlock.reduce((a, b) => a + b, 0) * dayCount),
+    avgTripsPerDay: Math.round(pickupsByBlock.reduce((a, b) => a + b, 0) * 10) / 10,
+    maxTripsPerDay: (() => {
+      let max = 0;
+      for (const [, dayPickups] of pickupsByDayBlock) {
+        const dayTotal = dayPickups.reduce((a, b) => a + b, 0);
+        if (dayTotal > max) max = dayTotal;
+      }
+      return max;
+    })(),
+    avgPassengersPerDay: Math.round(pickupsPassengersByBlock.reduce((a, b) => a + b, 0) * 10) / 10,
+    maxPassengersPerDay: (() => {
+      let max = 0;
+      for (const [, dayPassengers] of passengersByDayBlock) {
+        const dayTotal = dayPassengers.reduce((a, b) => a + b, 0);
+        if (dayTotal > max) max = dayTotal;
+      }
+      return max;
+    })(),
     currentRuns: session.routes.length,
     optimizedRuns: Math.max(1, session.routes.length - Math.ceil(session.routes.length * 0.12)),
     importedServiceHours,
