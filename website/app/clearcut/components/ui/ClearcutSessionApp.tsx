@@ -23,7 +23,6 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/clearcut/components/shadcn/collapsible';
 import { Tabs, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/tabs';
 import { ClearcutClientError } from '@/lib/clearcut/client';
-import { buildDemoTripsAndRoutes } from '@/lib/clearcut/demo-data';
 import { extractNewDepotsFromRoutes } from '@/lib/clearcut/depot-utils';
 import { computeClearcutMetrics } from '@/lib/clearcut/metrics';
 import type { DepotRow, RunRow } from '@/lib/clearcut/types';
@@ -420,8 +419,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     setStatus('Loading demo dataset...');
     setError(null);
     try {
-      const payload = buildDemoTripsAndRoutes();
-      await session.saveState({ trips: payload.trips, routes: payload.routes });
+      await session.loadDemo();
       setStatus('Demo dataset loaded.');
     } catch (demoError) {
       setStatus(null);

@@ -15,16 +15,21 @@ export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) 
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3">
         <MetricCard
           label={`Peak Pickups${metrics.maxPeakPickupsDate ? ` · ${metrics.maxPeakPickupsDate}` : ''}`}
           value={`${metrics.maxPeakPickups}`}
           sub={`avg ${metrics.peakPickups}`}
         />
         <MetricCard
-          label={`Peak On-Board${metrics.maxPeakOnBoardDate ? ` · ${metrics.maxPeakOnBoardDate}` : ''}`}
+          label={`Peak On-Board Pax${metrics.maxPeakOnBoardDate ? ` · ${metrics.maxPeakOnBoardDate}` : ''}`}
           value={`${metrics.maxPeakOnBoardPassengers}`}
           sub={`avg ${metrics.avgPeakOnBoardPassengers}`}
+        />
+        <MetricCard
+          label="Peak On-Board Time"
+          value={`${metrics.peakOnBoardTimeMinutes} min`}
+          sub={`avg ${metrics.avgOnBoardTimeMinutes} min`}
         />
         <MetricCard
           label={`Peak Vehicles${metrics.maxPeakVehiclesDate ? ` · ${metrics.maxPeakVehiclesDate}` : ''}`}

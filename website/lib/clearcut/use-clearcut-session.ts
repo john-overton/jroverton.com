@@ -14,6 +14,7 @@ import {
   importRoutes,
   importTrips,
   listImportTemplates,
+  loadDemoData,
   previewImportFile,
   removeSessionPassword,
   renameSession,
@@ -264,6 +265,16 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
     [withEditJwt],
   );
 
+  const loadDemo = useCallback(
+    async (): Promise<SessionState> =>
+      withEditJwt(async (jwt) => {
+        const state = await loadDemoData(token, jwt);
+        setLoadState({ status: 'ready', state, access: mode, hasJwt: true });
+        return state;
+      }),
+    [mode, token, withEditJwt],
+  );
+
   return {
     loadState,
     loadSession,
@@ -283,6 +294,7 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
     createTemplate,
     updateTemplate,
     deleteTemplate,
+    loadDemo,
     clearAuth: () => clearSessionJwt(token),
   };
 }

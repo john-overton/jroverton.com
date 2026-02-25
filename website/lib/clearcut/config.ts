@@ -32,3 +32,7 @@ export function getSessionsDirPath(): string {
 export function getSessionDbPath(editToken: string): string {
   return path.join(getSessionsDirPath(), `${editToken}.db`);
 }
+
+export function getDemoLocationsDbPath(): string {
+  return path.join(clearcutConfig.dataRoot, 'demo-locations.db');
+}

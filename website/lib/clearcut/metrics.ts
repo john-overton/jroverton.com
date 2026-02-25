@@ -52,6 +52,8 @@ export interface ClearcutMetrics {
   optimizedRuns: number;
   importedServiceHours: number;
   optimizedServiceHours: number;
+  avgOnBoardTimeMinutes: number;
+  peakOnBoardTimeMinutes: number;
   avgTripMiles: number;
   avgStartDeadheadMinutes: number;
   avgEndDeadheadMinutes: number;
@@ -249,11 +251,11 @@ function ensureDayBlockSets(
   return created;
 }
 
-function computeActualAvgRideTime(
+function computeRideTimeStats(
   trips: TripRow[],
   selectedDays: Set<number> | null,
   filterDate: string | null,
-): number | null {
+): { avg: number | null; max: number | null } {
   const rideTimes: number[] = [];
   for (const trip of trips) {
     const pickup = asDate(trip.pickup_leave_time ?? '') ?? asDate(trip.pickup_arrive_time ?? '');
@@ -267,7 +269,11 @@ function computeActualAvgRideTime(
       rideTimes.push(minutes);
     }
   }
-  return rideTimes.length > 0 ? rideTimes.reduce((a, b) => a + b, 0) / rideTimes.length : null;
+  if (rideTimes.length === 0) return { avg: null, max: null };
+  return {
+    avg: rideTimes.reduce((a, b) => a + b, 0) / rideTimes.length,
+    max: Math.max(...rideTimes),
+  };
 }
 
 function pickMiles(trip: TripRow): number {
@@ -837,8 +843,9 @@ export function computeClearcutMetrics(
     }
   }
 
-  const avgRideTimeMin =
-    computeActualAvgRideTime(session.trips, selectedDays, optSpecificDate) ?? session.settings.avg_ride_time_min;
+  const rideTimeStats = computeRideTimeStats(session.trips, selectedDays, optSpecificDate);
+  const avgRideTimeMin = rideTimeStats.avg ?? session.settings.avg_ride_time_min;
+  const peakRideTimeMin = rideTimeStats.max ?? 0;
   // <15 min: current block only; 15-30: current + 1 previous; 30-45: current + 2 previous; etc.
   const lookBackBlocks = Math.floor(avgRideTimeMin / blockSizeMinutes);
 
@@ -1098,6 +1105,8 @@ export function computeClearcutMetrics(
     optimizedRuns: Math.max(1, session.routes.length - Math.ceil(session.routes.length * 0.12)),
     importedServiceHours,
     optimizedServiceHours,
+    avgOnBoardTimeMinutes: Math.round(avgRideTimeMin * 10) / 10,
+    peakOnBoardTimeMinutes: Math.round(peakRideTimeMin * 10) / 10,
     avgTripMiles: Math.round(avgTripMiles * 10) / 10,
     avgStartDeadheadMinutes,
     avgEndDeadheadMinutes,

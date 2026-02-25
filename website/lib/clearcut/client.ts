@@ -403,3 +403,10 @@ export async function deleteImportTemplateRecord(id: number, jwt: string): Promi
     jwt,
   });
 }
+
+export async function loadDemoData(token: string, jwt: string): Promise<SessionState> {
+  return request<SessionState>(`/api/clearcut/sessions/${token}/demo`, {
+    method: 'POST',
+    jwt,
+  });
+}
