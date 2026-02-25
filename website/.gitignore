@@ -11,10 +11,11 @@
 !.yarn/versions
 
 # data
-data/clearcut/
+data/clearcut/*
 *.db
 *.db-shm
 *.db-wal
+!data/clearcut/demo-locations.db
 
 # testing
 /coverage
