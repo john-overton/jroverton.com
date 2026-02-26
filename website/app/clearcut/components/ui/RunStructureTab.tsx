@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleHelp, Copy, Plus, Redo2, SquareSplitHorizontal, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy, Plus, Redo2, SquareSplitHorizontal, Trash2, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/clearcut/components/shadcn/button';
@@ -95,7 +95,7 @@ function clampBreakTime(time: string, runStart: string, runEnd: string): string 
  *   R12A / R12P           → base "R12"
  * Returns the base name and the suffix found, or null if no split pattern.
  */
-const SPLIT_SUFFIX_RE = /[-_]?(am|pm|a|p|\d+)$/i;
+const SPLIT_SUFFIX_RE = /(?:[-_](?:am|pm|a|p|\d+)|(?:am|pm|a|p))$/i;
 
 function parseSplitName(name: string): { baseName: string; suffix: string } | null {
   const trimmed = name.trim();
@@ -321,6 +321,7 @@ export default function RunStructureTab({
   const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
   const [subTab, setSubTab] = useState<'imported' | 'bids' | 'runeditor'>('runeditor');
   const [localRuns, setLocalRuns] = useState<RunRow[]>(runs);
+  const [draftRun, setDraftRun] = useState<RunRow | null>(null);
   const [selectedRunCutDate, setSelectedRunCutDate] = useState<string | null>(null);
   const [runDayFilter, setRunDayFilter] = useState<ServiceDay | 'all'>('all');
   const [depotFilter, setDepotFilter] = useState<string>('all');
@@ -331,8 +332,12 @@ export default function RunStructureTab({
   const [importedSortKey, setImportedSortKey] = useState<ImportedSortColumn>('shiftStart');
   const [importedSortDir, setImportedSortDir] = useState<'asc' | 'desc'>('asc');
   const [importedBreaksExpanded, setImportedBreaksExpanded] = useState(false);
+  const [frozenOrder, setFrozenOrder] = useState<string[] | null>(null);
+  const [highlightedRunId, setHighlightedRunId] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ownPersistRef = useRef(false);
+  const sortFreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastEditedRunIdRef = useRef<string | null>(null);
   const { pushState, undo, redo, clearHistory, canUndo, canRedo } = useUndoRedo<RunRow[]>();
   const { toasts, showToast, dismissToast } = useToast();
 
@@ -345,6 +350,13 @@ export default function RunStructureTab({
     setLocalRuns(runs);
     clearHistory();
   }, [runs, clearHistory]);
+
+  // Cleanup sort-freeze timer on unmount
+  useEffect(() => {
+    return () => {
+      if (sortFreezeTimerRef.current) clearTimeout(sortFreezeTimerRef.current);
+    };
+  }, []);
 
   // Debounced save
   const persistRuns = useCallback(
@@ -530,23 +542,23 @@ export default function RunStructureTab({
 
   const runStats = useMemo(() => {
     let totalServiceHours = 0;
-    for (const run of localRuns) {
+    for (const run of filteredRuns) {
       totalServiceHours += Number(run.platform_hours) || 0;
     }
     const maxVehicles = Math.max(...runVehiclesByBlockFullDay, 0);
     const productivity = totalServiceHours > 0
       ? Math.round((avgDailyTrips / totalServiceHours) * 100) / 100
       : 0;
-    const { fte: estFTE, pt: estPT } = estimateFtePtCounts(localRuns);
+    const { fte: estFTE, pt: estPT } = estimateFtePtCounts(filteredRuns);
     return {
-      count: localRuns.length,
+      count: filteredRuns.length,
       totalServiceHours: Math.round(totalServiceHours * 10) / 10,
       maxVehicles,
       productivity,
       estFTE,
       estPT,
     };
-  }, [localRuns, runVehiclesByBlockFullDay, avgDailyTrips]);
+  }, [filteredRuns, runVehiclesByBlockFullDay, avgDailyTrips]);
 
   // ── Split overlap detection ──────────────────────────────────────
   // Runs that share a base name (split siblings) should not have overlapping times.
@@ -629,15 +641,34 @@ export default function RunStructureTab({
     });
   }, [filteredRuns, sortKey, sortDir]);
 
+  // Display order: use frozen order during edits, otherwise follow sort
+  const displayRuns = useMemo(() => {
+    if (!frozenOrder) return sortedRuns;
+    const runMap = new Map(filteredRuns.map((r) => [r.run_id, r]));
+    const ordered: RunRow[] = [];
+    for (const id of frozenOrder) {
+      const run = runMap.get(id);
+      if (run) {
+        ordered.push(run);
+        runMap.delete(id);
+      }
+    }
+    // Append any runs not in frozen order (e.g., newly added via copy)
+    for (const run of runMap.values()) {
+      ordered.push(run);
+    }
+    return ordered;
+  }, [frozenOrder, sortedRuns, filteredRuns]);
+
   // ── Actions ──────────────────────────────────────────────────────
 
   function addRun() {
+    if (draftRun) return;
     const defaultDays = runDayFilter !== 'all'
       ? JSON.stringify([runDayFilter])
       : '["M","T","W","Th","F"]';
-    const id = crypto.randomUUID();
-    const newRun: RunRow = {
-      run_id: id,
+    setDraftRun({
+      run_id: crypto.randomUUID(),
       run_name: `Route ${localRuns.length + 1}`,
       split_number: 0,
       depot: null,
@@ -653,8 +684,39 @@ export default function RunStructureTab({
       break_2_end: null,
       break_3_start: null,
       break_3_end: null,
-    };
-    updateLocalRuns([...localRuns, newRun]);
+    });
+  }
+
+  function updateDraft(field: keyof RunRow, value: string | number | null) {
+    if (!draftRun) return;
+    const next = { ...draftRun, [field]: value };
+    if (field.startsWith('break_') && typeof value === 'string' && value) {
+      next[field as keyof RunRow] = clampBreakTime(value, next.start_time, next.end_time) as never;
+    }
+    if (field === 'start_time' || field === 'end_time' || field.startsWith('break_')) {
+      const svcHrs = computeServiceHours(next);
+      next.platform_hours = String(svcHrs);
+      next.pay_hours = String(svcHrs);
+    }
+    setDraftRun(next);
+  }
+
+  function toggleDraftServiceDay(day: ServiceDay) {
+    if (!draftRun) return;
+    const days = parseServiceDays(draftRun.service_days);
+    const next = days.includes(day) ? days.filter((d) => d !== day) : [...days, day];
+    const sorted = ALL_SERVICE_DAYS.filter((d) => next.includes(d));
+    updateDraft('service_days', JSON.stringify(sorted));
+  }
+
+  function saveDraft() {
+    if (!draftRun) return;
+    updateLocalRuns([...localRuns, draftRun]);
+    setDraftRun(null);
+  }
+
+  function cancelDraft() {
+    setDraftRun(null);
   }
 
   function addSplit(run: RunRow) {
@@ -706,6 +768,20 @@ export default function RunStructureTab({
   }
 
   function updateRun(runId: string, field: keyof RunRow, value: string | number | null) {
+    // Freeze current display order on first edit so the row doesn't jump
+    setFrozenOrder((prev) => prev ?? sortedRuns.map((r) => r.run_id));
+    lastEditedRunIdRef.current = runId;
+
+    // Reset the 5-second debounce before re-sorting
+    if (sortFreezeTimerRef.current) clearTimeout(sortFreezeTimerRef.current);
+    sortFreezeTimerRef.current = setTimeout(() => {
+      setFrozenOrder(null);
+      setHighlightedRunId(runId);
+      setTimeout(() => setHighlightedRunId(null), 2000);
+      sortFreezeTimerRef.current = null;
+      lastEditedRunIdRef.current = null;
+    }, 5000);
+
     updateLocalRuns(
       localRuns.map((r) => {
         if (r.run_id !== runId) return r;
@@ -868,6 +944,15 @@ export default function RunStructureTab({
 
   return (
     <ToastProvider>
+      <style>{`
+        @keyframes highlight-row {
+          0% { background-color: color-mix(in srgb, var(--color-cc-accent) 25%, transparent); }
+          100% { background-color: transparent; }
+        }
+        .animate-highlight-row > td {
+          animation: highlight-row 2s ease-out;
+        }
+      `}</style>
       <SectionCard title="Demand & Vehicle Coverage">
         <div className="flex items-center justify-between mb-2">
           <div className="text-xs text-cc-text-muted">
@@ -1091,7 +1176,7 @@ export default function RunStructureTab({
                   </Select>
                 )}
                 {!readonlyView && (
-                  <Button size="sm" onClick={addRun} type="button">
+                  <Button size="sm" onClick={addRun} disabled={!!draftRun} type="button">
                     <Plus size={14} className="mr-1.5" /> Add Route
                   </Button>
                 )}
@@ -1118,6 +1203,187 @@ export default function RunStructureTab({
                 </span>
               </span>
             </div>
+
+            {draftRun && (() => {
+              const draftDays = parseServiceDays(draftRun.service_days);
+              return (
+                <div className="mb-3 border border-cc-accent/30 rounded-md bg-cc-accent/5 p-2">
+                  <div className="text-xs font-medium text-cc-accent mb-1.5">New Route</div>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[120px]">Route Name</TableHead>
+                          {depots.length > 0 && <TableHead className="min-w-[100px]">Depot</TableHead>}
+                          <TableHead className="min-w-[90px]">Start</TableHead>
+                          <TableHead className="min-w-[90px]">End</TableHead>
+                          <TableHead className="min-w-[70px]">Service Hrs</TableHead>
+                          {breaksExpanded ? (
+                            <>
+                              <TableHead className="min-w-[140px]">Break 1</TableHead>
+                              <TableHead className="min-w-[140px]">Break 2</TableHead>
+                            </>
+                          ) : (
+                            <TableHead className="min-w-[80px]">Breaks</TableHead>
+                          )}
+                          <TableHead className="min-w-[160px]">Days</TableHead>
+                          <TableHead className="min-w-[80px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell>
+                            <Input
+                              value={draftRun.run_name}
+                              className="h-7 text-xs"
+                              onChange={(e) => updateDraft('run_name', e.target.value)}
+                              autoFocus
+                            />
+                          </TableCell>
+                          {depots.length > 0 && (
+                            <TableCell>
+                              <Select
+                                value={draftRun.depot ?? 'none'}
+                                onValueChange={(v) => updateDraft('depot', v === 'none' ? null : v)}
+                              >
+                                <SelectTrigger className="h-7 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">{'\u2014'}</SelectItem>
+                                  {depots.map((d) => (
+                                    <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <Input
+                              type="time"
+                              value={draftRun.start_time}
+                              className="h-7 text-xs"
+                              onChange={(e) => updateDraft('start_time', e.target.value)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="time"
+                              value={draftRun.end_time}
+                              className="h-7 text-xs"
+                              onChange={(e) => updateDraft('end_time', e.target.value)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs">{draftRun.platform_hours}</span>
+                          </TableCell>
+                          {breaksExpanded ? (
+                            <>
+                              <TableCell>
+                                <div className="flex gap-1 items-center">
+                                  <Input
+                                    type="time"
+                                    value={draftRun.break_1_start ?? ''}
+                                    className="h-7 text-xs"
+                                    min={draftRun.start_time}
+                                    max={draftRun.end_time}
+                                    onChange={(e) => updateDraft('break_1_start', e.target.value || null)}
+                                  />
+                                  <span className="text-xs text-cc-text-muted">-</span>
+                                  <Input
+                                    type="time"
+                                    value={draftRun.break_1_end ?? ''}
+                                    className="h-7 text-xs"
+                                    min={draftRun.break_1_start ?? draftRun.start_time}
+                                    max={draftRun.end_time}
+                                    onChange={(e) => updateDraft('break_1_end', e.target.value || null)}
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1 items-center">
+                                  <Input
+                                    type="time"
+                                    value={draftRun.break_2_start ?? ''}
+                                    className="h-7 text-xs"
+                                    min={draftRun.start_time}
+                                    max={draftRun.end_time}
+                                    onChange={(e) => updateDraft('break_2_start', e.target.value || null)}
+                                  />
+                                  <span className="text-xs text-cc-text-muted">-</span>
+                                  <Input
+                                    type="time"
+                                    value={draftRun.break_2_end ?? ''}
+                                    className="h-7 text-xs"
+                                    min={draftRun.break_2_start ?? draftRun.start_time}
+                                    max={draftRun.end_time}
+                                    onChange={(e) => updateDraft('break_2_end', e.target.value || null)}
+                                  />
+                                </div>
+                              </TableCell>
+                            </>
+                          ) : (
+                            <TableCell>
+                              <span className="text-xs text-cc-text-muted">
+                                {(() => {
+                                  const b1 = breakDurationLabel(draftRun.break_1_start, draftRun.break_1_end);
+                                  const b2 = breakDurationLabel(draftRun.break_2_start, draftRun.break_2_end);
+                                  if (b1 && b2) return `${b1}, ${b2}`;
+                                  if (b1) return b1;
+                                  if (b2) return b2;
+                                  return '\u2014';
+                                })()}
+                              </span>
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <div className="flex gap-0.5">
+                              {ALL_SERVICE_DAYS.map((day) => (
+                                <button
+                                  key={day}
+                                  className={`px-1 py-0 text-[10px] rounded ${
+                                    draftDays.includes(day)
+                                      ? 'bg-cc-accent text-white'
+                                      : 'bg-cc-surface-2 text-cc-text-muted'
+                                  }`}
+                                  onClick={() => toggleDraftServiceDay(day)}
+                                >
+                                  {day}
+                                </button>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-cc-success"
+                                onClick={saveDraft}
+                                title="Save route"
+                                type="button"
+                              >
+                                <Check size={13} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-cc-danger"
+                                onClick={cancelDraft}
+                                title="Cancel"
+                                type="button"
+                              >
+                                <X size={13} />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="overflow-x-auto">
               <Table>
@@ -1167,12 +1433,12 @@ export default function RunStructureTab({
                       </TableCell>
                     </TableRow>
                   )}
-                  {sortedRuns.map((run) => {
+                  {displayRuns.map((run) => {
                     const days = parseServiceDays(run.service_days);
                     const disabled = readonlyView;
                     const hasOverlap = splitOverlapIds.has(run.run_id);
                     return (
-                      <TableRow key={run.run_id}>
+                      <TableRow key={run.run_id} className={run.run_id === highlightedRunId ? 'animate-highlight-row' : ''}>
                         <TableCell>
                           <Input
                             value={run.run_name}

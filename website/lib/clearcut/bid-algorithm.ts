@@ -40,10 +40,10 @@ function parseServiceDays(json: string): ServiceDay[] {
   }
 }
 
-// ── Phase 1: Split Reunion — Build Daily Blocks ─────────────────────
+// ── Phase 1: Build Daily Blocks (one per run per day) ────────────────
 
 export function buildDailyBlocks(runs: RunRow[]): DailyBlock[] {
-  // Key: "runName|day"
+  // Key: "runId|day" — each run (including each split) gets its own block
   const groups = new Map<string, { run_name: string; day: ServiceDay; run_ids: string[]; depot: string | null; pay_hours: number; starts: number[]; ends: number[] }>();
 
   for (const run of runs) {
@@ -53,7 +53,7 @@ export function buildDailyBlocks(runs: RunRow[]): DailyBlock[] {
     const payHrs = Number(run.pay_hours) || 0;
 
     for (const day of days) {
-      const key = `${run.run_name.toLowerCase()}|${day}`;
+      const key = `${run.run_id}|${day}`;
       let group = groups.get(key);
       if (!group) {
         group = { run_name: run.run_name, day, run_ids: [], depot: null, pay_hours: 0, starts: [], ends: [] };
@@ -197,10 +197,10 @@ function assembleFTEPackages(
   blocks: DailyBlock[],
   config: BidConfig,
 ): { ftePackages: WorkingPackage[]; remainingBlocks: DailyBlock[] } {
-  // Group blocks by run_name (case-insensitive)
+  // Group blocks by run_id so each run (including splits) is evaluated independently
   const runGroups = new Map<string, DailyBlock[]>();
   for (const block of blocks) {
-    const key = block.run_name.toLowerCase();
+    const key = block.run_ids[0];
     if (!runGroups.has(key)) runGroups.set(key, []);
     runGroups.get(key)!.push(block);
   }
@@ -294,10 +294,10 @@ function assemblePTPackages(
 ): WorkingPackage[] {
   if (blocks.length === 0) return [];
 
-  // Group by run_name first
+  // Group by run_id so each run (including splits) is independent
   const runGroups = new Map<string, DailyBlock[]>();
   for (const block of blocks) {
-    const key = block.run_name.toLowerCase();
+    const key = block.run_ids[0];
     if (!runGroups.has(key)) runGroups.set(key, []);
     runGroups.get(key)!.push(block);
   }
