@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Settings } from 'lucide-react';
+import { ChevronRight, Palette, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -17,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/app/clearcut/components/shadcn/dropdown-menu';
@@ -690,6 +691,28 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           )}
         </div>
         <div className="flex gap-2 flex-wrap justify-end items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Theme">
+                <Palette size={18} strokeWidth={2} aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Light</DropdownMenuLabel>
+              {palettes.filter((p) => p.mode === 'light').map((p) => (
+                <DropdownMenuItem key={p.id} onClick={() => setPaletteId(p.id as PaletteId)}>
+                  {paletteId === p.id ? `\u2713 ${p.name}` : `  ${p.name}`}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Dark</DropdownMenuLabel>
+              {palettes.filter((p) => p.mode === 'dark').map((p) => (
+                <DropdownMenuItem key={p.id} onClick={() => setPaletteId(p.id as PaletteId)}>
+                  {paletteId === p.id ? `\u2713 ${p.name}` : `  ${p.name}`}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {!readonlyView && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -706,15 +729,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     <DropdownMenuItem onClick={onLogout}>Logout</DropdownMenuItem>
                   </>
                 )}
-                <DropdownMenuSeparator />
-                {palettes.map((p) => (
-                  <DropdownMenuItem
-                    key={p.id}
-                    onClick={() => setPaletteId(p.id as PaletteId)}
-                  >
-                    {paletteId === p.id ? `\u2713 ${p.name}` : `  ${p.name}`}
-                  </DropdownMenuItem>
-                ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onClone}>Save As New</DropdownMenuItem>
                 <DropdownMenuItem className="text-cc-danger" onClick={onDelete}>
