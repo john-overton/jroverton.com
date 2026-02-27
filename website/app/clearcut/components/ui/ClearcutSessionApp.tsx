@@ -676,6 +676,10 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onRemovePassword={onRemovePassword}
           onLogout={onLogout}
           hasPassword={ready.state.session.has_password}
+          onCopyReadonlyLink={() => copyToClipboard(`${origin}/clearcut/r/${ready.state.session.readonly_token}`, 'readonly')}
+          onCopyEditLink={() => copyToClipboard(`${origin}/clearcut/s/${token}`, 'edit')}
+          copiedLink={copiedLink}
+          detectedOS={detectedOS}
         />
       }
       filterBar={
@@ -689,11 +693,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             specificDate={specificDate}
             timeStartLabel={allTimeBlocks[timeStartIndex]?.label ?? '--'}
             timeEndLabel={allTimeBlocks[timeEndIndex]?.label ?? '--'}
-            readonlyView={readonlyView}
-            onCopyReadonlyLink={() => copyToClipboard(`${origin}/clearcut/r/${ready.state.session.readonly_token}`, 'readonly')}
-            onCopyEditLink={() => copyToClipboard(`${origin}/clearcut/s/${token}`, 'edit')}
-            copiedLink={copiedLink}
-            detectedOS={detectedOS}
           >
             {/* Filter controls grid */}
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_1px_1fr_1px_1fr_1px_1fr] gap-4">

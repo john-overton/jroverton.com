@@ -1,13 +1,16 @@
 'use client';
 
 import {
-  Activity,
   BarChart3,
+  Check,
   GitBranch,
   Map,
   Palette,
+  Percent,
   Route,
   Settings,
+  Share,
+  Share2,
   TrendingUp,
   Upload,
 } from 'lucide-react';
@@ -34,7 +37,7 @@ type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runstructure' | 'de
 
 const ANALYZE_ITEMS: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
   { key: 'demand', label: 'Demand', icon: <BarChart3 size={16} /> },
-  { key: 'performance', label: 'Performance', icon: <Activity size={16} /> },
+  { key: 'performance', label: 'Performance', icon: <Percent size={16} /> },
   { key: 'map', label: 'Trip Map', icon: <Map size={16} /> },
   { key: 'deadhead', label: 'Deadhead', icon: <Route size={16} /> },
 ];
@@ -57,6 +60,10 @@ interface SidebarProps {
   onRemovePassword: () => void;
   onLogout: () => void;
   hasPassword: boolean;
+  onCopyReadonlyLink: () => void;
+  onCopyEditLink: () => void;
+  copiedLink: 'readonly' | 'edit' | null;
+  detectedOS: string;
 }
 
 export default function Sidebar({
@@ -75,8 +82,13 @@ export default function Sidebar({
   onRemovePassword,
   onLogout,
   hasPassword,
+  onCopyReadonlyLink,
+  onCopyEditLink,
+  copiedLink,
+  detectedOS,
 }: SidebarProps) {
   const [analyzeOpen, setAnalyzeOpen] = useState(true);
+  const ShareIcon = detectedOS === 'apple' ? Share : Share2;
 
   const renderNavButton = (item: { key: TabKey; label: string; icon: ReactNode }) => {
     const isActive = activeTab === item.key;
@@ -150,8 +162,45 @@ export default function Sidebar({
         )}
       </nav>
 
-      {/* Bottom: Theme + Settings */}
+      {/* Bottom: Share + Theme + Settings */}
       <div className="p-3 border-t border-cc-border flex items-center justify-center gap-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" aria-label="Share">
+              <ShareIcon size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start">
+            <DropdownMenuLabel>Share</DropdownMenuLabel>
+            <DropdownMenuItem
+              onSelect={(e) => e.preventDefault()}
+              onClick={onCopyReadonlyLink}
+            >
+              {copiedLink === 'readonly' ? (
+                <span className="flex items-center gap-1.5 text-cc-success">
+                  <Check size={14} /> Copied!
+                </span>
+              ) : (
+                'Copy read-only link'
+              )}
+            </DropdownMenuItem>
+            {!readonlyView && (
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                onClick={onCopyEditLink}
+              >
+                {copiedLink === 'edit' ? (
+                  <span className="flex items-center gap-1.5 text-cc-success">
+                    <Check size={14} /> Copied!
+                  </span>
+                ) : (
+                  'Copy edit link'
+                )}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" aria-label="Theme">

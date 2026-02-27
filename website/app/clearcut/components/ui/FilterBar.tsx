@@ -1,16 +1,7 @@
 'use client';
 
-import { Check, Filter, Share, Share2 } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { Button } from '@/app/clearcut/components/shadcn/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/app/clearcut/components/shadcn/dropdown-menu';
 
 const DAY_LABELS: Record<number, string> = {
   0: 'Sun',
@@ -33,11 +24,6 @@ interface FilterBarProps {
   specificDate: string | null;
   timeStartLabel: string;
   timeEndLabel: string;
-  readonlyView: boolean;
-  onCopyReadonlyLink: () => void;
-  onCopyEditLink: () => void;
-  copiedLink: 'readonly' | 'edit' | null;
-  detectedOS: string;
   children: ReactNode;
 }
 
@@ -50,11 +36,6 @@ export default function FilterBar({
   specificDate,
   timeStartLabel,
   timeEndLabel,
-  readonlyView,
-  onCopyReadonlyLink,
-  onCopyEditLink,
-  copiedLink,
-  detectedOS,
   children,
 }: FilterBarProps) {
   const [expanded, setExpanded] = useState(false);
@@ -105,8 +86,6 @@ export default function FilterBar({
     return selectedDayIds.map((d) => DAY_LABELS[d]).join(', ');
   }, [dayMode, selectedDayIds, specificDate]);
 
-  const ShareIcon = detectedOS === 'apple' ? Share : Share2;
-
   return (
     <div
       onMouseEnter={onMouseEnterContainer}
@@ -124,45 +103,6 @@ export default function FilterBar({
           <span className="text-cc-text-muted mx-1.5">&middot;</span>
           {timeStartLabel} – {timeEndLabel}
         </span>
-
-        <div className="ml-auto shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-xs" aria-label="Share">
-                <ShareIcon size={14} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Share</DropdownMenuLabel>
-              <DropdownMenuItem
-                onSelect={(e) => e.preventDefault()}
-                onClick={onCopyReadonlyLink}
-              >
-                {copiedLink === 'readonly' ? (
-                  <span className="flex items-center gap-1.5 text-cc-success">
-                    <Check size={14} /> Copied!
-                  </span>
-                ) : (
-                  'Copy read-only link'
-                )}
-              </DropdownMenuItem>
-              {!readonlyView && (
-                <DropdownMenuItem
-                  onSelect={(e) => e.preventDefault()}
-                  onClick={onCopyEditLink}
-                >
-                  {copiedLink === 'edit' ? (
-                    <span className="flex items-center gap-1.5 text-cc-success">
-                      <Check size={14} /> Copied!
-                    </span>
-                  ) : (
-                    'Copy edit link'
-                  )}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </div>
 
       {/* Popout filter panel */}
