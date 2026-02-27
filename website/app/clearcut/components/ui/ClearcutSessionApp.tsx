@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, ChevronRight, Palette, Settings, Share, Share2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -13,30 +12,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/clearcut/components/shadcn/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/app/clearcut/components/shadcn/dropdown-menu';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/clearcut/components/shadcn/collapsible';
-import { Tabs, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/tabs';
 import { ClearcutClientError } from '@/lib/clearcut/client';
 import { extractNewDepotsFromRoutes } from '@/lib/clearcut/depot-utils';
 import { computeClearcutMetrics } from '@/lib/clearcut/metrics';
 import type { DepotRow, RunRow } from '@/lib/clearcut/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/clearcut/use-clearcut-session';
 import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
-import { palettes, type PaletteId } from '@/app/clearcut/theme/palettes';
 
+import ClearcutShell from './ClearcutShell';
 import DeadheadTab from './DeadheadTab';
 import DemandTab from './DemandTab';
+import FilterBar from './FilterBar';
 import ImportTab from './ImportTab';
 import MapTab from './MapTab';
 import PerformanceTab from './PerformanceTab';
 import RunStructureTab from './RunStructureTab';
+import Sidebar from './Sidebar';
 import {
   DEMAND_BLOCK_MINUTES,
   PasswordPrompt,
@@ -49,14 +40,6 @@ import {
 
 type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runstructure' | 'deadhead';
 
-const TAB_ITEMS: Array<{ key: TabKey; label: string }> = [
-  { key: 'import', label: 'Import' },
-  { key: 'demand', label: 'Demand' },
-  { key: 'performance', label: 'Performance' },
-  { key: 'map', label: 'Trip Map' },
-  { key: 'runstructure', label: 'Route Structure' },
-  { key: 'deadhead', label: 'Deadhead' },
-];
 const WEEKDAY_DAY_IDS = [1, 2, 3, 4, 5] as const;
 const WEEKEND_DAY_IDS = [0, 6] as const;
 const DAY_LABELS: Record<number, string> = {
@@ -86,16 +69,28 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const timeRangeTrackRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<TabKey>(mode === 'readonly' ? 'demand' : 'import');
   const [hasVisitedMap, setHasVisitedMap] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatusRaw] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setStatus = useCallback((msg: string | null) => {
+    if (statusTimerRef.current) {
+      clearTimeout(statusTimerRef.current);
+      statusTimerRef.current = null;
+    }
+    setStatusRaw(msg);
+    if (msg) {
+      statusTimerRef.current = setTimeout(() => {
+        setStatusRaw(null);
+        statusTimerRef.current = null;
+      }, 5000);
+    }
+  }, []);
   const [selectedWeekdayDays, setSelectedWeekdayDays] = useState<number[]>([]);
   const [selectedWeekendDays, setSelectedWeekendDays] = useState<number[]>([]);
   const [timeStartIndex, setTimeStartIndex] = useState(0);
   const [timeEndIndex, setTimeEndIndex] = useState(0);
   const [draggingTimeHandle, setDraggingTimeHandle] = useState<'start' | 'end' | null>(null);
   const [intervalMinutes, setIntervalMinutes] = useState<15 | 30 | 60>(15);
-  const [filtersOpen, setFiltersOpen] = useState(true);
   const [dayMode, setDayMode] = useState<'dow' | 'specific'>('dow');
   const [specificDate, setSpecificDate] = useState<string | null>(null);
   const [selectedDepot, setSelectedDepot] = useState<string>('all');
@@ -252,6 +247,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   );
   const hasData = ready ? ready.state.session.trip_count > 0 || ready.state.session.route_count > 0 : false;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const depotDisplayName = useMemo(() => {
+    if (selectedDepot === 'all') return 'All Depots';
+    const depot = ready?.state.depots.find((d) => d.depot_id === selectedDepot);
+    return depot?.depot_name ?? selectedDepot;
+  }, [selectedDepot, ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -439,27 +439,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     } catch (demoError) {
       setStatus(null);
       setError(demoError instanceof Error ? demoError.message : 'Failed to load demo data.');
-    }
-  }
-
-  async function onSave() {
-    if (!ready || readonlyView) {
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setStatus('Saving session...');
-    try {
-      await session.saveState({
-        settings: ready.state.settings,
-        optimization: ready.state.optimization,
-      });
-      setStatus('Session saved.');
-    } catch (saveError) {
-      setStatus(null);
-      setError(saveError instanceof Error ? saveError.message : 'Save failed.');
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -676,356 +655,260 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   }
 
   return (
-    <main className="max-w-[1200px] mx-auto px-5 pt-12 pb-8">
-      <header className="flex justify-between gap-3 items-start">
-        <div>
-          <h1 className="text-3xl mb-1">{ready.state.session.name}</h1>
-          {readonlyView && <div className="text-cc-text-secondary text-sm">Read-only Mode</div>}
-          <div className="text-cc-text-secondary text-[13px] mt-1.5">
-            Data loaded: {availableDates.length} day{availableDates.length !== 1 ? 's' : ''}, {ready.state.session.trip_count} trips, {ready.state.session.route_count} routes
-          </div>
-        </div>
-        <div className="flex gap-2 flex-wrap justify-end items-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Share">
-                {detectedOS === 'apple' ? (
-                  <Share size={18} strokeWidth={2} aria-hidden />
-                ) : (
-                  <Share2 size={18} strokeWidth={2} aria-hidden />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Share</DropdownMenuLabel>
-              <DropdownMenuItem
-                onSelect={(e) => e.preventDefault()}
-                onClick={() => copyToClipboard(`${origin}/clearcut/r/${ready.state.session.readonly_token}`, 'readonly')}
-              >
-                {copiedLink === 'readonly' ? (
-                  <span className="flex items-center gap-1.5 text-cc-success"><Check size={14} /> Copied!</span>
-                ) : (
-                  'Copy read-only link'
-                )}
-              </DropdownMenuItem>
-              {!readonlyView && (
-                <DropdownMenuItem
-                  onSelect={(e) => e.preventDefault()}
-                  onClick={() => copyToClipboard(`${origin}/clearcut/s/${token}`, 'edit')}
-                >
-                  {copiedLink === 'edit' ? (
-                    <span className="flex items-center gap-1.5 text-cc-success"><Check size={14} /> Copied!</span>
-                  ) : (
-                    'Copy edit link'
-                  )}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Theme">
-                <Palette size={18} strokeWidth={2} aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Light</DropdownMenuLabel>
-              {palettes.filter((p) => p.mode === 'light').map((p) => (
-                <DropdownMenuItem key={p.id} onClick={() => setPaletteId(p.id as PaletteId)}>
-                  {paletteId === p.id ? `\u2713 ${p.name}` : `  ${p.name}`}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Dark</DropdownMenuLabel>
-              {palettes.filter((p) => p.mode === 'dark').map((p) => (
-                <DropdownMenuItem key={p.id} onClick={() => setPaletteId(p.id as PaletteId)}>
-                  {paletteId === p.id ? `\u2713 ${p.name}` : `  ${p.name}`}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {!readonlyView && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Session options">
-                  <Settings size={18} strokeWidth={2} aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onRename}>Rename</DropdownMenuItem>
-                <DropdownMenuItem onClick={onSetPassword}>Set Password</DropdownMenuItem>
-                {ready.state.session.has_password && (
-                  <>
-                    <DropdownMenuItem onClick={onRemovePassword}>Remove Password</DropdownMenuItem>
-                    <DropdownMenuItem onClick={onLogout}>Logout</DropdownMenuItem>
-                  </>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onClone}>Save As New</DropdownMenuItem>
-                <DropdownMenuItem className="text-cc-danger" onClick={onDelete}>
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {!readonlyView && (
-            <Button disabled={saving} onClick={onSave} type="button">
-              {saving ? 'Saving...' : 'Save Run Cut'}
-            </Button>
-          )}
-        </div>
-      </header>
-
-      {hasData && allTimeBlocks.length > 0 && (
-        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen} asChild>
-          <section className="mt-3 mb-1 border border-cc-border rounded-[10px] bg-cc-surface-1 p-3">
-            <CollapsibleTrigger className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full">
-              <ChevronRight
-                size={14}
-                className="transition-transform duration-150 data-[state=open]:rotate-90"
-                data-state={filtersOpen ? 'open' : 'closed'}
-              />
-              Filters
-            </CollapsibleTrigger>
-            <CollapsibleContent className="grid grid-cols-1 lg:grid-cols-[1fr_1px_1fr_1px_1fr_1px_1fr] gap-4 mt-2">
-            {/* Column 1: Interval */}
-            <div>
-              <div className="text-xs text-cc-text-muted mb-1">Interval</div>
-              <div className="flex gap-1 text-xs">
-                {([15, 30, 60] as const).map((mins) => (
-                  <button
-                    key={mins}
-                    className={`px-2 py-0.5 rounded ${intervalMinutes === mins ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                    onClick={() => setIntervalMinutes(mins)}
-                  >{mins}m</button>
-                ))}
-              </div>
-            </div>
-
-            <div className="hidden lg:block bg-cc-border" />
-            {/* Column 2: Depot */}
-            <div>
-              <div className="text-xs text-cc-text-muted mb-1">Depot</div>
-              <Select value={selectedDepot} onValueChange={setSelectedDepot} disabled={routeLinkedDepots.length <= 1}>
-                <SelectTrigger className="w-auto min-w-[140px] h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Depots</SelectItem>
-                  {routeLinkedDepots.map((d) => (
-                    <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="hidden lg:block bg-cc-border" />
-            {/* Column 3: Day Selection */}
-            <div>
-              <div className="flex items-center gap-1 mb-1.5">
-                <div className="text-xs text-cc-text-muted mr-1">Days</div>
+    <ClearcutShell
+      sidebar={
+        <Sidebar
+          sessionName={ready.state.session.name}
+          dataSummary={`${availableDates.length} day${availableDates.length !== 1 ? 's' : ''}, ${ready.state.session.trip_count} trips, ${ready.state.session.route_count} routes`}
+          readonlyView={readonlyView}
+          activeTab={tab}
+          onTabChange={(v) => {
+            setTab(v as TabKey);
+            if (v === 'map') setHasVisitedMap(true);
+          }}
+          hasData={hasData}
+          paletteId={paletteId}
+          onPaletteChange={setPaletteId}
+          onRename={onRename}
+          onClone={onClone}
+          onDelete={onDelete}
+          onSetPassword={onSetPassword}
+          onRemovePassword={onRemovePassword}
+          onLogout={onLogout}
+          hasPassword={ready.state.session.has_password}
+        />
+      }
+      filterBar={
+        hasData && allTimeBlocks.length > 0 ? (
+          <FilterBar
+            intervalMinutes={intervalMinutes}
+            selectedDepot={selectedDepot}
+            depotName={depotDisplayName}
+            dayMode={dayMode}
+            selectedDayIds={selectedDayIds}
+            specificDate={specificDate}
+            timeStartLabel={allTimeBlocks[timeStartIndex]?.label ?? '--'}
+            timeEndLabel={allTimeBlocks[timeEndIndex]?.label ?? '--'}
+            readonlyView={readonlyView}
+            onCopyReadonlyLink={() => copyToClipboard(`${origin}/clearcut/r/${ready.state.session.readonly_token}`, 'readonly')}
+            onCopyEditLink={() => copyToClipboard(`${origin}/clearcut/s/${token}`, 'edit')}
+            copiedLink={copiedLink}
+            detectedOS={detectedOS}
+          >
+            {/* Filter controls grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1px_1fr_1px_1fr_1px_1fr] gap-4">
+              {/* Column 1: Interval */}
+              <div>
+                <div className="text-xs text-cc-text-muted mb-1">Interval</div>
                 <div className="flex gap-1 text-xs">
-                  <button
-                    className={`px-2 py-0.5 rounded ${dayMode === 'dow' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                    onClick={() => setDayMode('dow')}
-                  >Day of Week</button>
-                  <button
-                    className={`px-2 py-0.5 rounded ${dayMode === 'specific' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                    onClick={() => {
-                      setDayMode('specific');
-                      if (!specificDate && availableDates.length > 0) {
-                        setSpecificDate(availableDates[0]);
-                      }
-                    }}
-                  >Specific Day</button>
+                  {([15, 30, 60] as const).map((mins) => (
+                    <button
+                      key={mins}
+                      className={`px-2 py-0.5 rounded ${intervalMinutes === mins ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                      onClick={() => setIntervalMinutes(mins)}
+                    >{mins}m</button>
+                  ))}
                 </div>
               </div>
-              {dayMode === 'dow' ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-1 mb-1.5 text-xs">
-                    <button
-                      className={`px-2 py-0.5 rounded ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                      onClick={() =>
-                        setSelectedWeekdayDays((prev) =>
-                          prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
-                        )
-                      }
-                    >Weekday</button>
-                    {WEEKDAY_DAY_IDS.map((day) => (
-                      <button
-                        key={`weekday-pill-${day}`}
-                        className={`px-2 py-0.5 rounded ${selectedWeekdayDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                        onClick={() => toggleWeekday(day)}
-                      >{DAY_LABELS[day]}</button>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1 text-xs">
-                    <button
-                      className={`px-2 py-0.5 rounded ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                      onClick={() =>
-                        setSelectedWeekendDays((prev) =>
-                          prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
-                        )
-                      }
-                    >Weekend</button>
-                    {WEEKEND_DAY_IDS.map((day) => (
-                      <button
-                        key={`weekend-pill-${day}`}
-                        className={`px-2 py-0.5 rounded ${selectedWeekendDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                        onClick={() => toggleWeekend(day)}
-                      >{DAY_LABELS[day]}</button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <Select
-                  value={specificDate ?? ''}
-                  onValueChange={(v) => setSpecificDate(v || null)}
-                >
-                  <SelectTrigger className="w-auto min-w-[200px]">
-                    <SelectValue placeholder="Select a date" />
+
+              <div className="hidden lg:block bg-cc-border" />
+              {/* Column 2: Depot */}
+              <div>
+                <div className="text-xs text-cc-text-muted mb-1">Depot</div>
+                <Select value={selectedDepot} onValueChange={setSelectedDepot} disabled={routeLinkedDepots.length <= 1}>
+                  <SelectTrigger className="w-auto min-w-[140px] h-7 text-xs">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableDates.length === 0 && (
-                      <SelectItem value="">No dates available</SelectItem>
-                    )}
-                    {availableDates.map((dateStr) => {
-                      const d = new Date(dateStr + 'T12:00:00');
-                      const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-                      return <SelectItem key={dateStr} value={dateStr}>{label}</SelectItem>;
-                    })}
+                    <SelectItem value="all">All Depots</SelectItem>
+                    {routeLinkedDepots.map((d) => (
+                      <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              )}
-            </div>
+              </div>
 
-            <div className="hidden lg:block bg-cc-border" />
-            {/* Column 3: Time Range */}
-            <div>
-              <div className="text-xs text-cc-text-muted mb-1">Time Range</div>
-              <div
-                ref={timeRangeTrackRef}
-                style={{ position: 'relative', height: 30 }}
-                onMouseDown={(event) => {
-                  if (allTimeBlocks.length <= 1) {
-                    return;
-                  }
-                  const track = timeRangeTrackRef.current;
-                  if (!track) {
-                    return;
-                  }
-                  const rect = track.getBoundingClientRect();
-                  const startX = (timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * rect.width;
-                  const endX = (timeEndIndex / Math.max(1, allTimeBlocks.length - 1)) * rect.width;
-                  const cursorX = event.clientX - rect.left;
-                  const handle = Math.abs(cursorX - startX) <= Math.abs(cursorX - endX) ? 'start' : 'end';
-                  setDraggingTimeHandle(handle);
-                  updateTimeHandleFromClientX(event.clientX, handle);
-                }}
-              >
+              <div className="hidden lg:block bg-cc-border" />
+              {/* Column 3: Day Selection */}
+              <div>
+                <div className="flex items-center gap-1 mb-1.5">
+                  <div className="text-xs text-cc-text-muted mr-1">Days</div>
+                  <div className="flex gap-1 text-xs">
+                    <button
+                      className={`px-2 py-0.5 rounded ${dayMode === 'dow' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                      onClick={() => setDayMode('dow')}
+                    >Day of Week</button>
+                    <button
+                      className={`px-2 py-0.5 rounded ${dayMode === 'specific' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                      onClick={() => {
+                        setDayMode('specific');
+                        if (!specificDate && availableDates.length > 0) {
+                          setSpecificDate(availableDates[0]);
+                        }
+                      }}
+                    >Specific Day</button>
+                  </div>
+                </div>
+                {dayMode === 'dow' ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-1 mb-1.5 text-xs">
+                      <button
+                        className={`px-2 py-0.5 rounded ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                        onClick={() =>
+                          setSelectedWeekdayDays((prev) =>
+                            prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
+                          )
+                        }
+                      >Weekday</button>
+                      {WEEKDAY_DAY_IDS.map((day) => (
+                        <button
+                          key={`weekday-pill-${day}`}
+                          className={`px-2 py-0.5 rounded ${selectedWeekdayDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                          onClick={() => toggleWeekday(day)}
+                        >{DAY_LABELS[day]}</button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 text-xs">
+                      <button
+                        className={`px-2 py-0.5 rounded ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                        onClick={() =>
+                          setSelectedWeekendDays((prev) =>
+                            prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
+                          )
+                        }
+                      >Weekend</button>
+                      {WEEKEND_DAY_IDS.map((day) => (
+                        <button
+                          key={`weekend-pill-${day}`}
+                          className={`px-2 py-0.5 rounded ${selectedWeekendDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                          onClick={() => toggleWeekend(day)}
+                        >{DAY_LABELS[day]}</button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <Select
+                    value={specificDate ?? ''}
+                    onValueChange={(v) => setSpecificDate(v || null)}
+                  >
+                    <SelectTrigger className="w-auto min-w-[200px]">
+                      <SelectValue placeholder="Select a date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableDates.length === 0 && (
+                        <SelectItem value="">No dates available</SelectItem>
+                      )}
+                      {availableDates.map((dateStr) => {
+                        const d = new Date(dateStr + 'T12:00:00');
+                        const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                        return <SelectItem key={dateStr} value={dateStr}>{label}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="hidden lg:block bg-cc-border" />
+              {/* Column 4: Time Range */}
+              <div>
+                <div className="text-xs text-cc-text-muted mb-1">Time Range</div>
                 <div
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    top: '50%',
-                    height: 4,
-                    transform: 'translateY(-50%)',
-                    borderRadius: 4,
-                    background: 'var(--color-cc-surface-3)',
-                  }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '50%',
-                    height: 4,
-                    transform: 'translateY(-50%)',
-                    borderRadius: 4,
-                    background: 'var(--color-cc-accent)',
-                    left: `${(timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
-                    width: `${((timeEndIndex - timeStartIndex) / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
-                  }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: `${(timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
-                    top: '50%',
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    background: 'var(--color-cc-accent)',
-                    border: '2px solid var(--color-cc-surface-1)',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-                    transform: 'translate(-50%, -50%)',
-                    pointerEvents: 'auto',
-                    cursor: 'ew-resize',
-                    zIndex: 4,
-                  }}
+                  ref={timeRangeTrackRef}
+                  style={{ position: 'relative', height: 30 }}
                   onMouseDown={(event) => {
-                    event.stopPropagation();
-                    setDraggingTimeHandle('start');
+                    if (allTimeBlocks.length <= 1) {
+                      return;
+                    }
+                    const track = timeRangeTrackRef.current;
+                    if (!track) {
+                      return;
+                    }
+                    const rect = track.getBoundingClientRect();
+                    const startX = (timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * rect.width;
+                    const endX = (timeEndIndex / Math.max(1, allTimeBlocks.length - 1)) * rect.width;
+                    const cursorX = event.clientX - rect.left;
+                    const handle = Math.abs(cursorX - startX) <= Math.abs(cursorX - endX) ? 'start' : 'end';
+                    setDraggingTimeHandle(handle);
+                    updateTimeHandleFromClientX(event.clientX, handle);
                   }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: `${(timeEndIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
-                    top: '50%',
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    background: 'var(--color-cc-accent)',
-                    border: '2px solid var(--color-cc-surface-1)',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-                    transform: 'translate(-50%, -50%)',
-                    pointerEvents: 'auto',
-                    cursor: 'ew-resize',
-                    zIndex: 4,
-                  }}
-                  onMouseDown={(event) => {
-                    event.stopPropagation();
-                    setDraggingTimeHandle('end');
-                  }}
-                />
-              </div>
-              <div className="flex justify-between text-[11px] text-cc-text-muted mt-1">
-                <span>Start: {allTimeBlocks[timeStartIndex]?.label ?? '--'}</span>
-                <span>End: {allTimeBlocks[timeEndIndex]?.label ?? '--'}</span>
-              </div>
-              <div className="text-xs text-cc-accent">
-                {allTimeBlocks[timeStartIndex]?.label} - {allTimeBlocks[timeEndIndex]?.label}
-                {' - '}
-                {dayMode === 'specific'
-                  ? specificDate ?? 'No date selected'
-                  : selectedDayIds.length > 0 ? `${selectedDayIds.length} day(s) selected` : 'No days selected'}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: '50%',
+                      height: 4,
+                      transform: 'translateY(-50%)',
+                      borderRadius: 4,
+                      background: 'var(--color-cc-surface-3)',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      height: 4,
+                      transform: 'translateY(-50%)',
+                      borderRadius: 4,
+                      background: 'var(--color-cc-accent)',
+                      left: `${(timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
+                      width: `${((timeEndIndex - timeStartIndex) / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${(timeStartIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
+                      top: '50%',
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      background: 'var(--color-cc-accent)',
+                      border: '2px solid var(--color-cc-surface-1)',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                      transform: 'translate(-50%, -50%)',
+                      pointerEvents: 'auto',
+                      cursor: 'ew-resize',
+                      zIndex: 4,
+                    }}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                      setDraggingTimeHandle('start');
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${(timeEndIndex / Math.max(1, allTimeBlocks.length - 1)) * 100}%`,
+                      top: '50%',
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      background: 'var(--color-cc-accent)',
+                      border: '2px solid var(--color-cc-surface-1)',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                      transform: 'translate(-50%, -50%)',
+                      pointerEvents: 'auto',
+                      cursor: 'ew-resize',
+                      zIndex: 4,
+                    }}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                      setDraggingTimeHandle('end');
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] text-cc-text-muted mt-1">
+                  <span>Start: {allTimeBlocks[timeStartIndex]?.label ?? '--'}</span>
+                  <span>End: {allTimeBlocks[timeEndIndex]?.label ?? '--'}</span>
+                </div>
               </div>
             </div>
-          </CollapsibleContent>
-        </section>
-      </Collapsible>
-      )}
-
-      <div className="mt-4 mb-2">
-        <Tabs value={tab} onValueChange={(v) => {
-          setTab(v as TabKey);
-          if (v === 'map') setHasVisitedMap(true);
-        }}>
-          <TabsList>
-            {TAB_ITEMS.map((item) => {
-              if (item.key === 'import' && readonlyView) return null;
-              const disabled = item.key !== 'import' && !hasData;
-              return (
-                <TabsTrigger key={item.key} value={item.key} disabled={disabled}>
-                  {item.label}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
-      </div>
-
+          </FilterBar>
+        ) : undefined
+      }
+    >
       {status && <p className="text-cc-success mb-2">{status}</p>}
       {error && <p className="text-cc-danger mb-2">{error}</p>}
 
@@ -1090,6 +973,6 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
         />
       )}
       {tab === 'deadhead' && <DeadheadTab metrics={metrics} />}
-    </main>
+    </ClearcutShell>
   );
 }

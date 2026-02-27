@@ -341,9 +341,9 @@ export function DemandCompositeChart({
   return (
     <div className="h-[230px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
-          <XAxis dataKey="label" hide />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} width={38} domain={[0, yMax]} />
           <Tooltip content={<ChartTooltip nameMap={nameMap} />} />
           <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
