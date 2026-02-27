@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Palette, Settings } from 'lucide-react';
+import { Check, ChevronRight, Palette, Settings, Share, Share2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -99,8 +99,16 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [dayMode, setDayMode] = useState<'dow' | 'specific'>('dow');
   const [specificDate, setSpecificDate] = useState<string | null>(null);
   const [selectedDepot, setSelectedDepot] = useState<string>('all');
+  const [copiedLink, setCopiedLink] = useState<'readonly' | 'edit' | null>(null);
 
   const readonlyView = mode === 'readonly';
+  const detectedOS = useMemo(() => {
+    if (typeof navigator === 'undefined') return 'other';
+    const ua = navigator.userAgent;
+    if (/Mac|iPhone|iPad|iPod/i.test(ua)) return 'apple';
+    if (/Android/i.test(ua)) return 'android';
+    return 'other';
+  }, []);
 
   const ready = session.loadState.status === 'ready' ? session.loadState : null;
   readyRef.current = ready;
@@ -413,6 +421,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     );
   }
 
+  async function copyToClipboard(text: string, type: 'readonly' | 'edit') {
+    await navigator.clipboard.writeText(text);
+    setCopiedLink(type);
+    setTimeout(() => setCopiedLink(null), 2000);
+  }
+
   async function onLoadDemo() {
     if (readonlyView || !ready) {
       return;
@@ -665,32 +679,49 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     <main className="max-w-[1200px] mx-auto px-5 pt-12 pb-8">
       <header className="flex justify-between gap-3 items-start">
         <div>
-          <h1 className="text-3xl font-bold mb-1">{ready.state.session.name}</h1>
-          <div className="text-cc-text-secondary text-sm">
-            Run Cutting &amp; Optimization Tool {readonlyView ? '- Read-only Mode' : ''}
-          </div>
+          <h1 className="text-3xl mb-1">{ready.state.session.name}</h1>
+          {readonlyView && <div className="text-cc-text-secondary text-sm">Read-only Mode</div>}
           <div className="text-cc-text-secondary text-[13px] mt-1.5">
-            Data loaded: {ready.state.session.trip_count} trips, {ready.state.session.route_count} routes
+            Data loaded: {availableDates.length} day{availableDates.length !== 1 ? 's' : ''}, {ready.state.session.trip_count} trips, {ready.state.session.route_count} routes
           </div>
-          {!readonlyView && origin && (
-            <div className="mt-2 text-[13px]">
-              Share link: <code>{`${origin}/clearcut/r/${ready.state.session.readonly_token}`}</code>{' '}
-              <Button
-                variant="outline"
-                size="sm"
-                className="ml-2"
-                type="button"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(`${origin}/clearcut/r/${ready.state.session.readonly_token}`);
-                  setStatus('Read-only link copied.');
-                }}
-              >
-                Copy
-              </Button>
-            </div>
-          )}
         </div>
         <div className="flex gap-2 flex-wrap justify-end items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Share">
+                {detectedOS === 'apple' ? (
+                  <Share size={18} strokeWidth={2} aria-hidden />
+                ) : (
+                  <Share2 size={18} strokeWidth={2} aria-hidden />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Share</DropdownMenuLabel>
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                onClick={() => copyToClipboard(`${origin}/clearcut/r/${ready.state.session.readonly_token}`, 'readonly')}
+              >
+                {copiedLink === 'readonly' ? (
+                  <span className="flex items-center gap-1.5 text-cc-success"><Check size={14} /> Copied!</span>
+                ) : (
+                  'Copy read-only link'
+                )}
+              </DropdownMenuItem>
+              {!readonlyView && (
+                <DropdownMenuItem
+                  onSelect={(e) => e.preventDefault()}
+                  onClick={() => copyToClipboard(`${origin}/clearcut/s/${token}`, 'edit')}
+                >
+                  {copiedLink === 'edit' ? (
+                    <span className="flex items-center gap-1.5 text-cc-success"><Check size={14} /> Copied!</span>
+                  ) : (
+                    'Copy edit link'
+                  )}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="icon" aria-label="Theme">
