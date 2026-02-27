@@ -867,7 +867,17 @@ export default function RunStructureTab({
       const durationHrs = Math.round(((endMin - startMin) / 60) * 10) / 10;
       const originalName = route.route_name ?? route.route_id ?? `Route ${localRuns.length + idx + 1}`;
 
-      return {
+      // Convert route break datetimes to HH:MM clock format
+      const b1S = asDate(route.break1_start);
+      const b1E = asDate(route.break1_end);
+      const b2S = asDate(route.break2_start);
+      const b2E = asDate(route.break2_end);
+      const break1Start = b1S ? formatMinutesToClock(dateToMinutesOfDay(b1S)) : null;
+      const break1End = b1E ? formatMinutesToClock(dateToMinutesOfDay(b1E)) : null;
+      const break2Start = b2S ? formatMinutesToClock(dateToMinutesOfDay(b2S)) : null;
+      const break2End = b2E ? formatMinutesToClock(dateToMinutesOfDay(b2E)) : null;
+
+      const runRow = {
         run_id: crypto.randomUUID(),
         run_name: originalName,
         _originalName: originalName,
@@ -877,15 +887,20 @@ export default function RunStructureTab({
         route_area: null,
         start_time: formatMinutesToClock(startMin),
         end_time: formatMinutesToClock(endMin),
-        platform_hours: String(Math.max(0, durationHrs)),
-        pay_hours: String(Math.max(0, durationHrs)),
-        break_1_start: null,
-        break_1_end: null,
-        break_2_start: null,
-        break_2_end: null,
+        platform_hours: '0',
+        pay_hours: '0',
+        break_1_start: break1Start,
+        break_1_end: break1End,
+        break_2_start: break2Start,
+        break_2_end: break2End,
         break_3_start: null,
         break_3_end: null,
       };
+      const svcHrs = computeServiceHours(runRow);
+      runRow.platform_hours = String(svcHrs);
+      runRow.pay_hours = String(svcHrs);
+
+      return runRow;
     });
 
     // Detect splits: group by base name, assign split_numbers if >1 route shares a base
@@ -949,6 +964,12 @@ export default function RunStructureTab({
 
     const serviceDaysJson = JSON.stringify(ALL_SERVICE_DAYS.filter((d) => copyDaysSelection.includes(d)));
 
+    // Convert break times from "H:MM AM/PM" display format to HH:MM clock format
+    const b1Start = row.break1Start ? formatMinutesToClock(parseClockFromLabel(row.break1Start)) : null;
+    const b1End = row.break1End ? formatMinutesToClock(parseClockFromLabel(row.break1End)) : null;
+    const b2Start = row.break2Start ? formatMinutesToClock(parseClockFromLabel(row.break2Start)) : null;
+    const b2End = row.break2End ? formatMinutesToClock(parseClockFromLabel(row.break2End)) : null;
+
     const newRun: RunRow = {
       run_id: crypto.randomUUID(),
       run_name: row.routeName,
@@ -958,15 +979,18 @@ export default function RunStructureTab({
       route_area: null,
       start_time: formatMinutesToClock(startMin),
       end_time: formatMinutesToClock(endMin),
-      platform_hours: String(row.durationHours),
-      pay_hours: String(row.durationHours),
-      break_1_start: null,
-      break_1_end: null,
-      break_2_start: null,
-      break_2_end: null,
+      platform_hours: '0',
+      pay_hours: '0',
+      break_1_start: b1Start,
+      break_1_end: b1End,
+      break_2_start: b2Start,
+      break_2_end: b2End,
       break_3_start: null,
       break_3_end: null,
     };
+    const svcHrs = computeServiceHours(newRun);
+    newRun.platform_hours = String(svcHrs);
+    newRun.pay_hours = String(svcHrs);
 
     updateLocalRuns([...localRuns, newRun]);
     showToast(`Route copied to ${copyDaysSelection.join(', ')}`);
