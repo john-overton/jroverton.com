@@ -35,9 +35,10 @@ export const DEMO_CONFIG = {
   routeActualStartVarianceMax: 10,
   routeActualEndVarianceMin: -15,
   routeActualEndVarianceMax: 5,
-  break1OffsetMinutes: 150,
-  break2OffsetMinutes: 330,
-  breakVarianceMinutes: 15,
+  breakMinRouteHours: 5,
+  breakDurationMinMinutes: 25,
+  breakDurationMaxMinutes: 45,
+  breakMidpointVarianceMinutes: 20,
 
   // Trips
   productivityMin: 1.5,
@@ -396,20 +397,24 @@ export function buildDemoTripsAndRoutes(): {
           C.routeActualEndVarianceMin +
           Math.floor(rand() * (C.routeActualEndVarianceMax - C.routeActualEndVarianceMin + 1));
 
-        const break1Minute = clamp(
-          routeStartMinute +
-            C.break1OffsetMinutes +
-            Math.round((rand() * 2 - 1) * C.breakVarianceMinutes),
-          routeStartMinute + 60,
-          routeEndMinute - 60,
-        );
-        const break2Minute = clamp(
-          routeStartMinute +
-            C.break2OffsetMinutes +
-            Math.round((rand() * 2 - 1) * C.breakVarianceMinutes),
-          break1Minute + 60,
-          routeEndMinute - 30,
-        );
+        // Generate break only for routes >= breakMinRouteHours
+        const routeDurationHours = durationMinutes / 60;
+        let break1StartStr: string | null = null;
+        let break1EndStr: string | null = null;
+        if (routeDurationHours >= C.breakMinRouteHours) {
+          const breakDuration = C.breakDurationMinMinutes +
+            Math.floor(rand() * (C.breakDurationMaxMinutes - C.breakDurationMinMinutes + 1));
+          const midpoint = routeStartMinute + Math.round(durationMinutes / 2);
+          const breakStartMinute = clamp(
+            midpoint - Math.round(breakDuration / 2) +
+              Math.round((rand() * 2 - 1) * C.breakMidpointVarianceMinutes),
+            routeStartMinute + 60,
+            routeEndMinute - breakDuration - 30,
+          );
+          const breakEndMinute = breakStartMinute + breakDuration;
+          break1StartStr = fmtDate(atDayMinutes(dayDate, breakStartMinute));
+          break1EndStr = fmtDate(atDayMinutes(dayDate, breakEndMinute));
+        }
 
         const routeId = `R-${dateStr.replaceAll('-', '')}-${String(routeIndex + 1).padStart(2, '0')}`;
 
@@ -421,8 +426,10 @@ export function buildDemoTripsAndRoutes(): {
           scheduled_end_time: fmtDate(routeEnd),
           actual_start_time: fmtDate(withMinutes(routeStart, actualStartVariance)),
           actual_end_time: fmtDate(withMinutes(routeEnd, actualEndVariance)),
-          break1: fmtDate(atDayMinutes(dayDate, break1Minute)),
-          break2: fmtDate(atDayMinutes(dayDate, break2Minute)),
+          break1_start: break1StartStr,
+          break1_end: break1EndStr,
+          break2_start: null,
+          break2_end: null,
           depot_address: depotRow.depot_address,
           depot_lat: depotRow.depot_lat,
           depot_lon: depotRow.depot_lon,

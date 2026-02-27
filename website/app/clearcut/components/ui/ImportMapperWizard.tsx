@@ -80,8 +80,10 @@ const ROUTE_FIELD_OPTIONS: Array<keyof RouteRow> = [
   'scheduled_end_time',
   'actual_start_time',
   'actual_end_time',
-  'break1',
-  'break2',
+  'break1_start',
+  'break1_end',
+  'break2_start',
+  'break2_end',
 ];
 
 interface Props {

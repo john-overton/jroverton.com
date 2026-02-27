@@ -1096,16 +1096,25 @@ export default function RunStructureTab({
                       {importedBreaksExpanded ? (
                         <>
                           <TableCell>
-                            <span className="text-xs text-cc-text-muted">{row.break1 ?? '\u2014'}</span>
+                            <span className="text-xs text-cc-text-muted">
+                              {row.break1Start && row.break1End ? `${row.break1Start} - ${row.break1End}` : '\u2014'}
+                            </span>
                           </TableCell>
                           <TableCell>
-                            <span className="text-xs text-cc-text-muted">{row.break2 ?? '\u2014'}</span>
+                            <span className="text-xs text-cc-text-muted">
+                              {row.break2Start && row.break2End ? `${row.break2Start} - ${row.break2End}` : '\u2014'}
+                            </span>
                           </TableCell>
                         </>
                       ) : (
                         <TableCell>
                           <span className="text-xs text-cc-text-muted">
-                            {row.break1 && row.break2 ? `${row.break1}, ${row.break2}` : row.break1 ?? row.break2 ?? '\u2014'}
+                            {(() => {
+                              const b1 = row.break1Start && row.break1End ? `${row.break1Start} - ${row.break1End}` : null;
+                              const b2 = row.break2Start && row.break2End ? `${row.break2Start} - ${row.break2End}` : null;
+                              if (b1 && b2) return `${b1}, ${b2}`;
+                              return b1 ?? b2 ?? '\u2014';
+                            })()}
                           </span>
                         </TableCell>
                       )}

@@ -1,11 +1,18 @@
 'use client';
 
-import { CircleHelp, Pencil, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleHelp, Pencil, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
 import { Button } from '@/app/clearcut/components/shadcn/button';
 import { Checkbox } from '@/app/clearcut/components/shadcn/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/clearcut/components/shadcn/collapsible';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/app/clearcut/components/shadcn/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -67,13 +74,60 @@ function InfoLabel({ children, tip }: { children: React.ReactNode; tip: string }
   );
 }
 
+function ColumnSelectorDropdown<K extends string>({
+  columns,
+  visibleColumns,
+  onToggle,
+}: {
+  columns: Array<{ key: K; label: string }>;
+  visibleColumns: Record<K, boolean>;
+  onToggle: (key: K, value: boolean) => void;
+}) {
+  const visibleCount = columns.filter((c) => visibleColumns[c.key]).length;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" type="button" className="text-xs">
+          Columns ({visibleCount}/{columns.length}) <ChevronDown size={14} className="ml-1" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {columns.map((column) => (
+          <DropdownMenuCheckboxItem
+            key={column.key}
+            checked={visibleColumns[column.key]}
+            onCheckedChange={(v) => onToggle(column.key, v === true)}
+            onSelect={(e) => e.preventDefault()}
+          >
+            {column.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 type TripDataColumnKey =
   | 'trip_id'
+  | 'trip_date'
   | 'route_id'
-  | 'pickup_time'
-  | 'dropoff_time'
+  | 'scheduled_pickup_time'
+  | 'scheduled_appointment_time'
+  | 'pickup_arrive_time'
+  | 'pickup_leave_time'
+  | 'dropoff_arrive_time'
+  | 'dropoff_leave_time'
+  | 'pickup_address'
+  | 'pickup_lat'
+  | 'pickup_lon'
+  | 'dropoff_address'
+  | 'dropoff_lat'
+  | 'dropoff_lon'
   | 'status'
-  | 'passenger_type';
+  | 'passenger_type'
+  | 'passenger_count'
+  | 'pick_odometer'
+  | 'drop_odometer';
 type RouteDataColumnKey =
   | 'route_id'
   | 'route_name'
@@ -81,8 +135,10 @@ type RouteDataColumnKey =
   | 'scheduled_end_time'
   | 'actual_start_time'
   | 'actual_end_time'
-  | 'break1'
-  | 'break2'
+  | 'break1_start'
+  | 'break1_end'
+  | 'break2_start'
+  | 'break2_end'
   | 'depot_address'
   | 'depot_lat'
   | 'depot_lon'
@@ -97,20 +153,26 @@ const TRIP_DATA_COLUMNS: Array<{
   label: string;
   getValue: (trip: TripRow) => string | null;
 }> = [
-  { key: 'trip_id', label: 'Trip', getValue: (trip) => trip.trip_id },
+  { key: 'trip_id', label: 'Trip ID', getValue: (trip) => trip.trip_id },
+  { key: 'trip_date', label: 'Trip Date', getValue: (trip) => trip.trip_date ?? '-' },
   { key: 'route_id', label: 'Route', getValue: (trip) => trip.route_id },
-  {
-    key: 'pickup_time',
-    label: 'Pickup',
-    getValue: (trip) => trip.pickup_arrive_time ?? trip.scheduled_pickup_time,
-  },
-  {
-    key: 'dropoff_time',
-    label: 'Dropoff',
-    getValue: (trip) => trip.dropoff_leave_time ?? trip.scheduled_appointment_time,
-  },
+  { key: 'scheduled_pickup_time', label: 'Sched. Pickup', getValue: (trip) => trip.scheduled_pickup_time },
+  { key: 'scheduled_appointment_time', label: 'Sched. Appt.', getValue: (trip) => trip.scheduled_appointment_time ?? '-' },
+  { key: 'pickup_arrive_time', label: 'Pickup Arrive', getValue: (trip) => trip.pickup_arrive_time ?? '-' },
+  { key: 'pickup_leave_time', label: 'Pickup Leave', getValue: (trip) => trip.pickup_leave_time ?? '-' },
+  { key: 'dropoff_arrive_time', label: 'Dropoff Arrive', getValue: (trip) => trip.dropoff_arrive_time ?? '-' },
+  { key: 'dropoff_leave_time', label: 'Dropoff Leave', getValue: (trip) => trip.dropoff_leave_time ?? '-' },
+  { key: 'pickup_address', label: 'Pickup Address', getValue: (trip) => trip.pickup_address ?? '-' },
+  { key: 'pickup_lat', label: 'Pickup Lat', getValue: (trip) => trip.pickup_lat ?? '-' },
+  { key: 'pickup_lon', label: 'Pickup Lon', getValue: (trip) => trip.pickup_lon ?? '-' },
+  { key: 'dropoff_address', label: 'Dropoff Address', getValue: (trip) => trip.dropoff_address ?? '-' },
+  { key: 'dropoff_lat', label: 'Dropoff Lat', getValue: (trip) => trip.dropoff_lat ?? '-' },
+  { key: 'dropoff_lon', label: 'Dropoff Lon', getValue: (trip) => trip.dropoff_lon ?? '-' },
   { key: 'status', label: 'Status', getValue: (trip) => trip.status },
   { key: 'passenger_type', label: 'Passenger Type', getValue: (trip) => trip.passenger_type },
+  { key: 'passenger_count', label: 'Passengers', getValue: (trip) => trip.passenger_count ?? '-' },
+  { key: 'pick_odometer', label: 'Pick Odometer', getValue: (trip) => trip.pick_odometer ?? '-' },
+  { key: 'drop_odometer', label: 'Drop Odometer', getValue: (trip) => trip.drop_odometer ?? '-' },
 ];
 
 const ROUTE_DATA_COLUMNS: Array<{
@@ -132,8 +194,10 @@ const ROUTE_DATA_COLUMNS: Array<{
   },
   { key: 'actual_start_time', label: 'Actual Start', getValue: (route) => route.actual_start_time ?? '-' },
   { key: 'actual_end_time', label: 'Actual End', getValue: (route) => route.actual_end_time ?? '-' },
-  { key: 'break1', label: 'Break 1', getValue: (route) => route.break1 ?? '-' },
-  { key: 'break2', label: 'Break 2', getValue: (route) => route.break2 ?? '-' },
+  { key: 'break1_start', label: 'Break 1 Start', getValue: (route) => route.break1_start ?? '-' },
+  { key: 'break1_end', label: 'Break 1 End', getValue: (route) => route.break1_end ?? '-' },
+  { key: 'break2_start', label: 'Break 2 Start', getValue: (route) => route.break2_start ?? '-' },
+  { key: 'break2_end', label: 'Break 2 End', getValue: (route) => route.break2_end ?? '-' },
   { key: 'depot_address', label: 'Depot Address', getValue: (route) => route.depot_address ?? '-' },
   { key: 'depot_lat', label: 'Depot Lat', getValue: (route) => route.depot_lat ?? '-' },
   { key: 'depot_lon', label: 'Depot Lon', getValue: (route) => route.depot_lon ?? '-' },
@@ -192,6 +256,8 @@ export default function ImportTab({
   depots,
   onDepotsChange,
 }: ImportTabProps) {
+  const [tripsOpen, setTripsOpen] = useState(false);
+  const [routesOpen, setRoutesOpen] = useState(false);
   const [tripPage, setTripPage] = useState(1);
   const [routePage, setRoutePage] = useState(1);
   const [flatImportLog, setFlatImportLog] = useState<{
@@ -201,11 +267,25 @@ export default function ImportTab({
   const [showFlatImportLog, setShowFlatImportLog] = useState(false);
   const [tripVisibleColumns, setTripVisibleColumns] = useState<Record<TripDataColumnKey, boolean>>({
     trip_id: true,
+    trip_date: true,
     route_id: true,
-    pickup_time: true,
-    dropoff_time: true,
+    scheduled_pickup_time: true,
+    scheduled_appointment_time: true,
+    pickup_arrive_time: true,
+    pickup_leave_time: true,
+    dropoff_arrive_time: true,
+    dropoff_leave_time: true,
+    pickup_address: true,
+    pickup_lat: true,
+    pickup_lon: true,
+    dropoff_address: true,
+    dropoff_lat: true,
+    dropoff_lon: true,
     status: true,
     passenger_type: true,
+    passenger_count: true,
+    pick_odometer: true,
+    drop_odometer: true,
   });
   const [routeVisibleColumns, setRouteVisibleColumns] = useState<Record<RouteDataColumnKey, boolean>>({
     route_id: true,
@@ -214,8 +294,10 @@ export default function ImportTab({
     scheduled_end_time: true,
     actual_start_time: true,
     actual_end_time: true,
-    break1: true,
-    break2: true,
+    break1_start: true,
+    break1_end: true,
+    break2_start: true,
+    break2_end: true,
     depot_address: true,
     depot_lat: true,
     depot_lon: true,
@@ -321,8 +403,8 @@ export default function ImportTab({
       'TRIP-001,2026-02-01,2026-02-01 08:00:00,2026-02-01 08:30:00,2026-02-01 07:58:00,2026-02-01 08:02:00,2026-02-01 08:27:00,2026-02-01 08:31:00,ROUTE-001,123 Main St,,,456 Oak St,,,completed,ambulatory,1,1000,1010',
     ].join('\n');
     const routeSample = [
-      'route_id,route_date,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1,break2,depot_address,depot_lat,depot_lon,distance_to_first_pick,distance_from_last_drop',
-      'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 14:00:00,100 Depot Way,40.7128,-74.0060,3.2,4.5',
+      'route_id,route_date,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1_start,break1_end,break2_start,break2_end,depot_address,depot_lat,depot_lon,distance_to_first_pick,distance_from_last_drop',
+      'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 11:30:00,,, 100 Depot Way,40.7128,-74.0060,3.2,4.5',
     ].join('\n');
 
     const content = kind === 'trips' ? tripSample : routeSample;
@@ -489,173 +571,167 @@ export default function ImportTab({
       </SectionCard>
 
       <SectionCard title="Data Views">
-        <details className="mb-3">
-          <summary className="cursor-pointer font-semibold">
+        <Collapsible open={tripsOpen} onOpenChange={setTripsOpen} className="mb-3">
+          <CollapsibleTrigger className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full">
+            <ChevronRight
+              size={14}
+              className="transition-transform duration-150 data-[state=open]:rotate-90"
+              data-state={tripsOpen ? 'open' : 'closed'}
+            />
             Trips ({state.trips.length})
-          </summary>
-          <div className="overflow-x-auto mt-2">
-            <div className="mb-3">
-              <div className="text-xs text-cc-text-muted mb-1.5">Columns</div>
-              <div className="flex flex-wrap gap-3">
-                {TRIP_DATA_COLUMNS.map((column) => (
-                  <label key={`trip-col-toggle-${column.key}`} className="flex items-center gap-1.5 text-[13px]">
-                    <Checkbox
-                      checked={tripVisibleColumns[column.key]}
-                      onCheckedChange={(v) =>
-                        setTripVisibleColumns((prev) => ({
-                          ...prev,
-                          [column.key]: v === true,
-                        }))
-                      }
-                    />
-                    {column.label}
-                  </label>
-                ))}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="overflow-x-auto mt-2">
+              <div className="mb-3">
+                <ColumnSelectorDropdown
+                  columns={TRIP_DATA_COLUMNS}
+                  visibleColumns={tripVisibleColumns}
+                  onToggle={(key, value) =>
+                    setTripVisibleColumns((prev) => ({ ...prev, [key]: value }))
+                  }
+                />
               </div>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {activeTripColumns.map((column) => (
-                    <TableHead key={`trip-col-head-${column.key}`}>{column.label}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tripPageRows.map((trip) => (
-                  <TableRow key={`trip-view-${trip.trip_id}-${trip.route_id}`}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
                     {activeTripColumns.map((column) => (
-                      <TableCell key={`trip-row-${trip.trip_id}-${column.key}`}>
-                        {column.getValue(trip) ?? '-'}
-                      </TableCell>
+                      <TableHead key={`trip-col-head-${column.key}`}>{column.label}</TableHead>
                     ))}
                   </TableRow>
-                ))}
-                {state.trips.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={Math.max(activeTripColumns.length, 1)} className="text-cc-text-muted">
-                      No trips available.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {state.trips.length > 0 && activeTripColumns.length === 0 && (
-                  <TableRow>
-                    <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            {state.trips.length > 0 && (
-              <div className="flex items-center justify-between mt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  disabled={currentTripPage <= 1}
-                  onClick={() => setTripPage((prev) => Math.max(1, prev - 1))}
-                >
-                  Previous
-                </Button>
-                <div className="text-[13px]">
-                  Page {currentTripPage} of {tripTotalPages}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  disabled={currentTripPage >= tripTotalPages}
-                  onClick={() => setTripPage((prev) => Math.min(tripTotalPages, prev + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </div>
-        </details>
-
-        <details>
-          <summary className="cursor-pointer font-semibold">
-            Routes ({state.routes.length})
-          </summary>
-          <div className="overflow-x-auto mt-2">
-            <div className="mb-3">
-              <div className="text-xs text-cc-text-muted mb-1.5">Columns</div>
-              <div className="flex flex-wrap gap-3">
-                {ROUTE_DATA_COLUMNS.map((column) => (
-                  <label key={`route-col-toggle-${column.key}`} className="flex items-center gap-1.5 text-[13px]">
-                    <Checkbox
-                      checked={routeVisibleColumns[column.key]}
-                      onCheckedChange={(v) =>
-                        setRouteVisibleColumns((prev) => ({
-                          ...prev,
-                          [column.key]: v === true,
-                        }))
-                      }
-                    />
-                    {column.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {activeRouteColumns.map((column) => (
-                    <TableHead key={`route-col-head-${column.key}`}>{column.label}</TableHead>
+                </TableHeader>
+                <TableBody>
+                  {tripPageRows.map((trip) => (
+                    <TableRow key={`trip-view-${trip.trip_id}-${trip.route_id}`}>
+                      {activeTripColumns.map((column) => (
+                        <TableCell key={`trip-row-${trip.trip_id}-${column.key}`}>
+                          {column.getValue(trip) ?? '-'}
+                        </TableCell>
+                      ))}
+                    </TableRow>
                   ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {routePageRows.map((route) => (
-                  <TableRow key={`route-view-${route.route_id}`}>
-                    {activeRouteColumns.map((column) => (
-                      <TableCell key={`route-row-${route.route_id}-${column.key}`}>
-                        {column.getValue(route) ?? '-'}
+                  {state.trips.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={Math.max(activeTripColumns.length, 1)} className="text-cc-text-muted">
+                        No trips available.
                       </TableCell>
+                    </TableRow>
+                  )}
+                  {state.trips.length > 0 && activeTripColumns.length === 0 && (
+                    <TableRow>
+                      <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              {state.trips.length > 0 && (
+                <div className="flex items-center justify-between mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    disabled={currentTripPage <= 1}
+                    onClick={() => setTripPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <div className="text-[13px]">
+                    Page {currentTripPage} of {tripTotalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    disabled={currentTripPage >= tripTotalPages}
+                    onClick={() => setTripPage((prev) => Math.min(tripTotalPages, prev + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Collapsible open={routesOpen} onOpenChange={setRoutesOpen}>
+          <CollapsibleTrigger className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full">
+            <ChevronRight
+              size={14}
+              className="transition-transform duration-150 data-[state=open]:rotate-90"
+              data-state={routesOpen ? 'open' : 'closed'}
+            />
+            Routes ({state.routes.length})
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="overflow-x-auto mt-2">
+              <div className="mb-3">
+                <ColumnSelectorDropdown
+                  columns={ROUTE_DATA_COLUMNS}
+                  visibleColumns={routeVisibleColumns}
+                  onToggle={(key, value) =>
+                    setRouteVisibleColumns((prev) => ({ ...prev, [key]: value }))
+                  }
+                />
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {activeRouteColumns.map((column) => (
+                      <TableHead key={`route-col-head-${column.key}`}>{column.label}</TableHead>
                     ))}
                   </TableRow>
-                ))}
-                {state.routes.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={Math.max(activeRouteColumns.length, 1)} className="text-cc-text-muted">
-                      No routes available.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {state.routes.length > 0 && activeRouteColumns.length === 0 && (
-                  <TableRow>
-                    <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            {state.routes.length > 0 && (
-              <div className="flex items-center justify-between mt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  disabled={currentRoutePage <= 1}
-                  onClick={() => setRoutePage((prev) => Math.max(1, prev - 1))}
-                >
-                  Previous
-                </Button>
-                <div className="text-[13px]">
-                  Page {currentRoutePage} of {routeTotalPages}
+                </TableHeader>
+                <TableBody>
+                  {routePageRows.map((route) => (
+                    <TableRow key={`route-view-${route.route_id}`}>
+                      {activeRouteColumns.map((column) => (
+                        <TableCell key={`route-row-${route.route_id}-${column.key}`}>
+                          {column.getValue(route) ?? '-'}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                  {state.routes.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={Math.max(activeRouteColumns.length, 1)} className="text-cc-text-muted">
+                        No routes available.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {state.routes.length > 0 && activeRouteColumns.length === 0 && (
+                    <TableRow>
+                      <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              {state.routes.length > 0 && (
+                <div className="flex items-center justify-between mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    disabled={currentRoutePage <= 1}
+                    onClick={() => setRoutePage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <div className="text-[13px]">
+                    Page {currentRoutePage} of {routeTotalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    disabled={currentRoutePage >= routeTotalPages}
+                    onClick={() => setRoutePage((prev) => Math.min(routeTotalPages, prev + 1))}
+                  >
+                    Next
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  disabled={currentRoutePage >= routeTotalPages}
-                  onClick={() => setRoutePage((prev) => Math.min(routeTotalPages, prev + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </div>
-        </details>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </SectionCard>
 
       {flatImportLog && (flatImportLog.trips.length > 0 || flatImportLog.routes.length > 0) && (

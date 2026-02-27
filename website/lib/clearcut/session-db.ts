@@ -53,8 +53,10 @@ const ROUTE_COLUMNS = [
   'scheduled_end_time',
   'actual_start_time',
   'actual_end_time',
-  'break1',
-  'break2',
+  'break1_start',
+  'break1_end',
+  'break2_start',
+  'break2_end',
   'depot_address',
   'depot_lat',
   'depot_lon',
@@ -132,11 +134,17 @@ function ensureRouteColumns(db: Database.Database): void {
   if (!existing.has('route_name')) {
     db.exec('ALTER TABLE routes ADD COLUMN route_name TEXT;');
   }
-  if (!existing.has('break1')) {
-    db.exec('ALTER TABLE routes ADD COLUMN break1 TEXT;');
+  if (!existing.has('break1_start')) {
+    db.exec('ALTER TABLE routes ADD COLUMN break1_start TEXT;');
   }
-  if (!existing.has('break2')) {
-    db.exec('ALTER TABLE routes ADD COLUMN break2 TEXT;');
+  if (!existing.has('break1_end')) {
+    db.exec('ALTER TABLE routes ADD COLUMN break1_end TEXT;');
+  }
+  if (!existing.has('break2_start')) {
+    db.exec('ALTER TABLE routes ADD COLUMN break2_start TEXT;');
+  }
+  if (!existing.has('break2_end')) {
+    db.exec('ALTER TABLE routes ADD COLUMN break2_end TEXT;');
   }
   if (!existing.has('route_date')) {
     db.exec('ALTER TABLE routes ADD COLUMN route_date TEXT;');

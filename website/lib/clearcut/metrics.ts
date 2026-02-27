@@ -808,11 +808,29 @@ export function computeClearcutMetrics(
     }
     const startM = dateToMinutes(start);
     const endM = Math.max(startM + 1, dateToMinutes(end));
+
+    // Parse break windows so we can exclude them from vehicle counts
+    const b1Start = asDate(route.break1_start);
+    const b1End = asDate(route.break1_end);
+    const b1StartM = b1Start ? dateToMinutes(b1Start) : null;
+    const b1EndM = b1End ? dateToMinutes(b1End) : null;
+    const b2Start = asDate(route.break2_start);
+    const b2End = asDate(route.break2_end);
+    const b2StartM = b2Start ? dateToMinutes(b2Start) : null;
+    const b2EndM = b2End ? dateToMinutes(b2End) : null;
+
     const routeDayKey = dateKey(start);
     const activeRouteBlocks = ensureDayBlockSets(activeRouteIdsByDayBlock, routeDayKey, blockCount);
     for (let i = 0; i < blocks.length; i += 1) {
       const block = blocks[i];
       if (endM > block.startMinutes && startM < block.endMinutes) {
+        // Skip blocks fully contained within a break window
+        const inBreak1 = b1StartM != null && b1EndM != null
+          && block.startMinutes >= b1StartM && block.endMinutes <= b1EndM;
+        const inBreak2 = b2StartM != null && b2EndM != null
+          && block.startMinutes >= b2StartM && block.endMinutes <= b2EndM;
+        if (inBreak1 || inBreak2) continue;
+
         vehiclesByBlock[i] += 1;
         activeRouteBlocks[i].add(route.route_id);
         let dayVehicles = vehiclesByDayBlock.get(routeDayKey);

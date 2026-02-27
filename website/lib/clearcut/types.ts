@@ -66,8 +66,10 @@ export interface RouteRow {
   scheduled_end_time: string;
   actual_start_time: string | null;
   actual_end_time: string | null;
-  break1: string | null;
-  break2: string | null;
+  break1_start: string | null;
+  break1_end: string | null;
+  break2_start: string | null;
+  break2_end: string | null;
   depot_address: string | null;
   depot_lat: string | null;
   depot_lon: string | null;

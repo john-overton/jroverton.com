@@ -7,8 +7,10 @@ export interface CurrentRunCutRow {
   shiftEnd: string;
   durationHours: number;
   activeBlockIndices: number[];
-  break1: string | null;
-  break2: string | null;
+  break1Start: string | null;
+  break1End: string | null;
+  break2Start: string | null;
+  break2End: string | null;
 }
 
 export interface OptimizedRouteRow {
@@ -126,16 +128,20 @@ export function buildRunCutForDate(
     }
 
     const name = route.route_name ?? route.route_id;
-    const break1Date = asDate(route.break1);
-    const break2Date = asDate(route.break2);
+    const b1Start = asDate(route.break1_start);
+    const b1End = asDate(route.break1_end);
+    const b2Start = asDate(route.break2_start);
+    const b2End = asDate(route.break2_end);
     rows.push({
       routeName: name,
       shiftStart: formatMinutes(roundedStart),
       shiftEnd: formatMinutes(roundedEnd),
       durationHours: Math.round(((roundedEnd - roundedStart) / 60) * 10) / 10,
       activeBlockIndices,
-      break1: break1Date ? formatMinutes(dateToMinutes(break1Date)) : null,
-      break2: break2Date ? formatMinutes(dateToMinutes(break2Date)) : null,
+      break1Start: b1Start ? formatMinutes(dateToMinutes(b1Start)) : null,
+      break1End: b1End ? formatMinutes(dateToMinutes(b1End)) : null,
+      break2Start: b2Start ? formatMinutes(dateToMinutes(b2Start)) : null,
+      break2End: b2End ? formatMinutes(dateToMinutes(b2End)) : null,
     });
   }
 
@@ -221,8 +227,10 @@ export function buildCurrentRunCut(
       shiftEnd: formatMinutes(roundedEnd),
       durationHours: Math.round(((roundedEnd - roundedStart) / 60) * 10) / 10,
       activeBlockIndices,
-      break1: null,
-      break2: null,
+      break1Start: null,
+      break1End: null,
+      break2Start: null,
+      break2End: null,
     });
   }
 

@@ -137,9 +137,10 @@ All parameters are in the `DEMO_CONFIG` export at the top of the file:
 | `routeDurationMaxHours` | `12` | Maximum route duration |
 | `routeActualStartVarianceMin/Max` | `-5 / +10` | Minutes offset from scheduled start |
 | `routeActualEndVarianceMin/Max` | `-15 / +5` | Minutes offset from scheduled end |
-| `break1OffsetMinutes` | `150` | Break 1 at ~2.5 hours after route start |
-| `break2OffsetMinutes` | `330` | Break 2 at ~5.5 hours after route start |
-| `breakVarianceMinutes` | `15` | +/- variance on break times |
+| `breakMinRouteHours` | `5` | Routes must be at least this long to get a break |
+| `breakDurationMinMinutes` | `25` | Minimum break duration |
+| `breakDurationMaxMinutes` | `45` | Maximum break duration |
+| `breakMidpointVarianceMinutes` | `20` | +/- variance from route midpoint for break placement |
 
 #### Trips
 | Variable | Default | Description |
