@@ -12,6 +12,7 @@ export interface ClearcutMetrics {
   pickupsByBlock: number[];
   onBoardByBlock: number[];
   vehiclesByBlock: number[];
+  vehiclesOnBreakByBlock: number[];
   deadheadByBlock: number[];
   otpByBlock: number[];
   pickupOtpByBlock: number[];
@@ -21,6 +22,7 @@ export interface ClearcutMetrics {
   maxPickupsByBlock: number[];
   maxOnBoardByBlock: number[];
   maxVehiclesByBlock: number[];
+  maxVehiclesOnBreakByBlock: number[];
   peakPickups: number;
   peakVehicles: number;
   peakOnBoard: number;
@@ -646,6 +648,7 @@ export function computeClearcutMetrics(
   const pickupsPassengersByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const onBoardByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const vehiclesByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const breaksByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const deadheadByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const otpByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const pickupOtpByBlock = Array.from({ length: blockCount }).fill(0) as number[];
@@ -666,6 +669,7 @@ export function computeClearcutMetrics(
   const pickupsByDayBlock = new Map<string, number[]>();
   const passengersByDayBlock = new Map<string, number[]>();
   const vehiclesByDayBlock = new Map<string, number[]>();
+  const breaksByDayBlock = new Map<string, number[]>();
 
   let totalPickupEligible = 0;
   let totalPickupOnTime = 0;
@@ -829,7 +833,16 @@ export function computeClearcutMetrics(
           && block.startMinutes >= b1StartM && block.endMinutes <= b1EndM;
         const inBreak2 = b2StartM != null && b2EndM != null
           && block.startMinutes >= b2StartM && block.endMinutes <= b2EndM;
-        if (inBreak1 || inBreak2) continue;
+        if (inBreak1 || inBreak2) {
+          breaksByBlock[i] += 1;
+          let dayBreaks = breaksByDayBlock.get(routeDayKey);
+          if (!dayBreaks) {
+            dayBreaks = Array.from({ length: blockCount }).fill(0) as number[];
+            breaksByDayBlock.set(routeDayKey, dayBreaks);
+          }
+          dayBreaks[i] += 1;
+          continue;
+        }
 
         vehiclesByBlock[i] += 1;
         activeRouteBlocks[i].add(route.route_id);
@@ -877,6 +890,7 @@ export function computeClearcutMetrics(
     }
     onBoardByBlock[i] = Math.round(onBoardSum * 10) / 10;
     vehiclesByBlock[i] = Math.round((vehiclesByBlock[i] / dayCount) * 10) / 10;
+    breaksByBlock[i] = Math.round((breaksByBlock[i] / dayCount) * 10) / 10;
     const trips = blockTripCounts[i] / dayCount;
     pickupOtpByBlock[i] =
       pickupEligibleCounts[i] > 0 ? (pickupOnTimeCounts[i] / pickupEligibleCounts[i]) * 100 : 0;
@@ -901,6 +915,7 @@ export function computeClearcutMetrics(
   const maxPickupsByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const maxOnBoardByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const maxVehiclesByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const maxBreaksByBlock = Array.from({ length: blockCount }).fill(0) as number[];
 
   for (const [, dayPickups] of pickupsByDayBlock) {
     for (let i = 0; i < blockCount; i += 1) {
@@ -923,6 +938,14 @@ export function computeClearcutMetrics(
     for (let i = 0; i < blockCount; i += 1) {
       if (dayVehicles[i] > maxVehiclesByBlock[i]) {
         maxVehiclesByBlock[i] = dayVehicles[i];
+      }
+    }
+  }
+
+  for (const [, dayBreaks] of breaksByDayBlock) {
+    for (let i = 0; i < blockCount; i += 1) {
+      if (dayBreaks[i] > maxBreaksByBlock[i]) {
+        maxBreaksByBlock[i] = dayBreaks[i];
       }
     }
   }
@@ -1046,6 +1069,7 @@ export function computeClearcutMetrics(
     pickupsByBlock,
     onBoardByBlock,
     vehiclesByBlock,
+    vehiclesOnBreakByBlock: breaksByBlock,
     deadheadByBlock,
     otpByBlock,
     pickupOtpByBlock,
@@ -1055,6 +1079,7 @@ export function computeClearcutMetrics(
     maxPickupsByBlock,
     maxOnBoardByBlock,
     maxVehiclesByBlock,
+    maxVehiclesOnBreakByBlock: maxBreaksByBlock,
     peakPickups: Math.max(...pickupsByBlock, 0),
     peakVehicles: Math.max(...vehiclesByBlock, 0),
     peakOnBoard: Math.round(Math.max(...onBoardByBlock, 0) * 10) / 10,

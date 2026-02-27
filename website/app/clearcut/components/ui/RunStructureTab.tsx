@@ -473,8 +473,21 @@ export default function RunStructureTab({
       const startMin = dateToMinutesOfDay(startDt);
       const endMin = dateToMinutesOfDay(endDt);
       if (endMin <= startMin) continue;
+      // Parse break windows
+      const b1S = asDate(route.break1_start);
+      const b1E = asDate(route.break1_end);
+      const b1SM = b1S ? dateToMinutesOfDay(b1S) : null;
+      const b1EM = b1E ? dateToMinutesOfDay(b1E) : null;
+      const b2S = asDate(route.break2_start);
+      const b2E = asDate(route.break2_end);
+      const b2SM = b2S ? dateToMinutesOfDay(b2S) : null;
+      const b2EM = b2E ? dateToMinutesOfDay(b2E) : null;
       for (let i = 0; i < fullDayMetrics.blocks.length; i++) {
-        if (startMin < fullDayMetrics.blocks[i].endMinutes && endMin > fullDayMetrics.blocks[i].startMinutes) {
+        const block = fullDayMetrics.blocks[i];
+        if (startMin < block.endMinutes && endMin > block.startMinutes) {
+          const inBreak1 = b1SM != null && b1EM != null && block.startMinutes >= b1SM && block.endMinutes <= b1EM;
+          const inBreak2 = b2SM != null && b2EM != null && block.startMinutes >= b2SM && block.endMinutes <= b2EM;
+          if (inBreak1 || inBreak2) continue;
           counts[i] += 1;
         }
       }
@@ -495,8 +508,9 @@ export default function RunStructureTab({
   const selectedDaySet = useMemo(() => new Set(selectedDays), [selectedDays]);
 
   // New routes for the chart — from locally-filtered runs, checked against global day selection
-  const runVehiclesByBlockFullDay = useMemo(() => {
+  const { runVehiclesByBlockFullDay, nrOnBreakByBlockFullDay } = useMemo(() => {
     const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
+    const breaks = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
     for (const run of filteredRuns) {
       const runDays = parseServiceDays(run.service_days);
       const matchesDays = selectedDays.length === 0 || runDays.some((d) => selectedDaySet.has(SERVICE_DAY_TO_DOW[d]));
@@ -505,13 +519,22 @@ export default function RunStructureTab({
       const startMin = parseClockToMinutes(run.start_time, 0);
       const endMin = parseClockToMinutes(run.end_time, 0);
       if (endMin <= startMin) continue;
+      // Parse break windows for runs
+      const rb1S = parseClockToMinutes(run.break_1_start ?? '', -1);
+      const rb1E = parseClockToMinutes(run.break_1_end ?? '', -1);
+      const rb2S = parseClockToMinutes(run.break_2_start ?? '', -1);
+      const rb2E = parseClockToMinutes(run.break_2_end ?? '', -1);
       for (let i = 0; i < fullDayMetrics.blocks.length; i++) {
-        if (startMin < fullDayMetrics.blocks[i].endMinutes && endMin > fullDayMetrics.blocks[i].startMinutes) {
+        const block = fullDayMetrics.blocks[i];
+        if (startMin < block.endMinutes && endMin > block.startMinutes) {
+          const inBreak1 = rb1S >= 0 && rb1E > rb1S && block.startMinutes >= rb1S && block.endMinutes <= rb1E;
+          const inBreak2 = rb2S >= 0 && rb2E > rb2S && block.startMinutes >= rb2S && block.endMinutes <= rb2E;
+          if (inBreak1 || inBreak2) { breaks[i] += 1; continue; }
           counts[i] += 1;
         }
       }
     }
-    return counts;
+    return { runVehiclesByBlockFullDay: counts, nrOnBreakByBlockFullDay: breaks };
   }, [filteredRuns, fullDayMetrics.blocks, selectedDays.length, selectedDaySet]);
 
   const runVehiclesByBlock = useMemo(() => {
@@ -522,6 +545,15 @@ export default function RunStructureTab({
       return fullIdx >= 0 ? runVehiclesByBlockFullDay[fullIdx] : 0;
     });
   }, [metrics.blocks, fullDayMetrics.blocks, runVehiclesByBlockFullDay]);
+
+  const nrOnBreakByBlock = useMemo(() => {
+    return metrics.blocks.map((viewBlock) => {
+      const fullIdx = fullDayMetrics.blocks.findIndex(
+        (b) => b.startMinutes === viewBlock.startMinutes,
+      );
+      return fullIdx >= 0 ? nrOnBreakByBlockFullDay[fullIdx] : 0;
+    });
+  }, [metrics.blocks, fullDayMetrics.blocks, nrOnBreakByBlockFullDay]);
 
   // ── Stats ────────────────────────────────────────────────────────
 
@@ -974,6 +1006,8 @@ export default function RunStructureTab({
           onBoard={demandMode === 'max' ? metrics.maxOnBoardByBlock : metrics.onBoardByBlock}
           currentVehicles={chartCurrentVehiclesByBlock}
           runVehicles={runVehiclesByBlock}
+          crOnBreak={demandMode === 'max' ? metrics.maxVehiclesOnBreakByBlock : metrics.vehiclesOnBreakByBlock}
+          nrOnBreak={nrOnBreakByBlock}
           blocks={metrics.blocks}
         />
       </SectionCard>

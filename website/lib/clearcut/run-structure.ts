@@ -120,18 +120,26 @@ export function buildRunCutForDate(
     const roundedEnd = roundUpToInterval(endMin, intervalMinutes);
     if (roundedEnd <= roundedStart) continue;
 
-    const activeBlockIndices: number[] = [];
-    for (let i = 0; i < blocks.length; i++) {
-      if (roundedStart < blocks[i].endMinutes && roundedEnd > blocks[i].startMinutes) {
-        activeBlockIndices.push(i);
-      }
-    }
-
     const name = route.route_name ?? route.route_id;
     const b1Start = asDate(route.break1_start);
     const b1End = asDate(route.break1_end);
     const b2Start = asDate(route.break2_start);
     const b2End = asDate(route.break2_end);
+    const b1StartM = b1Start ? dateToMinutes(b1Start) : null;
+    const b1EndM = b1End ? dateToMinutes(b1End) : null;
+    const b2StartM = b2Start ? dateToMinutes(b2Start) : null;
+    const b2EndM = b2End ? dateToMinutes(b2End) : null;
+
+    const activeBlockIndices: number[] = [];
+    for (let i = 0; i < blocks.length; i++) {
+      if (roundedStart < blocks[i].endMinutes && roundedEnd > blocks[i].startMinutes) {
+        const inBreak1 = b1StartM != null && b1EndM != null
+          && blocks[i].startMinutes >= b1StartM && blocks[i].endMinutes <= b1EndM;
+        const inBreak2 = b2StartM != null && b2EndM != null
+          && blocks[i].startMinutes >= b2StartM && blocks[i].endMinutes <= b2EndM;
+        if (!inBreak1 && !inBreak2) activeBlockIndices.push(i);
+      }
+    }
     rows.push({
       routeName: name,
       shiftStart: formatMinutes(roundedStart),

@@ -61,6 +61,8 @@ export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) 
           maxPickups={metrics.maxPickupsByBlock}
           maxOnBoard={metrics.maxOnBoardByBlock}
           maxVehicles={metrics.maxVehiclesByBlock}
+          onBreak={metrics.vehiclesOnBreakByBlock}
+          maxOnBreak={metrics.maxVehiclesOnBreakByBlock}
           blocks={metrics.blocks}
           mode={demandMode}
         />

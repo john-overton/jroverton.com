@@ -234,6 +234,54 @@ export function HeatStrip({ values, blocks, onBlockClick, activeIndex, valueLabe
   );
 }
 
+function ChartTooltip({ active, payload, label, nameMap }: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+  nameMap: Record<string, string>;
+}) {
+  if (!active || !payload?.length) return null;
+  const dataPoint = (payload[0] as unknown as { payload: Record<string, number> }).payload;
+  const onBreak = dataPoint.onBreak ?? 0;
+  const crOnBreak = dataPoint.crOnBreak ?? 0;
+  const nrOnBreak = dataPoint.nrOnBreak ?? 0;
+  const breakStyle = { color: 'var(--color-cc-text-muted)', lineHeight: 1.6 } as const;
+  const dotStyle = { color: 'var(--color-cc-warning)' } as const;
+  return (
+    <div style={{
+      borderRadius: 8,
+      background: 'var(--color-cc-surface-1)',
+      color: 'var(--color-cc-text)',
+      border: '1px solid var(--color-cc-border)',
+      padding: '8px 12px',
+      fontSize: 13,
+    }}>
+      <div style={{ color: 'var(--color-cc-text)', marginBottom: 4, fontWeight: 500 }}>Time: {label}</div>
+      {payload.map((entry) => (
+        <div key={entry.name} style={{ color: 'var(--color-cc-text-secondary)', lineHeight: 1.6 }}>
+          <span style={{ color: entry.color }}>●</span>{' '}
+          {nameMap[entry.name] ?? entry.name}: {entry.value}
+        </div>
+      ))}
+      {onBreak > 0 && (
+        <div style={breakStyle}>
+          <span style={dotStyle}>●</span> On Break: {onBreak}
+        </div>
+      )}
+      {crOnBreak > 0 && (
+        <div style={breakStyle}>
+          <span style={dotStyle}>●</span> CR On Break: {crOnBreak}
+        </div>
+      )}
+      {nrOnBreak > 0 && (
+        <div style={breakStyle}>
+          <span style={dotStyle}>●</span> NR On Break: {nrOnBreak}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DemandCompositeChart({
   pickups,
   onBoard,
@@ -241,6 +289,8 @@ export function DemandCompositeChart({
   maxPickups,
   maxOnBoard,
   maxVehicles,
+  onBreak,
+  maxOnBreak,
   blocks,
   mode,
 }: {
@@ -250,6 +300,8 @@ export function DemandCompositeChart({
   maxPickups?: number[];
   maxOnBoard?: number[];
   maxVehicles?: number[];
+  onBreak?: number[];
+  maxOnBreak?: number[];
   blocks: Array<{ label: string }>;
   mode?: 'avg' | 'max';
 }) {
@@ -257,6 +309,7 @@ export function DemandCompositeChart({
   const activePickups = mode === 'max' && maxPickups ? maxPickups : pickups;
   const activeOnBoard = mode === 'max' && maxOnBoard ? maxOnBoard : onBoard;
   const activeVehicles = mode === 'max' && maxVehicles ? maxVehicles : vehicles;
+  const activeOnBreak = mode === 'max' && maxOnBreak ? maxOnBreak : (onBreak ?? []);
 
   // Fix Y-axis to the max across both modes so the scale stays constant during transitions
   const yMax = useMemo(() => {
@@ -274,9 +327,16 @@ export function DemandCompositeChart({
         pickups: Math.round((activePickups[index] ?? 0) * 10) / 10,
         onBoard: Math.round((activeOnBoard[index] ?? 0) * 10) / 10,
         vehicles: Math.round((activeVehicles[index] ?? 0) * 10) / 10,
+        onBreak: Math.round((activeOnBreak[index] ?? 0) * 10) / 10,
       })),
-    [blocks, activeOnBoard, activePickups, activeVehicles],
+    [blocks, activeOnBoard, activePickups, activeVehicles, activeOnBreak],
   );
+
+  const nameMap = useMemo(() => ({
+    vehicles: 'Routes On Road',
+    onBoard: 'Active Trips',
+    pickups: 'Pickups',
+  }), []);
 
   return (
     <div className="h-[230px]">
@@ -285,18 +345,7 @@ export function DemandCompositeChart({
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" hide />
           <YAxis allowDecimals={false} width={38} domain={[0, yMax]} />
-          <Tooltip
-            formatter={(value: number | string | undefined, name: string | undefined) => {
-              const normalizedValue = typeof value === 'number' ? value : Number(value ?? 0);
-              if (name === 'vehicles') return [normalizedValue, 'Routes On Road'];
-              if (name === 'onBoard') return [normalizedValue, 'Active Trips'];
-              return [normalizedValue, 'Pickups'];
-            }}
-            labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, background: 'var(--color-cc-surface-1)', color: 'var(--color-cc-text)', borderColor: 'var(--color-cc-border)' }}
-            labelStyle={{ color: 'var(--color-cc-text)' }}
-            itemStyle={{ color: 'var(--color-cc-text-secondary)' }}
-          />
+          <Tooltip content={<ChartTooltip nameMap={nameMap} />} />
           <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
           <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
           <Line
@@ -437,12 +486,16 @@ export function RunStructureChart({
   onBoard,
   currentVehicles,
   runVehicles,
+  crOnBreak,
+  nrOnBreak,
   blocks,
 }: {
   pickups: number[];
   onBoard: number[];
   currentVehicles: number[];
   runVehicles: number[];
+  crOnBreak?: number[];
+  nrOnBreak?: number[];
   blocks: Array<{ label: string }>;
 }) {
   const { chartColors } = useClearcutTheme();
@@ -454,9 +507,18 @@ export function RunStructureChart({
         onBoard: Math.round((onBoard[index] ?? 0) * 10) / 10,
         currentVehicles: Math.round((currentVehicles[index] ?? 0) * 10) / 10,
         runVehicles: Math.round((runVehicles[index] ?? 0) * 10) / 10,
+        crOnBreak: Math.round((crOnBreak?.[index] ?? 0) * 10) / 10,
+        nrOnBreak: Math.round((nrOnBreak?.[index] ?? 0) * 10) / 10,
       })),
-    [blocks, onBoard, pickups, currentVehicles, runVehicles],
+    [blocks, onBoard, pickups, currentVehicles, runVehicles, crOnBreak, nrOnBreak],
   );
+
+  const nameMap = useMemo(() => ({
+    currentVehicles: 'Current Routes',
+    runVehicles: 'New Routes',
+    onBoard: 'Active Trips',
+    pickups: 'Pickups',
+  }), []);
 
   return (
     <div className="h-[260px]">
@@ -465,19 +527,7 @@ export function RunStructureChart({
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} width={38} />
-          <Tooltip
-            formatter={(value: number | string | undefined, name: string | undefined) => {
-              const v = typeof value === 'number' ? value : Number(value ?? 0);
-              if (name === 'currentVehicles') return [v, 'Current Routes'];
-              if (name === 'runVehicles') return [v, 'New Routes'];
-              if (name === 'onBoard') return [v, 'Active Trips'];
-              return [v, 'Pickups'];
-            }}
-            labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, background: 'var(--color-cc-surface-1)', color: 'var(--color-cc-text)', borderColor: 'var(--color-cc-border)' }}
-            labelStyle={{ color: 'var(--color-cc-text)' }}
-            itemStyle={{ color: 'var(--color-cc-text-secondary)' }}
-          />
+          <Tooltip content={<ChartTooltip nameMap={nameMap} />} />
           <Legend
             formatter={(value) => {
               if (value === 'currentVehicles') return 'Current Routes';
