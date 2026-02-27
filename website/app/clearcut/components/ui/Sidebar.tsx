@@ -1,10 +1,25 @@
 'use client';
 
-import { Activity, BarChart3, GitBranch, Map, Palette, Route, Settings, Upload } from 'lucide-react';
-import type { ReactNode } from 'react';
+import {
+  Activity,
+  BarChart3,
+  GitBranch,
+  Map,
+  Palette,
+  Route,
+  Settings,
+  TrendingUp,
+  Upload,
+} from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 
 import { Badge } from '@/app/clearcut/components/shadcn/badge';
 import { Button } from '@/app/clearcut/components/shadcn/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/app/clearcut/components/shadcn/collapsible';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,14 +32,14 @@ import { palettes, type PaletteId } from '@/app/clearcut/theme/palettes';
 
 type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runstructure' | 'deadhead';
 
-const NAV_ITEMS: Array<{ key: TabKey; label: string; icon: ReactNode; editOnly?: boolean }> = [
-  { key: 'import', label: 'Import', icon: <Upload size={16} />, editOnly: true },
+const ANALYZE_ITEMS: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
   { key: 'demand', label: 'Demand', icon: <BarChart3 size={16} /> },
   { key: 'performance', label: 'Performance', icon: <Activity size={16} /> },
   { key: 'map', label: 'Trip Map', icon: <Map size={16} /> },
-  { key: 'runstructure', label: 'Route Structure', icon: <GitBranch size={16} /> },
   { key: 'deadhead', label: 'Deadhead', icon: <Route size={16} /> },
 ];
+
+const ANALYZE_KEYS = new Set<TabKey>(ANALYZE_ITEMS.map((i) => i.key));
 
 interface SidebarProps {
   sessionName: string;
@@ -61,6 +76,30 @@ export default function Sidebar({
   onLogout,
   hasPassword,
 }: SidebarProps) {
+  const [analyzeOpen, setAnalyzeOpen] = useState(true);
+
+  const renderNavButton = (item: { key: TabKey; label: string; icon: ReactNode }) => {
+    const isActive = activeTab === item.key;
+    const disabled = item.key !== 'import' && !hasData;
+    return (
+      <Button
+        key={item.key}
+        variant="ghost"
+        size="sm"
+        disabled={disabled}
+        onClick={() => onTabChange(item.key)}
+        className={`w-full justify-start gap-2 mb-0.5 rounded-md ${
+          isActive
+            ? 'bg-cc-surface-3 text-cc-text font-semibold'
+            : 'text-cc-text-secondary'
+        }`}
+      >
+        {item.icon}
+        {item.label}
+      </Button>
+    );
+  };
+
   return (
     <>
       {/* Top: Session info */}
@@ -71,37 +110,48 @@ export default function Sidebar({
         {readonlyView && (
           <Badge variant="secondary" className="mt-1">Read-only</Badge>
         )}
-        <div className="text-xs text-cc-text-muted mt-1.5">{dataSummary}</div>
+        <div className="text-xs text-cc-text-secondary font-medium mt-2">Imported Data</div>
+        <div className="text-xs text-cc-text-muted mt-0.5">{dataSummary}</div>
       </div>
 
       {/* Middle: Navigation */}
       <nav className="flex-1 overflow-y-auto py-2 px-2">
-        {NAV_ITEMS.map((item) => {
-          if (item.editOnly && readonlyView) return null;
-          const isActive = activeTab === item.key;
-          const disabled = item.key !== 'import' && !hasData;
-          return (
+        {/* Import (edit-only) */}
+        {!readonlyView && renderNavButton(
+          { key: 'import', label: 'Import', icon: <Upload size={16} /> },
+        )}
+
+        {/* Analyze group */}
+        <Collapsible open={analyzeOpen} onOpenChange={setAnalyzeOpen}>
+          <CollapsibleTrigger asChild>
             <Button
-              key={item.key}
               variant="ghost"
               size="sm"
-              disabled={disabled}
-              onClick={() => onTabChange(item.key)}
               className={`w-full justify-start gap-2 mb-0.5 rounded-md ${
-                isActive
-                  ? 'bg-cc-surface-3 text-cc-text font-semibold'
+                ANALYZE_KEYS.has(activeTab) && !analyzeOpen
+                  ? 'text-cc-text font-semibold'
                   : 'text-cc-text-secondary'
               }`}
             >
-              {item.icon}
-              {item.label}
+              <TrendingUp size={16} className="shrink-0" />
+              Analyze
             </Button>
-          );
-        })}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="ml-4">
+              {ANALYZE_ITEMS.map((item) => renderNavButton(item))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Routes and Bids (standalone) */}
+        {renderNavButton(
+          { key: 'runstructure', label: 'Routes and Bids', icon: <GitBranch size={16} /> },
+        )}
       </nav>
 
       {/* Bottom: Theme + Settings */}
-      <div className="p-3 border-t border-cc-border flex items-center gap-1">
+      <div className="p-3 border-t border-cc-border flex items-center justify-center gap-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" aria-label="Theme">
