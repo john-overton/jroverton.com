@@ -3,7 +3,7 @@
 import { CircleHelp, Pencil, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
+// import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
 import { Button } from '@/app/clearcut/components/shadcn/button';
 import { Checkbox } from '@/app/clearcut/components/shadcn/checkbox';
 import {
@@ -67,7 +67,6 @@ function InfoLabel({ children, tip }: { children: React.ReactNode; tip: string }
   );
 }
 
-type ImportViewMode = 'main' | 'wizard' | 'flat';
 type TripDataColumnKey =
   | 'trip_id'
   | 'route_id'
@@ -193,8 +192,6 @@ export default function ImportTab({
   depots,
   onDepotsChange,
 }: ImportTabProps) {
-  const [importViewMode, setImportViewMode] = useState<ImportViewMode>('main');
-  const [wizardKey, setWizardKey] = useState(0);
   const [tripPage, setTripPage] = useState(1);
   const [routePage, setRoutePage] = useState(1);
   const [flatImportLog, setFlatImportLog] = useState<{
@@ -343,113 +340,46 @@ export default function ImportTab({
   return (
     <>
       <SectionCard title="Data Import">
-        {importViewMode === 'main' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="border border-cc-border rounded-[10px] p-4">
-              <div className="text-[13px] text-cc-text-muted mb-2">
-                Event-based import with templates and field mapping.
-              </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                type="button"
-                onClick={() => setImportViewMode('wizard')}
-              >
-                Trip Import Wizard
-              </Button>
-            </div>
-            <div className="border border-cc-border rounded-[10px] p-4">
-              <div className="text-[13px] text-cc-text-muted mb-2">
-                Direct trip/route file upload with CSV samples.
-              </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                type="button"
-                onClick={() => setImportViewMode('flat')}
-              >
-                Flat File Import
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {importViewMode === 'wizard' && (
-          <div className="mt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="mb-3"
-              type="button"
-              onClick={() => {
-                setImportViewMode('main');
-                setWizardKey((prev) => prev + 1);
-                setStatus(null);
-                setError(null);
-              }}
-            >
-              Back to Import Options
-            </Button>
-            <ImportMapperWizard
-              key={`import-wizard-${wizardKey}`}
-              readonlyView={readonlyView}
-              onPreview={session.previewImport}
-              onValidate={session.validateImport}
-              onApply={session.applyImport}
-              onListTemplates={session.listTemplates}
-              onCreateTemplate={session.createTemplate}
-              onDeleteTemplate={session.deleteTemplate}
-            />
-          </div>
-        )}
-
-        {importViewMode === 'flat' && (
-          <FlatFileImport
-            readonlyView={readonlyView}
-            onBack={() => {
-              setImportViewMode('main');
-              setStatus(null);
-              setError(null);
-            }}
-            onDownloadSample={downloadSampleCsv}
-            onImport={async (tripFile, routeFile) => {
-              if (readonlyView) return;
-              setStatus('Importing routes and trips...');
-              setError(null);
-              setFlatImportLog(null);
-              try {
-                const skippedMessages: string[] = [];
-                let routeSkipped: Array<{ row: number; reason: string }> = [];
-                let tripSkipped: Array<{ row: number; reason: string }> = [];
-                if (routeFile) {
-                  const routeResult = await session.uploadRoutes(routeFile);
-                  if (routeResult?.skipped_rows?.length) {
-                    skippedMessages.push(`${routeResult.skipped_rows.length} route row(s) skipped.`);
-                    routeSkipped = routeResult.skipped_rows;
-                  }
+        <FlatFileImport
+          readonlyView={readonlyView}
+          onDownloadSample={downloadSampleCsv}
+          onImport={async (tripFile, routeFile) => {
+            if (readonlyView) return;
+            setStatus('Importing routes and trips...');
+            setError(null);
+            setFlatImportLog(null);
+            try {
+              const skippedMessages: string[] = [];
+              let routeSkipped: Array<{ row: number; reason: string }> = [];
+              let tripSkipped: Array<{ row: number; reason: string }> = [];
+              if (routeFile) {
+                const routeResult = await session.uploadRoutes(routeFile);
+                if (routeResult?.skipped_rows?.length) {
+                  skippedMessages.push(`${routeResult.skipped_rows.length} route row(s) skipped.`);
+                  routeSkipped = routeResult.skipped_rows;
                 }
-                if (tripFile) {
-                  const tripResult = await session.uploadTrips(tripFile);
-                  if (tripResult?.skipped_rows?.length) {
-                    skippedMessages.push(`${tripResult.skipped_rows.length} trip row(s) skipped.`);
-                    tripSkipped = tripResult.skipped_rows;
-                  }
-                }
-                if (routeSkipped.length > 0 || tripSkipped.length > 0) {
-                  setFlatImportLog({ routes: routeSkipped, trips: tripSkipped });
-                }
-                const statusParts = ['Import complete.'];
-                if (skippedMessages.length > 0) {
-                  statusParts.push(skippedMessages.join(' '));
-                }
-                setStatus(statusParts.join(' '));
-              } catch (uploadError) {
-                setStatus(null);
-                setError(uploadError instanceof Error ? uploadError.message : 'Import failed.');
               }
-            }}
-          />
-        )}
+              if (tripFile) {
+                const tripResult = await session.uploadTrips(tripFile);
+                if (tripResult?.skipped_rows?.length) {
+                  skippedMessages.push(`${tripResult.skipped_rows.length} trip row(s) skipped.`);
+                  tripSkipped = tripResult.skipped_rows;
+                }
+              }
+              if (routeSkipped.length > 0 || tripSkipped.length > 0) {
+                setFlatImportLog({ routes: routeSkipped, trips: tripSkipped });
+              }
+              const statusParts = ['Import complete.'];
+              if (skippedMessages.length > 0) {
+                statusParts.push(skippedMessages.join(' '));
+              }
+              setStatus(statusParts.join(' '));
+            } catch (uploadError) {
+              setStatus(null);
+              setError(uploadError instanceof Error ? uploadError.message : 'Import failed.');
+            }
+          }}
+        />
         {!readonlyView && (
           <Button variant="outline" className="mt-3" onClick={onLoadDemo} type="button">
             Load Demo Dataset
@@ -755,18 +685,57 @@ export default function ImportTab({
 
 function FlatFileImport({
   readonlyView,
-  onBack,
   onDownloadSample,
   onImport,
 }: {
   readonlyView: boolean;
-  onBack: () => void;
   onDownloadSample: (kind: 'trips' | 'routes') => void;
   onImport: (tripFile: File | null, routeFile: File | null) => Promise<void>;
 }) {
   const [tripFile, setTripFile] = useState<File | null>(null);
   const [routeFile, setRouteFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const routeInputRef = useRef<HTMLInputElement>(null);
+  const tripInputRef = useRef<HTMLInputElement>(null);
+  const [routeDragOver, setRouteDragOver] = useState(false);
+  const [tripDragOver, setTripDragOver] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [tripError, setTripError] = useState<string | null>(null);
+
+  function validateFile(file: File): { valid: true } | { valid: false; reason: string } {
+    if (file.size === 0) return { valid: false, reason: 'File is empty (0 bytes).' };
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!ext || !['csv', 'xlsx', 'xls'].includes(ext)) {
+      return { valid: false, reason: `Unsupported file type ".${ext ?? ''}". Use .csv, .xlsx, or .xls.` };
+    }
+    return { valid: true };
+  }
+
+  function handleRouteFile(file: File | null) {
+    if (!file) { setRouteFile(null); return; }
+    const result = validateFile(file);
+    if (!result.valid) {
+      setRouteError(result.reason);
+      setRouteFile(null);
+      if (routeInputRef.current) routeInputRef.current.value = '';
+      return;
+    }
+    setRouteError(null);
+    setRouteFile(file);
+  }
+
+  function handleTripFile(file: File | null) {
+    if (!file) { setTripFile(null); return; }
+    const result = validateFile(file);
+    if (!result.valid) {
+      setTripError(result.reason);
+      setTripFile(null);
+      if (tripInputRef.current) tripInputRef.current.value = '';
+      return;
+    }
+    setTripError(null);
+    setTripFile(file);
+  }
 
   async function handleImport() {
     if (readonlyView || (!tripFile && !routeFile)) return;
@@ -779,83 +748,106 @@ function FlatFileImport({
   }
 
   return (
-    <div className="mt-2">
-      <Button
-        variant="outline"
-        size="sm"
-        className="mb-3"
-        type="button"
-        onClick={onBack}
-      >
-        Back to Import Options
-      </Button>
+    <div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <div className="flex gap-2 mb-2">
+        <div className="border border-cc-border rounded-[10px] overflow-hidden">
+          <div className="bg-cc-surface-2 px-4 py-2.5 flex items-center justify-between">
+            <div className="font-semibold text-sm">Route File (CSV/XLSX)</div>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               type="button"
+              className="text-xs text-cc-text-muted h-auto py-1"
               onClick={() => onDownloadSample('routes')}
             >
-              Download Route Sample CSV
+              Download Sample CSV
             </Button>
           </div>
           <div
-            className="border border-dashed border-cc-border-hover rounded-[10px] p-4"
-            style={{ background: readonlyView ? 'var(--color-cc-surface-2)' : undefined }}
+            className={`p-4 transition-colors ${routeDragOver ? 'border-2 border-dashed border-cc-accent bg-cc-accent/5' : ''}`}
+            style={{ background: readonlyView && !routeDragOver ? 'var(--color-cc-surface-2)' : undefined }}
+            onDragOver={(e) => { e.preventDefault(); setRouteDragOver(true); }}
+            onDragEnter={(e) => { e.preventDefault(); setRouteDragOver(true); }}
+            onDragLeave={() => setRouteDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setRouteDragOver(false);
+              if (readonlyView) return;
+              handleRouteFile(e.dataTransfer.files[0] ?? null);
+            }}
           >
-            <div className="font-semibold mb-1.5">Route File (CSV/XLSX)</div>
-            <div className="text-cc-text-muted text-[13px] mb-2">
-              Select the route file to import.
-            </div>
-            <Input
+            <input
+              ref={routeInputRef}
               type="file"
               accept=".csv,.xlsx,.xls"
+              className="hidden"
               disabled={readonlyView}
-              onChange={(event) => {
-                setRouteFile(event.target.files?.[0] ?? null);
-              }}
+              onChange={(event) => handleRouteFile(event.target.files?.[0] ?? null)}
             />
-            {routeFile && (
-              <div className="text-[13px] text-cc-success mt-1.5">
-                Selected: {routeFile.name}
+            <div className="flex border border-cc-border rounded-md overflow-hidden">
+              <button
+                type="button"
+                disabled={readonlyView}
+                className="shrink-0 bg-cc-accent text-white text-sm px-4 py-2 font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                onClick={() => routeInputRef.current?.click()}
+              >
+                Browse
+              </button>
+              <div className="flex-1 flex items-center px-3 text-sm text-cc-text-muted truncate bg-cc-surface-1">
+                {routeFile ? <span className="text-cc-success truncate">{routeFile.name}</span> : 'No file selected — or drag & drop here'}
               </div>
-            )}
+            </div>
+            {routeError && <div className="text-cc-danger text-[13px] mt-1.5">{routeError}</div>}
           </div>
         </div>
-        <div>
-          <div className="flex gap-2 mb-2">
+        <div className="border border-cc-border rounded-[10px] overflow-hidden">
+          <div className="bg-cc-surface-2 px-4 py-2.5 flex items-center justify-between">
+            <div className="font-semibold text-sm">Trip File (CSV/XLSX)</div>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               type="button"
+              className="text-xs text-cc-text-muted h-auto py-1"
               onClick={() => onDownloadSample('trips')}
             >
-              Download Trip Sample CSV
+              Download Sample CSV
             </Button>
           </div>
           <div
-            className="border border-dashed border-cc-border-hover rounded-[10px] p-4"
-            style={{ background: readonlyView ? 'var(--color-cc-surface-2)' : undefined }}
+            className={`p-4 transition-colors ${tripDragOver ? 'border-2 border-dashed border-cc-accent bg-cc-accent/5' : ''}`}
+            style={{ background: readonlyView && !tripDragOver ? 'var(--color-cc-surface-2)' : undefined }}
+            onDragOver={(e) => { e.preventDefault(); setTripDragOver(true); }}
+            onDragEnter={(e) => { e.preventDefault(); setTripDragOver(true); }}
+            onDragLeave={() => setTripDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setTripDragOver(false);
+              if (readonlyView) return;
+              handleTripFile(e.dataTransfer.files[0] ?? null);
+            }}
           >
-            <div className="font-semibold mb-1.5">Trip File (CSV/XLSX)</div>
-            <div className="text-cc-text-muted text-[13px] mb-2">
-              Select the trip file to import.
-            </div>
-            <Input
+            <input
+              ref={tripInputRef}
               type="file"
               accept=".csv,.xlsx,.xls"
+              className="hidden"
               disabled={readonlyView}
-              onChange={(event) => {
-                setTripFile(event.target.files?.[0] ?? null);
-              }}
+              onChange={(event) => handleTripFile(event.target.files?.[0] ?? null)}
             />
-            {tripFile && (
-              <div className="text-[13px] text-cc-success mt-1.5">
-                Selected: {tripFile.name}
+            <div className="flex border border-cc-border rounded-md overflow-hidden">
+              <button
+                type="button"
+                disabled={readonlyView}
+                className="shrink-0 bg-cc-accent text-white text-sm px-4 py-2 font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                onClick={() => tripInputRef.current?.click()}
+              >
+                Browse
+              </button>
+              <div className="flex-1 flex items-center px-3 text-sm text-cc-text-muted truncate bg-cc-surface-1">
+                {tripFile ? <span className="text-cc-success truncate">{tripFile.name}</span> : 'No file selected — or drag & drop here'}
               </div>
-            )}
+            </div>
+            {tripError && <div className="text-cc-danger text-[13px] mt-1.5">{tripError}</div>}
           </div>
         </div>
       </div>
