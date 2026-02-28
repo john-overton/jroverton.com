@@ -1,13 +1,13 @@
 import type { NextRequest } from 'next/server';
 
-import { buildDemoTripsAndRoutes } from '@/lib/clearcut/demo-data';
-import { handleRouteError, successResponse } from '@/lib/clearcut/errors';
+import { buildDemoTripsAndRoutes } from '@/lib/parallax/demo-data';
+import { handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
-} from '@/lib/clearcut/http';
-import { getSessionState, saveAndRefreshSessionState } from '@/lib/clearcut/service';
+} from '@/lib/parallax/http';
+import { getSessionState, saveAndRefreshSessionState } from '@/lib/parallax/service';
 
 export const runtime = 'nodejs';
 

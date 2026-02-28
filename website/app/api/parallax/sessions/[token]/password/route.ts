@@ -1,13 +1,13 @@
 import type { NextRequest } from 'next/server';
 
-import { hashPassword, verifyPassword } from '@/lib/clearcut/auth';
-import { ApiError, handleRouteError, successResponse } from '@/lib/clearcut/errors';
+import { hashPassword, verifyPassword } from '@/lib/parallax/auth';
+import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
-} from '@/lib/clearcut/http';
-import { setSessionPasswordHash } from '@/lib/clearcut/registry-db';
+} from '@/lib/parallax/http';
+import { setSessionPasswordHash } from '@/lib/parallax/registry-db';
 
 export const runtime = 'nodejs';
 

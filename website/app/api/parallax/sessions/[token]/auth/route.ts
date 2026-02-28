@@ -5,10 +5,10 @@ import {
   AUTH_ATTEMPT_WINDOW_MS,
   AUTH_LOCKOUT_MS,
   AUTH_MAX_ATTEMPTS,
-} from '@/lib/clearcut/config';
-import { signSessionJwt, verifyPassword } from '@/lib/clearcut/auth';
-import { ApiError, handleRouteError, successResponse } from '@/lib/clearcut/errors';
-import { assertValidTokenParam, getClientIp, requireSessionByEditToken } from '@/lib/clearcut/http';
+} from '@/lib/parallax/config';
+import { signSessionJwt, verifyPassword } from '@/lib/parallax/auth';
+import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
+import { assertValidTokenParam, getClientIp, requireSessionByEditToken } from '@/lib/parallax/http';
 
 export const runtime = 'nodejs';
 

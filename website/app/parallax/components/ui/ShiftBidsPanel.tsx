@@ -3,18 +3,18 @@
 import { ChevronDown, ChevronRight, CircleHelp, Download, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { Badge } from '@/app/clearcut/components/shadcn/badge';
-import { Button } from '@/app/clearcut/components/shadcn/button';
-import { Checkbox } from '@/app/clearcut/components/shadcn/checkbox';
-import { Input } from '@/app/clearcut/components/shadcn/input';
-import { Label } from '@/app/clearcut/components/shadcn/label';
+import { Badge } from '@/app/parallax/components/shadcn/badge';
+import { Button } from '@/app/parallax/components/shadcn/button';
+import { Checkbox } from '@/app/parallax/components/shadcn/checkbox';
+import { Input } from '@/app/parallax/components/shadcn/input';
+import { Label } from '@/app/parallax/components/shadcn/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/app/clearcut/components/shadcn/select';
+} from '@/app/parallax/components/shadcn/select';
 import {
   Table,
   TableBody,
@@ -22,10 +22,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/clearcut/components/shadcn/table';
-import { DEFAULT_BID_CONFIG, generateBidPackages } from '@/lib/clearcut/bid-algorithm';
-import { exportBidsToExcel } from '@/lib/clearcut/bid-export';
-import type { BidConfig, BidResult, DepotRow, RunRow, ServiceDay } from '@/lib/clearcut/types';
+} from '@/app/parallax/components/shadcn/table';
+import { DEFAULT_BID_CONFIG, generateBidPackages } from '@/lib/parallax/bid-algorithm';
+import { exportBidsToExcel } from '@/lib/parallax/bid-export';
+import type { BidConfig, BidResult, DepotRow, RunRow, ServiceDay } from '@/lib/parallax/types';
 
 const ALL_SERVICE_DAYS: ServiceDay[] = ['M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'];
 

@@ -4,20 +4,20 @@ import {
   parseBearerToken,
   signSessionJwt,
   verifyJwtFromRequest,
-} from '@/lib/clearcut/auth';
-import { ApiError, handleRouteError, successResponse } from '@/lib/clearcut/errors';
+} from '@/lib/parallax/auth';
+import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
   requireSessionByToken,
-} from '@/lib/clearcut/http';
+} from '@/lib/parallax/http';
 import {
   deleteClearcutSession,
   getSessionState,
   saveAndRefreshSessionState,
-} from '@/lib/clearcut/service';
-import type { SessionStateUpdateInput } from '@/lib/clearcut/types';
+} from '@/lib/parallax/service';
+import type { SessionStateUpdateInput } from '@/lib/parallax/types';
 
 export const runtime = 'nodejs';
 

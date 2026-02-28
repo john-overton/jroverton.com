@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEMO_CITIES } from '../lib/clearcut/demo-cities';
+import { DEMO_CITIES } from '../lib/parallax/demo-cities';
 import {
   getCityByName,
   getExistingAddressesForCity,
@@ -24,7 +24,7 @@ import {
   insertCity,
   insertLocation,
   withDemoLocationsDb,
-} from '../lib/clearcut/demo-locations-db';
+} from '../lib/parallax/demo-locations-db';
 
 // ── Configuration ───────────────────────────────────────────────────
 

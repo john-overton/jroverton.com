@@ -146,14 +146,14 @@ export async function createSession(input?: {
   name?: string;
   password?: string;
 }): Promise<CreateSessionResponse> {
-  return request<CreateSessionResponse>('/api/clearcut/sessions', {
+  return request<CreateSessionResponse>('/api/parallax/sessions', {
     method: 'POST',
     body: input ?? {},
   });
 }
 
 export async function getSession(token: string, jwt?: string | null): Promise<GetSessionResponse> {
-  return request<GetSessionResponse>(`/api/clearcut/sessions/${token}`, { jwt });
+  return request<GetSessionResponse>(`/api/parallax/sessions/${token}`, { jwt });
 }
 
 export async function updateSession(
@@ -161,7 +161,7 @@ export async function updateSession(
   jwt: string,
   input: SessionStateUpdateInput,
 ): Promise<SessionState> {
-  return request<SessionState>(`/api/clearcut/sessions/${token}`, {
+  return request<SessionState>(`/api/parallax/sessions/${token}`, {
     method: 'PUT',
     body: input,
     jwt,
@@ -169,21 +169,21 @@ export async function updateSession(
 }
 
 export async function deleteSession(token: string, jwt: string): Promise<{ deleted: true }> {
-  return request<{ deleted: true }>(`/api/clearcut/sessions/${token}`, {
+  return request<{ deleted: true }>(`/api/parallax/sessions/${token}`, {
     method: 'DELETE',
     jwt,
   });
 }
 
 export async function authSession(token: string, password?: string): Promise<AuthSessionResponse> {
-  return request<AuthSessionResponse>(`/api/clearcut/sessions/${token}/auth`, {
+  return request<AuthSessionResponse>(`/api/parallax/sessions/${token}/auth`, {
     method: 'POST',
     body: { password },
   });
 }
 
 export async function renameSession(token: string, jwt: string, name: string): Promise<{ name: string }> {
-  return request<{ name: string }>(`/api/clearcut/sessions/${token}/name`, {
+  return request<{ name: string }>(`/api/parallax/sessions/${token}/name`, {
     method: 'PATCH',
     body: { name },
     jwt,
@@ -191,7 +191,7 @@ export async function renameSession(token: string, jwt: string, name: string): P
 }
 
 export async function cloneSession(token: string, jwt: string): Promise<CloneSessionResponse> {
-  return request<CloneSessionResponse>(`/api/clearcut/sessions/${token}/clone`, {
+  return request<CloneSessionResponse>(`/api/parallax/sessions/${token}/clone`, {
     method: 'POST',
     jwt,
   });
@@ -203,7 +203,7 @@ export async function setSessionPassword(
   newPassword: string,
   currentPassword?: string,
 ): Promise<{ passwordProtected: true }> {
-  return request<{ passwordProtected: true }>(`/api/clearcut/sessions/${token}/password`, {
+  return request<{ passwordProtected: true }>(`/api/parallax/sessions/${token}/password`, {
     method: 'PUT',
     body: { newPassword, currentPassword },
     jwt,
@@ -215,7 +215,7 @@ export async function removeSessionPassword(
   jwt: string,
   currentPassword?: string,
 ): Promise<{ passwordProtected: false }> {
-  return request<{ passwordProtected: false }>(`/api/clearcut/sessions/${token}/password`, {
+  return request<{ passwordProtected: false }>(`/api/parallax/sessions/${token}/password`, {
     method: 'DELETE',
     body: { currentPassword },
     jwt,
@@ -225,7 +225,7 @@ export async function removeSessionPassword(
 export async function importTrips(token: string, jwt: string, file: File): Promise<ImportResponse> {
   const formData = new FormData();
   formData.set('file', file);
-  return request<ImportResponse>(`/api/clearcut/sessions/${token}/import/trips`, {
+  return request<ImportResponse>(`/api/parallax/sessions/${token}/import/trips`, {
     method: 'POST',
     jwt,
     formData,
@@ -235,7 +235,7 @@ export async function importTrips(token: string, jwt: string, file: File): Promi
 export async function importRoutes(token: string, jwt: string, file: File): Promise<ImportResponse> {
   const formData = new FormData();
   formData.set('file', file);
-  return request<ImportResponse>(`/api/clearcut/sessions/${token}/import/routes`, {
+  return request<ImportResponse>(`/api/parallax/sessions/${token}/import/routes`, {
     method: 'POST',
     jwt,
     formData,
@@ -255,11 +255,11 @@ export async function listTrips(
     params.set('offset', String(pagination.offset));
   }
   const qs = params.size > 0 ? `?${params.toString()}` : '';
-  return request<ListTripsResponse>(`/api/clearcut/sessions/${token}/trips${qs}`, { jwt });
+  return request<ListTripsResponse>(`/api/parallax/sessions/${token}/trips${qs}`, { jwt });
 }
 
 export async function listRoutes(token: string, jwt: string): Promise<ListRoutesResponse> {
-  return request<ListRoutesResponse>(`/api/clearcut/sessions/${token}/routes`, { jwt });
+  return request<ListRoutesResponse>(`/api/parallax/sessions/${token}/routes`, { jwt });
 }
 
 export async function saveSettings(
@@ -289,7 +289,7 @@ export async function previewImportFile(
   if (sheetName) {
     formData.set('sheet_name', sheetName);
   }
-  return request<ImportPreviewResponse>(`/api/clearcut/sessions/${token}/import/preview`, {
+  return request<ImportPreviewResponse>(`/api/parallax/sessions/${token}/import/preview`, {
     method: 'POST',
     jwt,
     formData,
@@ -302,7 +302,7 @@ export async function validateImportMappingConfig(
   preview: ImportPreviewResponse,
   config: ImportMappingConfig,
 ): Promise<ImportValidateResponse> {
-  return request<ImportValidateResponse>(`/api/clearcut/sessions/${token}/import/validate-mapping`, {
+  return request<ImportValidateResponse>(`/api/parallax/sessions/${token}/import/validate-mapping`, {
     method: 'POST',
     jwt,
     body: { preview, config },
@@ -323,7 +323,7 @@ export async function applyImportMappingConfig(
     formData.set('sheet_name', sheetName);
   }
   return request<ImportApplyResponse & { trip_count: number; route_count: number }>(
-    `/api/clearcut/sessions/${token}/import/apply`,
+    `/api/parallax/sessions/${token}/import/apply`,
     {
       method: 'POST',
       jwt,
@@ -337,7 +337,7 @@ export async function listImportTemplates(
   jwt: string,
 ): Promise<ListTemplatesResponse> {
   const params = new URLSearchParams({ token });
-  return request<ListTemplatesResponse>(`/api/clearcut/import-templates?${params.toString()}`, { jwt });
+  return request<ListTemplatesResponse>(`/api/parallax/import-templates?${params.toString()}`, { jwt });
 }
 
 export async function createImportTemplateRecord(
@@ -350,7 +350,7 @@ export async function createImportTemplateRecord(
     config: ImportMappingConfig;
   },
 ): Promise<{ template: ImportTemplateRecord }> {
-  return request<{ template: ImportTemplateRecord }>(`/api/clearcut/import-templates`, {
+  return request<{ template: ImportTemplateRecord }>(`/api/parallax/import-templates`, {
     method: 'POST',
     jwt,
     body: {
@@ -378,7 +378,7 @@ export async function updateImportTemplateRecord(
     config?: ImportMappingConfig;
   },
 ): Promise<{ template: ImportTemplateRecord }> {
-  return request<{ template: ImportTemplateRecord }>(`/api/clearcut/import-templates/${id}`, {
+  return request<{ template: ImportTemplateRecord }>(`/api/parallax/import-templates/${id}`, {
     method: 'PATCH',
     jwt,
     body: {
@@ -398,14 +398,14 @@ export async function updateImportTemplateRecord(
 }
 
 export async function deleteImportTemplateRecord(id: number, jwt: string): Promise<{ deleted: true }> {
-  return request<{ deleted: true }>(`/api/clearcut/import-templates/${id}`, {
+  return request<{ deleted: true }>(`/api/parallax/import-templates/${id}`, {
     method: 'DELETE',
     jwt,
   });
 }
 
 export async function loadDemoData(token: string, jwt: string): Promise<SessionState> {
-  return request<SessionState>(`/api/clearcut/sessions/${token}/demo`, {
+  return request<SessionState>(`/api/parallax/sessions/${token}/demo`, {
     method: 'POST',
     jwt,
   });

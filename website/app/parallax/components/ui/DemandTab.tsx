@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
+import type { ClearcutMetrics } from '@/lib/parallax/metrics';
 
 import { DemandCompositeChart, HeatStrip, MetricCard, SectionCard } from './shared';
 

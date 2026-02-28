@@ -16,13 +16,14 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
-import { Badge } from '@/app/clearcut/components/shadcn/badge';
-import { Button } from '@/app/clearcut/components/shadcn/button';
+import { Badge } from '@/app/parallax/components/shadcn/badge';
+import { Button } from '@/app/parallax/components/shadcn/button';
+import ParallaxMark from './ParallaxMark';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@/app/clearcut/components/shadcn/collapsible';
+} from '@/app/parallax/components/shadcn/collapsible';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,8 +31,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/app/clearcut/components/shadcn/dropdown-menu';
-import { palettes, type PaletteId } from '@/app/clearcut/theme/palettes';
+} from '@/app/parallax/components/shadcn/dropdown-menu';
+import { palettes, type PaletteId } from '@/app/parallax/theme/palettes';
 
 type TabKey = 'import' | 'demand' | 'performance' | 'map' | 'runstructure' | 'deadhead';
 
@@ -114,8 +115,17 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Top: Session info */}
-      <div className="p-4 border-b border-cc-border">
+      {/* Top: App logo */}
+      <div className="px-4 pt-4 pb-2 border-b border-cc-border">
+        <div className="flex items-center gap-3 mb-3">
+          <ParallaxMark size="tiny" variant="color" />
+          <span
+            className="font-semibold text-sm tracking-[3px] uppercase"
+            style={{ fontFamily: "'Outfit', var(--font-outfit), sans-serif" }}
+          >
+            Parallax
+          </span>
+        </div>
         <h1 className="text-lg font-semibold truncate" title={sessionName}>
           {sessionName}
         </h1>

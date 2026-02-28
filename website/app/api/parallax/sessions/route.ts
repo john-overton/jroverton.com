@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 
-import { signSessionJwt } from '@/lib/clearcut/auth';
-import { ApiError, handleRouteError, successResponse } from '@/lib/clearcut/errors';
-import { createClearcutSession } from '@/lib/clearcut/service';
+import { signSessionJwt } from '@/lib/parallax/auth';
+import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
+import { createClearcutSession } from '@/lib/parallax/service';
 
 export const runtime = 'nodejs';
 

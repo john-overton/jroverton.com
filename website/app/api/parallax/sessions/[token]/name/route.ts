@@ -1,12 +1,12 @@
 import type { NextRequest } from 'next/server';
 
-import { ApiError, handleRouteError, successResponse } from '@/lib/clearcut/errors';
+import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
-} from '@/lib/clearcut/http';
-import { renameSession } from '@/lib/clearcut/registry-db';
+} from '@/lib/parallax/http';
+import { renameSession } from '@/lib/parallax/registry-db';
 
 export const runtime = 'nodejs';
 

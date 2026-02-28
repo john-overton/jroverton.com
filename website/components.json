@@ -5,7 +5,7 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "app/clearcut/clearcut.css",
+    "css": "app/parallax/parallax.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
@@ -15,7 +15,7 @@
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
-    "ui": "@/app/clearcut/components/shadcn",
+    "ui": "@/app/parallax/components/shadcn",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

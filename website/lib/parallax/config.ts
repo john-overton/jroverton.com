@@ -8,17 +8,18 @@ export const AUTH_ATTEMPT_WINDOW_MS = 30_000;
 export const AUTH_MAX_ATTEMPTS = 5;
 export const AUTH_LOCKOUT_MS = 5 * 60_000;
 
-const defaultDataRoot = path.join(process.cwd(), 'data', 'clearcut');
+const defaultDataRoot = path.join(process.cwd(), 'data', 'parallax');
 
 export const clearcutConfig = {
-  dataRoot: process.env.CLEARCUT_DATA_DIR
-    ? path.resolve(process.env.CLEARCUT_DATA_DIR)
+  dataRoot: (process.env.PARALLAX_DATA_DIR ?? process.env.CLEARCUT_DATA_DIR)
+    ? path.resolve((process.env.PARALLAX_DATA_DIR ?? process.env.CLEARCUT_DATA_DIR)!)
     : defaultDataRoot,
   jwtSecret:
+    process.env.PARALLAX_JWT_SECRET ??
     process.env.CLEARCUT_JWT_SECRET ??
     (process.env.NODE_ENV === 'production'
       ? ''
-      : 'clearcut-dev-secret-change-me'),
+      : 'parallax-dev-secret-change-me'),
 };
 
 export function getRegistryDbPath(): string {

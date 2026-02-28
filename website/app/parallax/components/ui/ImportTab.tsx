@@ -3,24 +3,24 @@
 import { ChevronDown, ChevronRight, CircleHelp, Pencil, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// import ImportMapperWizard from '@/app/clearcut/components/ui/ImportMapperWizard';
-import { Button } from '@/app/clearcut/components/shadcn/button';
-import { Checkbox } from '@/app/clearcut/components/shadcn/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/clearcut/components/shadcn/collapsible';
+// import ImportMapperWizard from '@/app/parallax/components/ui/ImportMapperWizard';
+import { Button } from '@/app/parallax/components/shadcn/button';
+import { Checkbox } from '@/app/parallax/components/shadcn/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/parallax/components/shadcn/collapsible';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from '@/app/clearcut/components/shadcn/dropdown-menu';
+} from '@/app/parallax/components/shadcn/dropdown-menu';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/app/clearcut/components/shadcn/dialog';
-import { Input } from '@/app/clearcut/components/shadcn/input';
-import { Label } from '@/app/clearcut/components/shadcn/label';
+} from '@/app/parallax/components/shadcn/dialog';
+import { Input } from '@/app/parallax/components/shadcn/input';
+import { Label } from '@/app/parallax/components/shadcn/label';
 import {
   Table,
   TableBody,
@@ -28,10 +28,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/clearcut/components/shadcn/table';
-import type { ImportResponse } from '@/lib/clearcut/client';
-import { extractNewDepotsFromRoutes } from '@/lib/clearcut/depot-utils';
-import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
+} from '@/app/parallax/components/shadcn/table';
+import type { ImportResponse } from '@/lib/parallax/client';
+import { extractNewDepotsFromRoutes } from '@/lib/parallax/depot-utils';
+import type { ClearcutMetrics } from '@/lib/parallax/metrics';
 import type {
   DepotRow,
   ImportApplyResponse,
@@ -42,7 +42,7 @@ import type {
   RouteRow,
   SessionState,
   TripRow,
-} from '@/lib/clearcut/types';
+} from '@/lib/parallax/types';
 
 import { SectionCard } from './shared';
 
@@ -412,7 +412,7 @@ export default function ImportTab({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = kind === 'trips' ? 'clearcut-flat-trip-sample.csv' : 'clearcut-flat-route-sample.csv';
+    anchor.download = kind === 'trips' ? 'parallax-flat-trip-sample.csv' : 'parallax-flat-route-sample.csv';
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);

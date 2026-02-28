@@ -1,13 +1,13 @@
 import type { NextRequest } from 'next/server';
 
-import { signSessionJwt } from '@/lib/clearcut/auth';
-import { handleRouteError, successResponse } from '@/lib/clearcut/errors';
+import { signSessionJwt } from '@/lib/parallax/auth';
+import { handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
-} from '@/lib/clearcut/http';
-import { cloneClearcutSession } from '@/lib/clearcut/service';
+} from '@/lib/parallax/http';
+import { cloneClearcutSession } from '@/lib/parallax/service';
 
 export const runtime = 'nodejs';
 

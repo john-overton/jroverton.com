@@ -15,9 +15,9 @@ import {
   YAxis,
 } from 'recharts';
 
-import { Button } from '@/app/clearcut/components/shadcn/button';
-import { Input } from '@/app/clearcut/components/shadcn/input';
-import { Label } from '@/app/clearcut/components/shadcn/label';
+import { Button } from '@/app/parallax/components/shadcn/button';
+import { Input } from '@/app/parallax/components/shadcn/input';
+import { Label } from '@/app/parallax/components/shadcn/label';
 import {
   Table,
   TableBody,
@@ -25,10 +25,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/clearcut/components/shadcn/table';
-import type { RouteRow, TripRow } from '@/lib/clearcut/types';
-import type { YardTripRow } from '@/lib/clearcut/metrics';
-import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
+} from '@/app/parallax/components/shadcn/table';
+import type { RouteRow, TripRow } from '@/lib/parallax/types';
+import type { YardTripRow } from '@/lib/parallax/metrics';
+import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
 export const DEMAND_BLOCK_MINUTES = 15;
 

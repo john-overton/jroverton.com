@@ -1,6 +1,6 @@
 'use client';
 
-import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
+import type { ClearcutMetrics } from '@/lib/parallax/metrics';
 
 import { HeatStrip, MetricCard, SectionCard, YardTripTable } from './shared';
 

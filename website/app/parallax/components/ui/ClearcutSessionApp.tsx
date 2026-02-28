@@ -4,20 +4,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Button } from '@/app/clearcut/components/shadcn/button';
+import { Button } from '@/app/parallax/components/shadcn/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/app/clearcut/components/shadcn/select';
-import { ClearcutClientError } from '@/lib/clearcut/client';
-import { extractNewDepotsFromRoutes } from '@/lib/clearcut/depot-utils';
-import { computeClearcutMetrics } from '@/lib/clearcut/metrics';
-import type { DepotRow, RunRow } from '@/lib/clearcut/types';
-import { useClearcutSession, type ClearcutMode } from '@/lib/clearcut/use-clearcut-session';
-import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
+} from '@/app/parallax/components/shadcn/select';
+import { ClearcutClientError } from '@/lib/parallax/client';
+import { extractNewDepotsFromRoutes } from '@/lib/parallax/depot-utils';
+import { computeClearcutMetrics } from '@/lib/parallax/metrics';
+import type { DepotRow, RunRow } from '@/lib/parallax/types';
+import { useClearcutSession, type ClearcutMode } from '@/lib/parallax/use-clearcut-session';
+import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
 import ClearcutShell from './ClearcutShell';
 import DeadheadTab from './DeadheadTab';
@@ -464,7 +464,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     }
     try {
       const clone = await session.clone();
-      router.push(`/clearcut/s/${clone.session.edit_token}`);
+      router.push(`/parallax/s/${clone.session.edit_token}`);
     } catch (cloneError) {
       setError(cloneError instanceof Error ? cloneError.message : 'Clone failed.');
     }
@@ -480,7 +480,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     }
     try {
       await session.remove();
-      router.push('/clearcut');
+      router.push('/parallax');
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Delete failed.');
     }
@@ -617,7 +617,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
         <p className="text-cc-text-secondary">
           The session token is invalid or no longer exists.
         </p>
-        <Link href="/clearcut">Create a new session</Link>
+        <Link href="/parallax">Create a new session</Link>
       </main>
     );
   }
@@ -676,8 +676,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onRemovePassword={onRemovePassword}
           onLogout={onLogout}
           hasPassword={ready.state.session.has_password}
-          onCopyReadonlyLink={() => copyToClipboard(`${origin}/clearcut/r/${ready.state.session.readonly_token}`, 'readonly')}
-          onCopyEditLink={() => copyToClipboard(`${origin}/clearcut/s/${token}`, 'edit')}
+          onCopyReadonlyLink={() => copyToClipboard(`${origin}/parallax/r/${ready.state.session.readonly_token}`, 'readonly')}
+          onCopyEditLink={() => copyToClipboard(`${origin}/parallax/s/${token}`, 'edit')}
           copiedLink={copiedLink}
           detectedOS={detectedOS}
         />

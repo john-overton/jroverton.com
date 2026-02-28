@@ -8,8 +8,8 @@
 
 import { useMemo, useRef, useState } from 'react';
 
-import { Label } from '@/app/clearcut/components/shadcn/label';
-import { Slider } from '@/app/clearcut/components/shadcn/slider';
+import { Label } from '@/app/parallax/components/shadcn/label';
+import { Slider } from '@/app/parallax/components/shadcn/slider';
 import {
   Table,
   TableBody,
@@ -17,10 +17,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/clearcut/components/shadcn/table';
-import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
-import { buildOptimizedRoutes, computeAvgShiftHours } from '@/lib/clearcut/run-structure';
-import type { OptimizationRow, RouteRow } from '@/lib/clearcut/types';
+} from '@/app/parallax/components/shadcn/table';
+import type { ClearcutMetrics } from '@/lib/parallax/metrics';
+import { buildOptimizedRoutes, computeAvgShiftHours } from '@/lib/parallax/run-structure';
+import type { OptimizationRow, RouteRow } from '@/lib/parallax/types';
 
 import { SectionCard } from './shared';
 

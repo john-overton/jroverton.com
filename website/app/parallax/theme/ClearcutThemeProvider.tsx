@@ -40,7 +40,7 @@ export function ClearcutThemeProvider({
   const palette = getPalette(paletteId);
 
   // Apply CSS custom properties to both the wrapper and document root.
-  // The wrapper is the `.clearcut` scoping element. Document root is needed
+  // The wrapper is the `.parallax` scoping element. Document root is needed
   // because Radix portals (dropdowns, dialogs) render at body level and
   // need to inherit the same variables.
   useEffect(() => {
@@ -65,8 +65,8 @@ export function ClearcutThemeProvider({
     document.body.style.color = palette.tokens['--color-cc-text'];
 
     return () => {
-      // Clean up root-level vars when ClearCut unmounts so they don't leak
-      // to non-ClearCut pages during client-side navigation.
+      // Clean up root-level vars when Parallax unmounts so they don't leak
+      // to non-Parallax pages during client-side navigation.
       for (const [prop] of tokenEntries) {
         root.style.removeProperty(prop);
       }
@@ -88,7 +88,7 @@ export function ClearcutThemeProvider({
 
   return (
     <ClearcutThemeContext.Provider value={{ palette, paletteId, setPaletteId, chartColors: palette.chartColors }}>
-      <div ref={wrapperRef} className={`clearcut ${className ?? ''}`}>
+      <div ref={wrapperRef} className={`parallax ${className ?? ''}`}>
         {children}
       </div>
     </ClearcutThemeContext.Provider>

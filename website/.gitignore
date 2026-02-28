@@ -11,11 +11,11 @@
 !.yarn/versions
 
 # data
-data/clearcut/*
+data/parallax/*
 *.db
 *.db-shm
 *.db-wal
-!data/clearcut/demo-locations.db
+!data/parallax/demo-locations.db
 
 # testing
 /coverage

@@ -2,24 +2,24 @@
 
 import { useMemo, useState } from 'react';
 
-import { Button } from '@/app/clearcut/components/shadcn/button';
-import { Checkbox } from '@/app/clearcut/components/shadcn/checkbox';
+import { Button } from '@/app/parallax/components/shadcn/button';
+import { Checkbox } from '@/app/parallax/components/shadcn/checkbox';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/app/clearcut/components/shadcn/dialog';
-import { Input } from '@/app/clearcut/components/shadcn/input';
-import { Label } from '@/app/clearcut/components/shadcn/label';
-import { Progress } from '@/app/clearcut/components/shadcn/progress';
+} from '@/app/parallax/components/shadcn/dialog';
+import { Input } from '@/app/parallax/components/shadcn/input';
+import { Label } from '@/app/parallax/components/shadcn/label';
+import { Progress } from '@/app/parallax/components/shadcn/progress';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/app/clearcut/components/shadcn/select';
+} from '@/app/parallax/components/shadcn/select';
 import {
   Table,
   TableBody,
@@ -27,7 +27,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/clearcut/components/shadcn/table';
+} from '@/app/parallax/components/shadcn/table';
 import type {
   ImportApplyResponse,
   ImportMappingConfig,
@@ -36,7 +36,7 @@ import type {
   ImportValidateResponse,
   RouteRow,
   TripRow,
-} from '@/lib/clearcut/types';
+} from '@/lib/parallax/types';
 
 import { SectionCard } from './shared';
 

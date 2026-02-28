@@ -3,15 +3,15 @@
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy, Plus, Redo2, SquareSplitHorizontal, Trash2, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Button } from '@/app/clearcut/components/shadcn/button';
-import { Input } from '@/app/clearcut/components/shadcn/input';
+import { Button } from '@/app/parallax/components/shadcn/button';
+import { Input } from '@/app/parallax/components/shadcn/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/app/clearcut/components/shadcn/select';
+} from '@/app/parallax/components/shadcn/select';
 import {
   Table,
   TableBody,
@@ -19,17 +19,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/clearcut/components/shadcn/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/clearcut/components/shadcn/tabs';
-import type { ClearcutMetrics } from '@/lib/clearcut/metrics';
-import { estimateFtePtCounts } from '@/lib/clearcut/bid-algorithm';
-import type { CurrentRunCutRow } from '@/lib/clearcut/run-structure';
-import { buildRunCutForDate, getAvailableDates } from '@/lib/clearcut/run-structure';
-import type { DepotRow, OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/clearcut/types';
+} from '@/app/parallax/components/shadcn/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/parallax/components/shadcn/tabs';
+import type { ClearcutMetrics } from '@/lib/parallax/metrics';
+import { estimateFtePtCounts } from '@/lib/parallax/bid-algorithm';
+import type { CurrentRunCutRow } from '@/lib/parallax/run-structure';
+import { buildRunCutForDate, getAvailableDates } from '@/lib/parallax/run-structure';
+import type { DepotRow, OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/parallax/types';
 
-import { Toast, ToastClose, ToastProvider, ToastTitle, ToastViewport } from '@/app/clearcut/components/shadcn/toast';
-import { useToast } from '@/app/clearcut/hooks/useToast';
-import { useUndoRedo } from '@/app/clearcut/hooks/useUndoRedo';
+import { Toast, ToastClose, ToastProvider, ToastTitle, ToastViewport } from '@/app/parallax/components/shadcn/toast';
+import { useToast } from '@/app/parallax/hooks/useToast';
+import { useUndoRedo } from '@/app/parallax/hooks/useUndoRedo';
 
 import ShiftBidsPanel from './ShiftBidsPanel';
 import { RunStructureChart, SectionCard, parseClockToMinutes, formatMinutesToClock } from './shared';

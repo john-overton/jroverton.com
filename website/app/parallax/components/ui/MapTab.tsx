@@ -4,11 +4,11 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Label } from '@/app/clearcut/components/shadcn/label';
-import { Slider } from '@/app/clearcut/components/shadcn/slider';
-import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
-import type { ClearcutMetrics, TimeBlock } from '@/lib/clearcut/metrics';
-import type { TripRow } from '@/lib/clearcut/types';
+import { Label } from '@/app/parallax/components/shadcn/label';
+import { Slider } from '@/app/parallax/components/shadcn/slider';
+import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
+import type { ClearcutMetrics, TimeBlock } from '@/lib/parallax/metrics';
+import type { TripRow } from '@/lib/parallax/types';
 
 import { HeatStrip, SectionCard, hexToRgb, parseDateTime } from './shared';
 
@@ -308,7 +308,7 @@ export default function MapTab({ metrics, trips, selectedDays, specificDate }: M
         closeButton: false,
         closeOnClick: false,
         maxWidth: '240px',
-        className: 'clearcut-map-popup',
+        className: 'parallax-map-popup',
       });
       popupRef.current = popup;
 

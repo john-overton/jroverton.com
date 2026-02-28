@@ -1,13 +1,13 @@
 import type { NextRequest } from 'next/server';
 
-import { ApiError, handleRouteError, successResponse } from '@/lib/clearcut/errors';
+import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
-} from '@/lib/clearcut/http';
-import { validateImportMapping } from '@/lib/clearcut/import-mapper';
-import type { ImportMappingConfig, ImportPreviewResponse } from '@/lib/clearcut/types';
+} from '@/lib/parallax/http';
+import { validateImportMapping } from '@/lib/parallax/import-mapper';
+import type { ImportMappingConfig, ImportPreviewResponse } from '@/lib/parallax/types';
 
 export const runtime = 'nodejs';
 

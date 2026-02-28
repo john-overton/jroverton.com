@@ -4,14 +4,14 @@ import { ArrowDown, ArrowUp, Download } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 
-import { Button } from '@/app/clearcut/components/shadcn/button';
+import { Button } from '@/app/parallax/components/shadcn/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/app/clearcut/components/shadcn/select';
+} from '@/app/parallax/components/shadcn/select';
 import {
   Table,
   TableBody,
@@ -19,10 +19,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/clearcut/components/shadcn/table';
-import type { ClearcutMetrics, ComputeMetricsOptions, PerRouteMetrics } from '@/lib/clearcut/metrics';
-import { computeClearcutMetrics, computePerRouteMetrics } from '@/lib/clearcut/metrics';
-import type { RouteRow, SessionState, TripRow } from '@/lib/clearcut/types';
+} from '@/app/parallax/components/shadcn/table';
+import type { ClearcutMetrics, ComputeMetricsOptions, PerRouteMetrics } from '@/lib/parallax/metrics';
+import { computeClearcutMetrics, computePerRouteMetrics } from '@/lib/parallax/metrics';
+import type { RouteRow, SessionState, TripRow } from '@/lib/parallax/types';
 
 import { MetricCard, PerformanceCompositeChart, SectionCard } from './shared';
 
