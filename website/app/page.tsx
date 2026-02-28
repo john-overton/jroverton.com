@@ -71,6 +71,25 @@ export default function Home() {
                     </div>
                   </Link>
                 </div>
+                <div className="col-12 col-sm-6">
+                  <Link href="/parallax" className="text-decoration-none">
+                    <div className="glass-card p-3 rounded-3 h-100 group" style={{ '--hover-border': 'var(--accent-green)' } as any}>
+                      <div className="d-flex align-items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" style={{ width: '24px', height: '24px', flexShrink: 0 }}>
+                          <rect x="2" y="4" width="28" height="4" rx="2" fill="#2D6A4F"/>
+                          <rect x="5" y="11" width="21" height="4" rx="2" fill="#E07A2F"/>
+                          <rect x="8" y="18" width="14" height="4" rx="2" fill="#2A9D8F"/>
+                          <rect x="11" y="25" width="7" height="4" rx="2" fill="#40916C"/>
+                        </svg>
+                        <div>
+                          <div className="fw-bold text-ink small">Parallax</div>
+                          <div className="text-muted small" style={{ fontSize: '0.75rem' }}>Transit operations analysis</div>
+                        </div>
+                        <i className="ph ph-arrow-right ms-auto text-accent-green opacity-0 group-hover-opacity-100 transition-opacity"></i>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
               </div>
             </section>
 
