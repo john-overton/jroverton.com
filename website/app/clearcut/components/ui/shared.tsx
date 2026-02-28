@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@/app/clearcut/components/shadcn/table';
 import type { RouteRow, TripRow } from '@/lib/clearcut/types';
+import type { YardTripRow } from '@/lib/clearcut/metrics';
 import { useClearcutTheme } from '@/app/clearcut/theme/ClearcutThemeProvider';
 
 export const DEMAND_BLOCK_MINUTES = 15;
@@ -473,6 +474,63 @@ export function TripTable({ title, trips }: { title: string; trips: Array<{ trip
             <TableRow key={trip.trip_id}>
               <TableCell>{trip.trip_id}</TableCell>
               <TableCell>{trip.route_id}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+export function YardTripTable({
+  title,
+  trips,
+  variant,
+}: {
+  title: string;
+  trips: YardTripRow[];
+  variant: 'start' | 'return';
+}) {
+  const isReturn = variant === 'return';
+  const colSpan = isReturn ? 6 : 4;
+  return (
+    <div className="border border-cc-border rounded-lg p-3 mb-3">
+      <div className="font-semibold mb-2">{title}</div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Trip</TableHead>
+            <TableHead>Route</TableHead>
+            <TableHead>Distance (mi)</TableHead>
+            <TableHead>Travel (min)</TableHead>
+            {isReturn && <TableHead>Late</TableHead>}
+            {isReturn && <TableHead>Variance (min)</TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {trips.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={colSpan} className="text-cc-text-muted">
+                No trips available
+              </TableCell>
+            </TableRow>
+          )}
+          {trips.map((trip) => (
+            <TableRow key={trip.trip_id}>
+              <TableCell>{trip.trip_id}</TableCell>
+              <TableCell>{trip.route_id}</TableCell>
+              <TableCell>{trip.yardDistanceMiles}</TableCell>
+              <TableCell>{trip.travelTimeMinutes}</TableCell>
+              {isReturn && (
+                <TableCell className={trip.isLate ? 'text-red-400 font-medium' : ''}>
+                  {trip.isLate ? 'Yes' : 'No'}
+                </TableCell>
+              )}
+              {isReturn && (
+                <TableCell className={trip.returnVarianceMinutes && trip.returnVarianceMinutes > 0 ? 'text-red-400' : ''}>
+                  {trip.returnVarianceMinutes ?? '—'}
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

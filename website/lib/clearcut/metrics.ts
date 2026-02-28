@@ -7,6 +7,15 @@ export interface TimeBlock {
   endMinutes: number;
 }
 
+export interface YardTripRow {
+  trip_id: string;
+  route_id: string;
+  yardDistanceMiles: number;
+  travelTimeMinutes: number;
+  isLate?: boolean;
+  returnVarianceMinutes?: number;
+}
+
 export interface ClearcutMetrics {
   blocks: TimeBlock[];
   pickupsByBlock: number[];
@@ -63,6 +72,11 @@ export interface ClearcutMetrics {
   avgDeadheadEndMiles: number;
   highDeadheadTripsStart: TripRow[];
   highDeadheadTripsEnd: TripRow[];
+  avgLeaveYardSlackMinutes: number;
+  avgReturnYardSlackMinutes: number;
+  lateReturnPct: number;
+  yardStartTrips: YardTripRow[];
+  yardEndTrips: YardTripRow[];
   derivedServiceWindow: {
     startLabel: string;
     endLabel: string;
@@ -1057,6 +1071,93 @@ export function computeClearcutMetrics(
     milesToMinutes(endDeadheadMiles.length > 0 ? average(endDeadheadMiles) : fallbackMiles) * 10,
   ) / 10;
 
+  // Yard slack and late return metrics
+  const routeById = new Map<string, RouteRow>();
+  for (const route of session.routes) {
+    routeById.set(route.route_id, route);
+  }
+
+  const leaveYardSlacks: number[] = [];
+  const returnYardSlacks: number[] = [];
+  let lateReturnCount = 0;
+  let totalRouteDaysForLate = 0;
+  const allYardStartTrips: YardTripRow[] = [];
+  const allYardEndTrips: YardTripRow[] = [];
+
+  for (const [, dayTrips] of tripsByRouteDay) {
+    if (dayTrips.length === 0) continue;
+    const route = routeById.get(dayTrips[0].route_id);
+    if (!route) continue;
+
+    // Sort by pickup time (already sorted from earlier deadhead computation)
+    const firstTrip = dayTrips[0];
+    const lastTrip = dayTrips[dayTrips.length - 1];
+
+    const rStart = routeStart(route);
+    const rEnd = routeEnd(route);
+    const schedEnd = asDate(route.scheduled_end_time);
+    const firstPickup = tripPickupTime(firstTrip);
+    const lastDropoff = tripDropoffTime(lastTrip);
+
+    // Leave yard slack: (first pickup - route start) - travel time from depot
+    const distToFirst = Number(route.distance_to_first_pick);
+    const distFromLast = Number(route.distance_from_last_drop);
+    const distToFirstValid = Number.isFinite(distToFirst) && distToFirst >= 0;
+    const distFromLastValid = Number.isFinite(distFromLast) && distFromLast >= 0;
+
+    if (rStart && firstPickup && distToFirstValid) {
+      const gapMinutes = (firstPickup.getTime() - rStart.getTime()) / 60_000;
+      const travelMin = milesToMinutes(distToFirst);
+      leaveYardSlacks.push(Math.max(0, gapMinutes - travelMin));
+      allYardStartTrips.push({
+        trip_id: firstTrip.trip_id,
+        route_id: firstTrip.route_id,
+        yardDistanceMiles: Math.round(distToFirst * 10) / 10,
+        travelTimeMinutes: Math.round(travelMin * 10) / 10,
+      });
+    }
+
+    if (rEnd && lastDropoff && distFromLastValid) {
+      const gapMinutes = (rEnd.getTime() - lastDropoff.getTime()) / 60_000;
+      const travelMin = milesToMinutes(distFromLast);
+      returnYardSlacks.push(Math.max(0, gapMinutes - travelMin));
+
+      const isLate = schedEnd ? rEnd.getTime() > schedEnd.getTime() : false;
+      const variance = schedEnd ? (rEnd.getTime() - schedEnd.getTime()) / 60_000 : 0;
+
+      allYardEndTrips.push({
+        trip_id: lastTrip.trip_id,
+        route_id: lastTrip.route_id,
+        yardDistanceMiles: Math.round(distFromLast * 10) / 10,
+        travelTimeMinutes: Math.round(travelMin * 10) / 10,
+        isLate,
+        returnVarianceMinutes: Math.round(variance * 10) / 10,
+      });
+    }
+
+    // Late return tracking
+    if (rEnd && schedEnd) {
+      totalRouteDaysForLate += 1;
+      if (rEnd.getTime() > schedEnd.getTime()) {
+        lateReturnCount += 1;
+      }
+    }
+  }
+
+  const avgLeaveYardSlackMinutes = Math.round(average(leaveYardSlacks) * 10) / 10;
+  const avgReturnYardSlackMinutes = Math.round(average(returnYardSlacks) * 10) / 10;
+  const lateReturnPct = totalRouteDaysForLate > 0
+    ? Math.round((lateReturnCount / totalRouteDaysForLate) * 1000) / 10
+    : 0;
+
+  // Top 6 by distance descending
+  const yardStartTrips = allYardStartTrips
+    .sort((a, b) => b.yardDistanceMiles - a.yardDistanceMiles)
+    .slice(0, 6);
+  const yardEndTrips = allYardEndTrips
+    .sort((a, b) => b.yardDistanceMiles - a.yardDistanceMiles)
+    .slice(0, 6);
+
   const importedServiceHours = sumServiceHours(session.routes);
   const targetProductivity = session.optimization.target_productivity ?? 0;
   const optimizedServiceHours = Math.max(
@@ -1157,6 +1258,11 @@ export function computeClearcutMetrics(
     avgDeadheadEndMiles: Math.round(average(deadheadByBlock.slice(-8)) * 10) / 10,
     highDeadheadTripsStart,
     highDeadheadTripsEnd,
+    avgLeaveYardSlackMinutes,
+    avgReturnYardSlackMinutes,
+    lateReturnPct,
+    yardStartTrips,
+    yardEndTrips,
     derivedServiceWindow,
   };
 }

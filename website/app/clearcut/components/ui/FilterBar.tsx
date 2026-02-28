@@ -14,6 +14,7 @@ const DAY_LABELS: Record<number, string> = {
 };
 
 const DISSOLVE_DELAY_MS = 1000;
+const EXPAND_DELAY_MS = 500;
 
 interface FilterBarProps {
   intervalMinutes: 15 | 30 | 60;
@@ -40,11 +41,16 @@ export default function FilterBar({
 }: FilterBarProps) {
   const [expanded, setExpanded] = useState(false);
   const dissolveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTimer = useCallback(() => {
     if (dissolveTimer.current) {
       clearTimeout(dissolveTimer.current);
       dissolveTimer.current = null;
+    }
+    if (expandTimer.current) {
+      clearTimeout(expandTimer.current);
+      expandTimer.current = null;
     }
   }, []);
 
@@ -62,7 +68,10 @@ export default function FilterBar({
 
   const onMouseEnterContainer = useCallback(() => {
     clearTimer();
-    setExpanded(true);
+    expandTimer.current = setTimeout(() => {
+      setExpanded(true);
+      expandTimer.current = null;
+    }, EXPAND_DELAY_MS);
   }, [clearTimer]);
 
   const onMouseLeaveContainer = useCallback(() => {
@@ -88,11 +97,12 @@ export default function FilterBar({
 
   return (
     <div
+      className="relative"
       onMouseEnter={onMouseEnterContainer}
       onMouseLeave={onMouseLeaveContainer}
     >
       {/* Compact bar */}
-      <div className="flex items-center gap-2 px-4 py-2 text-sm">
+      <div className="flex items-center gap-2 px-4 py-2 text-sm shadow-[0_2px_4px_rgba(0,0,0,0.06)]">
         <Filter size={14} className="text-cc-text-muted shrink-0" />
         <span className="text-cc-text-secondary truncate">
           {intervalMinutes}m
@@ -107,7 +117,7 @@ export default function FilterBar({
 
       {/* Popout filter panel */}
       {expanded && (
-        <div className="border-t border-cc-border bg-cc-surface-1 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute left-0 right-0 top-full z-30 bg-cc-surface-1 border-b border-cc-border px-4 py-3 shadow-lg animate-in fade-in slide-in-from-top-1 duration-300">
           {children}
         </div>
       )}
