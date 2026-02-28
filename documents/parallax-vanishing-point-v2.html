@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parallax — Vanishing Point Logo</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --revenue-run: #2D6A4F;
+    --revenue-light: #40916C;
+    --peak-hour: #E07A2F;
+    --peak-light: #F4A261;
+    --evening-rush: #264653;
+    --evening-light: #2A9D8F;
+    --night-owl: #1B2838;
+    --night-light: #334155;
+
+    --surface: #0C0F14;
+    --surface-elevated: #141820;
+    --surface-card: #1A1F2A;
+    --text-primary: #F0F0F0;
+    --text-secondary: #8A8F9A;
+    --text-muted: #555B66;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--surface);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+  }
+
+  .header {
+    padding: 48px 60px 36px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .header .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .header h1 {
+    font-weight: 300;
+    font-size: 26px;
+    color: var(--text-secondary);
+  }
+
+  section {
+    padding: 60px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 40px;
+  }
+
+  /* ===== Shared Mark Base ===== */
+  .vp-mark {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vp-mark .line {
+    border-radius: 2px;
+    transition: all 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 380px;
+    background: var(--surface-elevated);
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 80%, rgba(45,106,79,0.08) 0%, transparent 60%);
+  }
+
+  .hero-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .mark-hero .line { height: 5px; margin-bottom: 14px; }
+  .mark-hero .line-1 { background: var(--revenue-run); width: 120px; margin-left: 0; }
+  .mark-hero .line-2 { background: var(--peak-hour); width: 88px; margin-left: 10px; }
+  .mark-hero .line-3 { background: var(--evening-light); width: 56px; margin-left: 20px; }
+  .mark-hero .line-4 { background: var(--revenue-light); width: 24px; margin-left: 30px; }
+
+  .hero:hover .mark-hero .line-1 { width: 130px; margin-left: 0; }
+  .hero:hover .mark-hero .line-2 { width: 94px; margin-left: 18px; }
+  .hero:hover .mark-hero .line-3 { width: 62px; margin-left: 34px; }
+  .hero:hover .mark-hero .line-4 { width: 34px; margin-left: 48px; }
+
+  .hero-wordmark {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 48px;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+  }
+
+  /* ===== Variations Grid ===== */
+  .var-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .var-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+    min-height: 280px;
+    position: relative;
+    transition: background 0.3s ease;
+  }
+  .var-cell .cell-label {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .var-dark { background: var(--surface-elevated); }
+  .var-dark:hover { background: var(--surface-card); }
+  .var-light { background: #F2F0ED; }
+  .var-light:hover { background: #E8E5E0; }
+  .var-light .cell-label { color: #AAA; }
+  .var-green { background: var(--revenue-run); }
+  .var-green:hover { background: #256B47; }
+  .var-green .cell-label { color: rgba(255,255,255,0.4); }
+  .var-night { background: var(--night-owl); }
+  .var-night:hover { background: #1F2D40; }
+  .var-night .cell-label { color: rgba(255,255,255,0.25); }
+  .var-peak { background: var(--evening-rush); }
+  .var-peak:hover { background: #1D3844; }
+  .var-peak .cell-label { color: rgba(255,255,255,0.3); }
+  .var-warm { background: #FAF7F2; }
+  .var-warm:hover { background: #F0EBE3; }
+  .var-warm .cell-label { color: #BBB; }
+
+  /* MD marks — full color */
+  .mark-md .line { height: 3.5px; margin-bottom: 10px; }
+  .mark-md .line-1 { background: var(--revenue-run); width: 80px; margin-left: 0; }
+  .mark-md .line-2 { background: var(--peak-hour); width: 60px; margin-left: 6px; }
+  .mark-md .line-3 { background: var(--evening-light); width: 40px; margin-left: 12px; }
+  .mark-md .line-4 { background: var(--revenue-light); width: 20px; margin-left: 18px; }
+
+  .var-cell:hover .mark-md .line-1 { width: 86px; margin-left: 0; }
+  .var-cell:hover .mark-md .line-2 { width: 66px; margin-left: 12px; }
+  .var-cell:hover .mark-md .line-3 { width: 46px; margin-left: 22px; }
+  .var-cell:hover .mark-md .line-4 { width: 28px; margin-left: 32px; }
+
+  /* MD marks — mono white */
+  .mark-mono-w .line { height: 3.5px; margin-bottom: 10px; }
+  .mark-mono-w .line-1 { background: rgba(255,255,255,1); width: 80px; margin-left: 0; }
+  .mark-mono-w .line-2 { background: rgba(255,255,255,0.7); width: 60px; margin-left: 6px; }
+  .mark-mono-w .line-3 { background: rgba(255,255,255,0.45); width: 40px; margin-left: 12px; }
+  .mark-mono-w .line-4 { background: rgba(255,255,255,0.25); width: 20px; margin-left: 18px; }
+
+  .var-cell:hover .mark-mono-w .line-1 { width: 86px; margin-left: 0; }
+  .var-cell:hover .mark-mono-w .line-2 { width: 66px; margin-left: 12px; }
+  .var-cell:hover .mark-mono-w .line-3 { width: 46px; margin-left: 22px; }
+  .var-cell:hover .mark-mono-w .line-4 { width: 28px; margin-left: 32px; }
+
+  /* MD marks — mono dark */
+  .mark-mono-d .line { height: 3.5px; margin-bottom: 10px; }
+  .mark-mono-d .line-1 { background: rgba(27,40,56,1); width: 80px; margin-left: 0; }
+  .mark-mono-d .line-2 { background: rgba(27,40,56,0.65); width: 60px; margin-left: 6px; }
+  .mark-mono-d .line-3 { background: rgba(27,40,56,0.4); width: 40px; margin-left: 12px; }
+  .mark-mono-d .line-4 { background: rgba(27,40,56,0.2); width: 20px; margin-left: 18px; }
+
+  .var-cell:hover .mark-mono-d .line-1 { width: 86px; margin-left: 0; }
+  .var-cell:hover .mark-mono-d .line-2 { width: 66px; margin-left: 12px; }
+  .var-cell:hover .mark-mono-d .line-3 { width: 46px; margin-left: 22px; }
+  .var-cell:hover .mark-mono-d .line-4 { width: 28px; margin-left: 32px; }
+
+  /* Wordmarks in variations */
+  .var-wordmark {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-top: 16px;
+  }
+  .var-dark .var-wordmark { color: var(--text-primary); }
+  .var-light .var-wordmark { color: var(--night-owl); }
+  .var-green .var-wordmark { color: #FFF; }
+  .var-night .var-wordmark { color: #F0F0F0; }
+  .var-peak .var-wordmark { color: #F0F0F0; }
+  .var-warm .var-wordmark { color: var(--night-owl); }
+
+  /* ===== Horizontal Lockups ===== */
+  .lockup-row {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .h-lockup {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 32px 40px;
+    border-radius: 12px;
+    transition: background 0.3s ease;
+  }
+  .h-lockup:hover { background: rgba(255,255,255,0.03); }
+
+  .mark-sm .line { height: 2.5px; margin-bottom: 6px; }
+  .mark-sm .line-1 { background: var(--revenue-run); width: 48px; margin-left: 0; }
+  .mark-sm .line-2 { background: var(--peak-hour); width: 36px; margin-left: 4px; }
+  .mark-sm .line-3 { background: var(--evening-light); width: 24px; margin-left: 8px; }
+  .mark-sm .line-4 { background: var(--revenue-light); width: 12px; margin-left: 12px; }
+
+  .h-lockup:hover .mark-sm .line-1 { width: 52px; margin-left: 0; }
+  .h-lockup:hover .mark-sm .line-2 { width: 40px; margin-left: 8px; }
+  .h-lockup:hover .mark-sm .line-3 { width: 28px; margin-left: 14px; }
+  .h-lockup:hover .mark-sm .line-4 { width: 18px; margin-left: 20px; }
+
+  /* Mono white SM for marketing card */
+  .mark-sm-w .line { height: 2.5px; margin-bottom: 6px; }
+  .mark-sm-w .line-1 { background: rgba(255,255,255,1); width: 48px; margin-left: 0; }
+  .mark-sm-w .line-2 { background: rgba(255,255,255,0.7); width: 36px; margin-left: 4px; }
+  .mark-sm-w .line-3 { background: rgba(255,255,255,0.45); width: 24px; margin-left: 8px; }
+  .mark-sm-w .line-4 { background: rgba(255,255,255,0.25); width: 12px; margin-left: 12px; }
+
+  .mock-card-header:hover .mark-sm-w .line-1 { width: 52px; margin-left: 0; }
+  .mock-card-header:hover .mark-sm-w .line-2 { width: 40px; margin-left: 8px; }
+  .mock-card-header:hover .mark-sm-w .line-3 { width: 28px; margin-left: 14px; }
+  .mock-card-header:hover .mark-sm-w .line-4 { width: 18px; margin-left: 20px; }
+
+  .h-wordmark {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+  }
+  .h-wordmark-light {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 300;
+    font-size: 28px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+  }
+
+  /* ===== App Icons ===== */
+  .icon-row {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .app-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+  }
+  .app-icon:hover { transform: scale(1.05); }
+
+  .icon-dark { background: var(--surface-card); }
+  .icon-green { background: var(--revenue-run); }
+  .icon-night { background: var(--night-owl); }
+  .icon-light { background: #F2F0ED; }
+  .icon-peak { background: var(--evening-rush); }
+
+  .mark-xs .line { height: 2.5px; margin-bottom: 5px; border-radius: 1.5px; }
+
+  .mark-xs-color .line-1 { background: var(--revenue-run); width: 32px; margin-left: 0; }
+  .mark-xs-color .line-2 { background: var(--peak-hour); width: 24px; margin-left: 2px; }
+  .mark-xs-color .line-3 { background: var(--evening-light); width: 16px; margin-left: 4px; }
+  .mark-xs-color .line-4 { background: var(--revenue-light); width: 8px; margin-left: 6px; }
+
+  .app-icon:hover .mark-xs-color .line-1 { width: 34px; margin-left: 0; }
+  .app-icon:hover .mark-xs-color .line-2 { width: 26px; margin-left: 4px; }
+  .app-icon:hover .mark-xs-color .line-3 { width: 18px; margin-left: 8px; }
+  .app-icon:hover .mark-xs-color .line-4 { width: 12px; margin-left: 11px; }
+
+  .mark-xs-white .line-1 { background: rgba(255,255,255,1); width: 32px; margin-left: 0; }
+  .mark-xs-white .line-2 { background: rgba(255,255,255,0.7); width: 24px; margin-left: 2px; }
+  .mark-xs-white .line-3 { background: rgba(255,255,255,0.45); width: 16px; margin-left: 4px; }
+  .mark-xs-white .line-4 { background: rgba(255,255,255,0.25); width: 8px; margin-left: 6px; }
+
+  .app-icon:hover .mark-xs-white .line-1 { width: 34px; margin-left: 0; }
+  .app-icon:hover .mark-xs-white .line-2 { width: 26px; margin-left: 4px; }
+  .app-icon:hover .mark-xs-white .line-3 { width: 18px; margin-left: 8px; }
+  .app-icon:hover .mark-xs-white .line-4 { width: 12px; margin-left: 11px; }
+
+  .mark-xs-dark .line-1 { background: rgba(27,40,56,1); width: 32px; margin-left: 0; }
+  .mark-xs-dark .line-2 { background: rgba(27,40,56,0.65); width: 24px; margin-left: 2px; }
+  .mark-xs-dark .line-3 { background: rgba(27,40,56,0.4); width: 16px; margin-left: 4px; }
+  .mark-xs-dark .line-4 { background: rgba(27,40,56,0.2); width: 8px; margin-left: 6px; }
+
+  .app-icon:hover .mark-xs-dark .line-1 { width: 34px; margin-left: 0; }
+  .app-icon:hover .mark-xs-dark .line-2 { width: 26px; margin-left: 4px; }
+  .app-icon:hover .mark-xs-dark .line-3 { width: 18px; margin-left: 8px; }
+  .app-icon:hover .mark-xs-dark .line-4 { width: 12px; margin-left: 11px; }
+
+  .icon-size-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    text-align: center;
+  }
+
+  /* ===== Favicon strip ===== */
+  .favicon-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 28px;
+    background: #2C2F36;
+    border-radius: 8px;
+  }
+  .fav-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+  .fav-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #3A3D44;
+    padding: 6px 14px 6px 10px;
+    border-radius: 6px 6px 0 0;
+    transition: background 0.3s ease;
+  }
+  .fav-tab:hover { background: #44474F; }
+
+  .mark-fav .line { height: 1.5px; margin-bottom: 2px; border-radius: 1px; }
+  .mark-fav .line-1 { background: var(--revenue-run); width: 12px; margin-left: 0; }
+  .mark-fav .line-2 { background: var(--peak-hour); width: 9px; margin-left: 1px; }
+  .mark-fav .line-3 { background: var(--evening-light); width: 6px; margin-left: 2px; }
+
+  .fav-tab:hover .mark-fav .line-1 { width: 14px; margin-left: 0; }
+  .fav-tab:hover .mark-fav .line-2 { width: 10px; margin-left: 2px; }
+  .fav-tab:hover .mark-fav .line-3 { width: 7px; margin-left: 4px; }
+
+  .fav-tab span {
+    font-size: 11px;
+    color: #CCC;
+    font-family: 'Outfit', sans-serif;
+  }
+  .fav-tab-inactive {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 6px 6px 0 0;
+  }
+  .fav-tab-inactive span {
+    font-size: 11px;
+    color: #555;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  /* ===== Context Mockups ===== */
+  .mockup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .mockup-card {
+    background: var(--surface-elevated);
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 200px;
+  }
+
+  .mock-navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    background: var(--surface-card);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    transition: background 0.3s ease;
+  }
+  .mock-navbar:hover { background: #1E2330; }
+
+  .mock-navbar .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .mark-tiny .line { height: 2px; margin-bottom: 3.5px; border-radius: 1px; }
+  .mark-tiny .line-1 { background: var(--revenue-run); width: 28px; margin-left: 0; }
+  .mark-tiny .line-2 { background: var(--peak-hour); width: 21px; margin-left: 2px; }
+  .mark-tiny .line-3 { background: var(--evening-light); width: 14px; margin-left: 4px; }
+  .mark-tiny .line-4 { background: var(--revenue-light); width: 7px; margin-left: 6px; }
+
+  .mock-navbar:hover .mark-tiny .line-1 { width: 30px; margin-left: 0; }
+  .mock-navbar:hover .mark-tiny .line-2 { width: 23px; margin-left: 4px; }
+  .mock-navbar:hover .mark-tiny .line-3 { width: 16px; margin-left: 7px; }
+  .mock-navbar:hover .mark-tiny .line-4 { width: 10px; margin-left: 10px; }
+
+  .nav-wordmark {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+  }
+  .mock-nav-links { display: flex; gap: 24px; }
+  .mock-nav-links span { font-size: 13px; color: var(--text-muted); }
+
+  .mock-content { padding: 28px; }
+  .mock-content .mock-line {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.04);
+    margin-bottom: 10px;
+  }
+  .mock-content .mock-line:nth-child(1) { width: 70%; }
+  .mock-content .mock-line:nth-child(2) { width: 90%; }
+  .mock-content .mock-line:nth-child(3) { width: 55%; }
+  .mock-content .mock-line:nth-child(4) { width: 80%; }
+
+  .mock-card-header {
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    background: linear-gradient(135deg, var(--evening-rush) 0%, var(--night-owl) 100%);
+    transition: background 0.3s ease;
+    cursor: default;
+  }
+  .mock-card-header .tagline {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 300;
+    font-size: 14px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+    margin-top: 16px;
+  }
+  .mock-card-header .card-wordmark {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 24px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: #FFF;
+    margin-top: 12px;
+  }
+
+  @media (max-width: 768px) {
+    section { padding: 40px 24px; }
+    .header { padding: 36px 24px 28px; }
+    .var-grid { grid-template-columns: 1fr; }
+    .mockup-grid { grid-template-columns: 1fr; }
+    .hero-wordmark { font-size: 32px; letter-spacing: 5px; }
+    .mark-hero .line-1 { width: 90px; }
+    .mark-hero .line-2 { width: 66px; margin-left: 8px; }
+    .mark-hero .line-3 { width: 42px; margin-left: 16px; }
+    .mark-hero .line-4 { width: 18px; margin-left: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="tag">Selected Concept — Vanishing Point</div>
+  <h1>Parallax Logo System</h1>
+</div>
+
+<!-- Hero -->
+<section>
+  <div class="section-label">Primary Lockup</div>
+  <div class="hero">
+    <div class="hero-lockup">
+      <div class="vp-mark mark-hero">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="hero-wordmark">Parallax</div>
+    </div>
+  </div>
+</section>
+
+<!-- Color Variations -->
+<section>
+  <div class="section-label">Color Variations</div>
+  <div class="var-grid">
+    <div class="var-cell var-dark">
+      <div class="cell-label">Full Color / Dark</div>
+      <div class="vp-mark mark-md">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="var-wordmark">Parallax</div>
+    </div>
+    <div class="var-cell var-light">
+      <div class="cell-label">Full Color / Light</div>
+      <div class="vp-mark mark-md">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="var-wordmark">Parallax</div>
+    </div>
+    <div class="var-cell var-green">
+      <div class="cell-label">Mono White / Brand</div>
+      <div class="vp-mark mark-mono-w">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="var-wordmark">Parallax</div>
+    </div>
+    <div class="var-cell var-night">
+      <div class="cell-label">Mono White / Night</div>
+      <div class="vp-mark mark-mono-w">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="var-wordmark">Parallax</div>
+    </div>
+    <div class="var-cell var-warm">
+      <div class="cell-label">Mono Dark / Warm</div>
+      <div class="vp-mark mark-mono-d">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="var-wordmark">Parallax</div>
+    </div>
+    <div class="var-cell var-peak">
+      <div class="cell-label">Full Color / Evening</div>
+      <div class="vp-mark mark-md">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="var-wordmark">Parallax</div>
+    </div>
+  </div>
+</section>
+
+<!-- Horizontal Lockups -->
+<section>
+  <div class="section-label">Horizontal Lockups</div>
+  <div class="lockup-row">
+    <div class="h-lockup">
+      <div class="vp-mark mark-sm">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="h-wordmark">Parallax</div>
+    </div>
+    <div class="h-lockup">
+      <div class="vp-mark mark-sm">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+        <div class="line line-4"></div>
+      </div>
+      <div class="h-wordmark-light">Parallax</div>
+    </div>
+  </div>
+</section>
+
+<!-- App Icons -->
+<section>
+  <div class="section-label">App Icons & Favicon</div>
+  <div class="icon-row" style="margin-bottom: 32px;">
+    <div>
+      <div class="app-icon icon-dark">
+        <div class="vp-mark mark-xs mark-xs-color">
+          <div class="line line-1"></div>
+          <div class="line line-2"></div>
+          <div class="line line-3"></div>
+          <div class="line line-4"></div>
+        </div>
+      </div>
+      <div class="icon-size-label">Dark</div>
+    </div>
+    <div>
+      <div class="app-icon icon-green">
+        <div class="vp-mark mark-xs mark-xs-white">
+          <div class="line line-1"></div>
+          <div class="line line-2"></div>
+          <div class="line line-3"></div>
+          <div class="line line-4"></div>
+        </div>
+      </div>
+      <div class="icon-size-label">Brand</div>
+    </div>
+    <div>
+      <div class="app-icon icon-night">
+        <div class="vp-mark mark-xs mark-xs-white">
+          <div class="line line-1"></div>
+          <div class="line line-2"></div>
+          <div class="line line-3"></div>
+          <div class="line line-4"></div>
+        </div>
+      </div>
+      <div class="icon-size-label">Night</div>
+    </div>
+    <div>
+      <div class="app-icon icon-light">
+        <div class="vp-mark mark-xs mark-xs-dark">
+          <div class="line line-1"></div>
+          <div class="line line-2"></div>
+          <div class="line line-3"></div>
+          <div class="line line-4"></div>
+        </div>
+      </div>
+      <div class="icon-size-label">Light</div>
+    </div>
+    <div>
+      <div class="app-icon icon-peak">
+        <div class="vp-mark mark-xs mark-xs-color">
+          <div class="line line-1"></div>
+          <div class="line line-2"></div>
+          <div class="line line-3"></div>
+          <div class="line line-4"></div>
+        </div>
+      </div>
+      <div class="icon-size-label">Evening</div>
+    </div>
+  </div>
+
+  <div class="favicon-strip">
+    <div class="fav-dot" style="background:#FF5F57;"></div>
+    <div class="fav-dot" style="background:#FEBC2E;"></div>
+    <div class="fav-dot" style="background:#28C840;"></div>
+    <div style="width: 20px;"></div>
+    <div class="fav-tab">
+      <div class="vp-mark mark-fav">
+        <div class="line line-1"></div>
+        <div class="line line-2"></div>
+        <div class="line line-3"></div>
+      </div>
+      <span>Parallax</span>
+    </div>
+    <div class="fav-tab-inactive">
+      <span style="color:#555;">Another Tab</span>
+    </div>
+  </div>
+</section>
+
+<!-- In-Context Mockups -->
+<section>
+  <div class="section-label">In Context</div>
+  <div class="mockup-grid">
+    <div class="mockup-card">
+      <div class="mock-navbar">
+        <div class="nav-logo">
+          <div class="vp-mark mark-tiny">
+            <div class="line line-1"></div>
+            <div class="line line-2"></div>
+            <div class="line line-3"></div>
+            <div class="line line-4"></div>
+          </div>
+          <span class="nav-wordmark">Parallax</span>
+        </div>
+        <div class="mock-nav-links">
+          <span>Dashboard</span>
+          <span>Routes</span>
+          <span>Reports</span>
+        </div>
+      </div>
+      <div class="mock-content">
+        <div class="mock-line"></div>
+        <div class="mock-line"></div>
+        <div class="mock-line"></div>
+        <div class="mock-line"></div>
+      </div>
+    </div>
+
+    <div class="mockup-card">
+      <div class="mock-card-header">
+        <div class="vp-mark mark-sm-w" style="align-items: center;">
+          <div class="line line-1"></div>
+          <div class="line line-2"></div>
+          <div class="line line-3"></div>
+          <div class="line line-4"></div>
+        </div>
+        <div class="card-wordmark">Parallax</div>
+        <div class="tagline">Transit Intelligence</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
