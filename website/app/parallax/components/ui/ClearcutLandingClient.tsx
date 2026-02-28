@@ -342,9 +342,9 @@ export default function ClearcutLandingClient() {
             maxWidth: 500,
             animation: 'fadeUp 0.5s ease-out',
             pointerEvents: 'auto',
-            background: 'rgba(244, 243, 240, 0.55)',
-            backdropFilter: 'blur(16px) saturate(1.4)',
-            WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+            background: 'rgba(244, 243, 240, 0.35)',
+            backdropFilter: 'blur(2px) saturate(1.4)',
+            WebkitBackdropFilter: 'blur(2px) saturate(1.4)',
             borderRadius: 20,
             border: '1px solid rgba(255, 255, 255, 0.35)',
             boxShadow:
@@ -394,8 +394,11 @@ export default function ClearcutLandingClient() {
               maxWidth: 420,
             }}
           >
-            Import route data, analyze demand patterns, measure deadhead and slack, and build optimized bids from real operational numbers.
+            Import your route and trip data, analyze demand patterns and performance characteristics, plan your route structure, and export optimized bids from real operational numbers.
           </p>
+          <p style={{ fontSize: 12, color: '#4e4f52', marginBottom: 16 }}>
+            Suitable for most on-demand and pre-scheduled trip services.
+            </p>
 
           {/* Inline session form */}
           <form onSubmit={onCreateSession}>
@@ -605,9 +608,9 @@ export default function ClearcutLandingClient() {
             alignItems: 'center',
             gap: 20,
             pointerEvents: 'auto',
-            background: 'rgba(244, 243, 240, 0.45)',
-            backdropFilter: 'blur(12px) saturate(1.3)',
-            WebkitBackdropFilter: 'blur(12px) saturate(1.3)',
+            background: 'rgba(244, 243, 240, 0.3)',
+            backdropFilter: 'blur(2px) saturate(1.3)',
+            WebkitBackdropFilter: 'blur(2px) saturate(1.3)',
             borderRadius: 12,
             border: '1px solid rgba(255, 255, 255, 0.25)',
             boxShadow: '0 0 2px 1px rgba(26,29,35,0.04) inset, 0 0 8px 3px rgba(26,29,35,0.03) inset',
