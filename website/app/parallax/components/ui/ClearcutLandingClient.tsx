@@ -299,7 +299,10 @@ export default function ClearcutLandingClient() {
         flexDirection: 'column',
         overflow: 'hidden',
         fontFamily: "'DM Sans', var(--font-dm-sans), sans-serif",
-        background: '#f4f3f0',
+        // No solid background here — the map sits at z-0 and must be
+        // visible through the frosted glass panels (backdrop-filter).
+        // Fallback cream only when there is no Mapbox token.
+        background: mapboxToken ? 'transparent' : '#f4f3f0',
         color: '#1a1d23',
       }}
     >
@@ -339,6 +342,17 @@ export default function ClearcutLandingClient() {
             maxWidth: 500,
             animation: 'fadeUp 0.5s ease-out',
             pointerEvents: 'auto',
+            background: 'rgba(244, 243, 240, 0.55)',
+            backdropFilter: 'blur(16px) saturate(1.4)',
+            WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+            borderRadius: 20,
+            border: '1px solid rgba(255, 255, 255, 0.35)',
+            boxShadow:
+              '0 0 2px 1px rgba(26,29,35,0.06) inset, ' +
+              '0 0 10px 4px rgba(26,29,35,0.04) inset, ' +
+              '0 4px 24px rgba(26,29,35,0.06), ' +
+              '0 8px 48px rgba(26,29,35,0.04)',
+            padding: '36px 40px',
           }}
         >
           {/* Logo + wordmark */}
@@ -577,7 +591,7 @@ export default function ClearcutLandingClient() {
           display: 'flex',
           justifyContent: 'flex-end',
           alignItems: 'center',
-          padding: '16px 56px',
+          padding: '14px 56px',
           maxWidth: 1400,
           margin: '0 auto',
           width: '100%',
@@ -585,7 +599,21 @@ export default function ClearcutLandingClient() {
           zIndex: 10,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20, pointerEvents: 'auto' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 20,
+            pointerEvents: 'auto',
+            background: 'rgba(244, 243, 240, 0.45)',
+            backdropFilter: 'blur(12px) saturate(1.3)',
+            WebkitBackdropFilter: 'blur(12px) saturate(1.3)',
+            borderRadius: 12,
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            boxShadow: '0 0 2px 1px rgba(26,29,35,0.04) inset, 0 0 8px 3px rgba(26,29,35,0.03) inset',
+            padding: '10px 20px',
+          }}
+        >
           <span style={{ fontSize: 13, color: '#4e4f52' }}>&copy; 2026 John Overton</span>
           <a href="#" style={{ fontSize: 13, color: '#4e4f52', textDecoration: 'none' }}>Privacy</a>
           <a href="#" style={{ fontSize: 13, color: '#4e4f52', textDecoration: 'none' }}>Terms</a>
