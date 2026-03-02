@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx';
-import type { BidPackage, BidResult, DepotRow } from './types';
+import { formatMinutesToClock } from '@/app/parallax/components/ui/shared';
+import { collapseRoutes } from './bid-algorithm';
+import type { BidPackage, BidResult, CollapsedRoute, DepotRow } from './types';
 
 function packageToRow(pkg: BidPackage, depotNameMap: Map<string, string>) {
   // Build a readable run summary from daily blocks
@@ -19,6 +21,42 @@ function packageToRow(pkg: BidPackage, depotNameMap: Map<string, string>) {
     'Consistency Score': pkg.consistency_score,
     Depot: pkg.depot ? (depotNameMap.get(pkg.depot) ?? pkg.depot) : 'Mixed',
   };
+}
+
+function routeDetailRow(
+  pkg: BidPackage,
+  route: CollapsedRoute,
+  depotNameMap: Map<string, string>,
+) {
+  const breaks = [
+    route.break_1_start && route.break_1_end ? `${route.break_1_start}-${route.break_1_end}` : null,
+    route.break_2_start && route.break_2_end ? `${route.break_2_start}-${route.break_2_end}` : null,
+    route.break_3_start && route.break_3_end ? `${route.break_3_start}-${route.break_3_end}` : null,
+  ].filter(Boolean).join(', ');
+
+  return {
+    'Bid Rank': pkg.bid_rank,
+    'Run Name': route.run_name,
+    Days: route.days.join(', '),
+    Depot: route.depot ? (depotNameMap.get(route.depot) ?? route.depot) : '',
+    'Start Time': formatMinutesToClock(route.start_time_minutes),
+    'End Time': formatMinutesToClock(route.end_time_minutes),
+    'Pay Hours': Math.round(route.pay_hours * 10) / 10,
+    Breaks: breaks,
+  };
+}
+
+function setDetailColumnWidths(sheet: XLSX.WorkSheet) {
+  sheet['!cols'] = [
+    { wch: 10 },  // Bid Rank
+    { wch: 18 },  // Run Name
+    { wch: 20 },  // Days
+    { wch: 15 },  // Depot
+    { wch: 12 },  // Start Time
+    { wch: 12 },  // End Time
+    { wch: 12 },  // Pay Hours
+    { wch: 30 },  // Breaks
+  ];
 }
 
 function setColumnWidths(sheet: XLSX.WorkSheet) {
@@ -55,6 +93,23 @@ export function exportBidsToExcel(result: BidResult, depots: DepotRow[]): void {
   const ptSheet = XLSX.utils.json_to_sheet(ptData.length > 0 ? ptData : [{}]);
   setColumnWidths(ptSheet);
   XLSX.utils.book_append_sheet(wb, ptSheet, 'PT Bids');
+
+  // Route detail sheets
+  const fteDetailData = ftePackages.flatMap((pkg) => {
+    const routes = collapseRoutes(pkg.daily_blocks);
+    return routes.map((r) => routeDetailRow(pkg, r, depotNameMap));
+  });
+  const fteDetailSheet = XLSX.utils.json_to_sheet(fteDetailData.length > 0 ? fteDetailData : [{}]);
+  setDetailColumnWidths(fteDetailSheet);
+  XLSX.utils.book_append_sheet(wb, fteDetailSheet, 'FTE Route Detail');
+
+  const ptDetailData = ptPackages.flatMap((pkg) => {
+    const routes = collapseRoutes(pkg.daily_blocks);
+    return routes.map((r) => routeDetailRow(pkg, r, depotNameMap));
+  });
+  const ptDetailSheet = XLSX.utils.json_to_sheet(ptDetailData.length > 0 ? ptDetailData : [{}]);
+  setDetailColumnWidths(ptDetailSheet);
+  XLSX.utils.book_append_sheet(wb, ptDetailSheet, 'PT Route Detail');
 
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([buffer], {

@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown, ChevronRight, CircleHelp, Download, Play } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 import { Badge } from '@/app/parallax/components/shadcn/badge';
 import { Button } from '@/app/parallax/components/shadcn/button';
@@ -23,9 +23,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/parallax/components/shadcn/table';
-import { DEFAULT_BID_CONFIG, generateBidPackages } from '@/lib/parallax/bid-algorithm';
+import { DEFAULT_BID_CONFIG, collapseRoutes, generateBidPackages } from '@/lib/parallax/bid-algorithm';
 import { exportBidsToExcel } from '@/lib/parallax/bid-export';
 import type { BidConfig, BidResult, DepotRow, RunRow, ServiceDay } from '@/lib/parallax/types';
+
+import { formatMinutesToClock } from './shared';
 
 const ALL_SERVICE_DAYS: ServiceDay[] = ['M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'];
 
@@ -54,14 +56,25 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView }: ShiftBids
   const [config, setConfig] = useState<BidConfig>({ ...DEFAULT_BID_CONFIG });
   const [result, setResult] = useState<BidResult | null>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | 'FTE' | 'PT'>('all');
+  const [expandedBids, setExpandedBids] = useState<Set<string>>(new Set());
 
   function updateConfig<K extends keyof BidConfig>(key: K, value: BidConfig[K]) {
     setConfig((prev) => ({ ...prev, [key]: value }));
   }
 
+  function toggleExpanded(bidId: string) {
+    setExpandedBids((prev) => {
+      const next = new Set(prev);
+      if (next.has(bidId)) next.delete(bidId);
+      else next.add(bidId);
+      return next;
+    });
+  }
+
   function handleGenerate() {
     const bidResult = generateBidPackages(runs, config);
     setResult(bidResult);
+    setExpandedBids(new Set());
   }
 
   const depotNameMap = useMemo(() => {
@@ -271,42 +284,89 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView }: ShiftBids
                 </TableRow>
               )}
               {filteredPackages.map((pkg) => {
+                const isExpanded = expandedBids.has(pkg.bid_id);
                 const runNames = [...new Set(pkg.daily_blocks.map((b) => b.run_name))].join(', ');
+                const collapsed = isExpanded ? collapseRoutes(pkg.daily_blocks) : [];
                 return (
-                  <TableRow key={pkg.bid_id}>
-                    <TableCell className="text-xs font-medium">{pkg.bid_rank}</TableCell>
-                    <TableCell>
-                      <Badge variant={pkg.type === 'FTE' ? 'default' : 'secondary'} className="text-[10px]">
-                        {pkg.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs">{runNames}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-0.5">
-                        {ALL_SERVICE_DAYS.map((day) => (
-                          <span
-                            key={day}
-                            className={`px-1 py-0 text-[10px] rounded ${
-                              pkg.days_on.includes(day)
-                                ? 'bg-cc-accent text-white'
-                                : 'bg-cc-surface-2 text-cc-text-muted'
-                            }`}
-                          >
-                            {day}
-                          </span>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-cc-text-muted">
-                      {pkg.days_off.join(', ') || '\u2014'}
-                    </TableCell>
-                    <TableCell className="text-xs">{pkg.weekly_pay_hours}</TableCell>
-                    <TableCell className="text-xs">{pkg.consecutive_days_off}</TableCell>
-                    <TableCell className="text-xs">{pkg.consistency_score}%</TableCell>
-                    <TableCell className="text-xs text-cc-text-muted">
-                      {pkg.depot ? (depotNameMap.get(pkg.depot) ?? pkg.depot) : 'Mixed'}
-                    </TableCell>
-                  </TableRow>
+                  <Fragment key={pkg.bid_id}>
+                    <TableRow className="cursor-pointer" onClick={() => toggleExpanded(pkg.bid_id)}>
+                      <TableCell className="text-xs font-medium">
+                        <span className="inline-flex items-center gap-1">
+                          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                          {pkg.bid_rank}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={pkg.type === 'FTE' ? 'default' : 'secondary'} className="text-[10px]">
+                          {pkg.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">{runNames}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-0.5">
+                          {ALL_SERVICE_DAYS.map((day) => (
+                            <span
+                              key={day}
+                              className={`px-1 py-0 text-[10px] rounded ${
+                                pkg.days_on.includes(day)
+                                  ? 'bg-cc-accent text-white'
+                                  : 'bg-cc-surface-2 text-cc-text-muted'
+                              }`}
+                            >
+                              {day}
+                            </span>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-cc-text-muted">
+                        {pkg.days_off.join(', ') || '\u2014'}
+                      </TableCell>
+                      <TableCell className="text-xs">{pkg.weekly_pay_hours}</TableCell>
+                      <TableCell className="text-xs">{pkg.consecutive_days_off}</TableCell>
+                      <TableCell className="text-xs">{pkg.consistency_score}%</TableCell>
+                      <TableCell className="text-xs text-cc-text-muted">
+                        {pkg.depot ? (depotNameMap.get(pkg.depot) ?? pkg.depot) : 'Mixed'}
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && collapsed.map((route, idx) => {
+                      const breaks = [
+                        route.break_1_start && route.break_1_end ? `${route.break_1_start}-${route.break_1_end}` : null,
+                        route.break_2_start && route.break_2_end ? `${route.break_2_start}-${route.break_2_end}` : null,
+                        route.break_3_start && route.break_3_end ? `${route.break_3_start}-${route.break_3_end}` : null,
+                      ].filter(Boolean).join(', ') || '\u2014';
+                      return (
+                        <TableRow key={`${pkg.bid_id}-route-${idx}`} className="bg-cc-surface-1/50">
+                          <TableCell />
+                          <TableCell />
+                          <TableCell className="text-xs pl-6 text-cc-text-secondary">{route.run_name}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-0.5">
+                              {ALL_SERVICE_DAYS.map((day) => (
+                                <span
+                                  key={day}
+                                  className={`px-1 py-0 text-[10px] rounded ${
+                                    route.days.includes(day)
+                                      ? 'bg-cc-accent/60 text-white'
+                                      : 'bg-cc-surface-2 text-cc-text-muted'
+                                  }`}
+                                >
+                                  {day}
+                                </span>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-cc-text-muted">
+                            {formatMinutesToClock(route.start_time_minutes)} - {formatMinutesToClock(route.end_time_minutes)}
+                          </TableCell>
+                          <TableCell className="text-xs">{Math.round(route.pay_hours * 10) / 10}</TableCell>
+                          <TableCell className="text-xs text-cc-text-muted" colSpan={2}>{breaks}</TableCell>
+                          <TableCell className="text-xs text-cc-text-muted">
+                            {route.depot ? (depotNameMap.get(route.depot) ?? route.depot) : '\u2014'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </Fragment>
                 );
               })}
             </TableBody>

@@ -1,4 +1,4 @@
-import type { BidConfig, BidPackage, BidResult, BidType, DailyBlock, RunRow, ServiceDay } from './types';
+import type { BidConfig, BidPackage, BidResult, BidType, CollapsedRoute, DailyBlock, RunRow, ServiceDay } from './types';
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -44,7 +44,13 @@ function parseServiceDays(json: string): ServiceDay[] {
 
 export function buildDailyBlocks(runs: RunRow[]): DailyBlock[] {
   // Key: "runId|day" — each run (including each split) gets its own block
-  const groups = new Map<string, { run_name: string; day: ServiceDay; run_ids: string[]; depot: string | null; pay_hours: number; starts: number[]; ends: number[] }>();
+  const groups = new Map<string, {
+    run_name: string; day: ServiceDay; run_ids: string[]; depot: string | null;
+    pay_hours: number; starts: number[]; ends: number[];
+    break_1_start: string | null; break_1_end: string | null;
+    break_2_start: string | null; break_2_end: string | null;
+    break_3_start: string | null; break_3_end: string | null;
+  }>();
 
   for (const run of runs) {
     const days = parseServiceDays(run.service_days);
@@ -56,7 +62,12 @@ export function buildDailyBlocks(runs: RunRow[]): DailyBlock[] {
       const key = `${run.run_id}|${day}`;
       let group = groups.get(key);
       if (!group) {
-        group = { run_name: run.run_name, day, run_ids: [], depot: null, pay_hours: 0, starts: [], ends: [] };
+        group = {
+          run_name: run.run_name, day, run_ids: [], depot: null, pay_hours: 0, starts: [], ends: [],
+          break_1_start: run.break_1_start, break_1_end: run.break_1_end,
+          break_2_start: run.break_2_start, break_2_end: run.break_2_end,
+          break_3_start: run.break_3_start, break_3_end: run.break_3_end,
+        };
         groups.set(key, group);
       }
       group.run_ids.push(run.run_id);
@@ -80,6 +91,9 @@ export function buildDailyBlocks(runs: RunRow[]): DailyBlock[] {
       start_time_minutes: startMin,
       end_time_minutes: endMin,
       span_minutes: Math.max(0, endMin - startMin),
+      break_1_start: g.break_1_start, break_1_end: g.break_1_end,
+      break_2_start: g.break_2_start, break_2_end: g.break_2_end,
+      break_3_start: g.break_3_start, break_3_end: g.break_3_end,
     });
   }
 
@@ -466,6 +480,48 @@ export function generateBidPackages(runs: RunRow[], config: BidConfig): BidResul
     pt_count: ptBids.length,
     unassigned_blocks: [],
   };
+}
+
+// ── Collapse daily blocks into display rows ─────────────────────────
+
+export function collapseRoutes(blocks: DailyBlock[]): CollapsedRoute[] {
+  const map = new Map<string, CollapsedRoute>();
+  for (const b of blocks) {
+    const key = [
+      b.run_name,
+      b.depot ?? '',
+      b.start_time_minutes,
+      b.end_time_minutes,
+      b.break_1_start ?? '',
+      b.break_1_end ?? '',
+      b.break_2_start ?? '',
+      b.break_2_end ?? '',
+      b.break_3_start ?? '',
+      b.break_3_end ?? '',
+    ].join('|');
+
+    const existing = map.get(key);
+    if (existing) {
+      existing.days.push(b.day);
+      existing.pay_hours += b.pay_hours;
+    } else {
+      map.set(key, {
+        run_name: b.run_name,
+        depot: b.depot,
+        start_time_minutes: b.start_time_minutes,
+        end_time_minutes: b.end_time_minutes,
+        break_1_start: b.break_1_start,
+        break_1_end: b.break_1_end,
+        break_2_start: b.break_2_start,
+        break_2_end: b.break_2_end,
+        break_3_start: b.break_3_start,
+        break_3_end: b.break_3_end,
+        pay_hours: b.pay_hours,
+        days: [b.day],
+      });
+    }
+  }
+  return [...map.values()];
 }
 
 // ── Quick FTE/PT estimation for stats bar ───────────────────────────

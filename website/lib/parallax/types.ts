@@ -122,6 +122,27 @@ export interface DailyBlock {
   start_time_minutes: number;
   end_time_minutes: number;
   span_minutes: number;
+  break_1_start: string | null;
+  break_1_end: string | null;
+  break_2_start: string | null;
+  break_2_end: string | null;
+  break_3_start: string | null;
+  break_3_end: string | null;
+}
+
+export interface CollapsedRoute {
+  run_name: string;
+  depot: string | null;
+  start_time_minutes: number;
+  end_time_minutes: number;
+  break_1_start: string | null;
+  break_1_end: string | null;
+  break_2_start: string | null;
+  break_2_end: string | null;
+  break_3_start: string | null;
+  break_3_end: string | null;
+  pay_hours: number;
+  days: ServiceDay[];
 }
 
 export interface BidPackage {
