@@ -373,19 +373,19 @@ export function buildDemoTripsAndRoutes(): {
         const depot = depotLocations[routeIndex % depotLocations.length];
         const depotRow = depots[routeIndex % depots.length];
 
-        const routeStartMinute = clamp(
+        const routeStartMinute = roundTo15(clamp(
           serviceStartMinutes + Math.round(routeIndex * startSpacing),
           serviceStartMinutes,
           serviceEndMinutes - 120,
-        );
+        ));
         const durationMinutes =
           C.routeDurationMinHours * 60 +
           Math.floor(rand() * (C.routeDurationMaxHours - C.routeDurationMinHours) * 60);
-        const routeEndMinute = clamp(
+        const routeEndMinute = roundTo15(clamp(
           routeStartMinute + durationMinutes,
           routeStartMinute + 120,
           serviceEndMinutes,
-        );
+        ));
 
         const routeStart = atDayMinutes(dayDate, routeStartMinute);
         const routeEnd = atDayMinutes(dayDate, routeEndMinute);

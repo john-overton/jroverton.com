@@ -144,9 +144,9 @@ export function buildRunCutForDate(
     rows.push({
       routeName: name,
       depotAddress: route.depot_address ?? null,
-      shiftStart: formatMinutes(roundedStart),
-      shiftEnd: formatMinutes(roundedEnd),
-      durationHours: Math.round(((roundedEnd - roundedStart) / 60) * 10) / 10,
+      shiftStart: formatMinutes(startMin),
+      shiftEnd: formatMinutes(endMin),
+      durationHours: Math.round(((endMin - startMin) / 60) * 10) / 10,
       activeBlockIndices,
       break1Start: b1Start ? formatMinutes(dateToMinutes(b1Start)) : null,
       break1End: b1End ? formatMinutes(dateToMinutes(b1End)) : null,
