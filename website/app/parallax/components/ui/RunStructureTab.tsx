@@ -507,6 +507,21 @@ export default function RunStructureTab({
 
   const selectedDaySet = useMemo(() => new Set(selectedDays), [selectedDays]);
 
+  // Depot lookup maps
+  const depotNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const d of depots) map.set(d.depot_id, d.depot_name);
+    return map;
+  }, [depots]);
+
+  const depotAddressToName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const d of depots) {
+      if (d.depot_address) map.set(d.depot_address, d.depot_name);
+    }
+    return map;
+  }, [depots]);
+
   // New routes for the chart — from locally-filtered runs, checked against global day selection
   const { runVehiclesByBlockFullDay, nrOnBreakByBlockFullDay } = useMemo(() => {
     const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
@@ -858,10 +873,16 @@ export default function RunStructureTab({
 
     const serviceDaysJson = JSON.stringify(ALL_SERVICE_DAYS.filter((d) => copyDaysSelection.includes(d)));
 
+    // Build address → depot_id lookup for matching imported routes to depots
+    const addressToDepotId = new Map<string, string>();
+    for (const d of depots) {
+      if (d.depot_address) addressToDepotId.set(d.depot_address, d.depot_id);
+    }
+
     // Build raw run rows with original names first
     const rawRuns: (RunRow & { _originalName: string })[] = dateRoutes.map((route, idx) => {
-      const start = asDate(route.actual_start_time) ?? asDate(route.scheduled_start_time);
-      const end = asDate(route.actual_end_time) ?? asDate(route.scheduled_end_time);
+      const start = asDate(route.scheduled_start_time) ?? asDate(route.actual_start_time);
+      const end = asDate(route.scheduled_end_time) ?? asDate(route.actual_end_time);
       const startMin = start ? dateToMinutesOfDay(start) : 360;
       const endMin = end ? dateToMinutesOfDay(end) : 840;
       const durationHrs = Math.round(((endMin - startMin) / 60) * 10) / 10;
@@ -882,7 +903,7 @@ export default function RunStructureTab({
         run_name: originalName,
         _originalName: originalName,
         split_number: 0,
-        depot: route.depot_address ?? null,
+        depot: (route.depot_address ? addressToDepotId.get(route.depot_address) : null) ?? null,
         service_days: serviceDaysJson,
         route_area: null,
         start_time: formatMinutesToClock(startMin),
@@ -970,11 +991,16 @@ export default function RunStructureTab({
     const b2Start = row.break2Start ? formatMinutesToClock(parseClockFromLabel(row.break2Start)) : null;
     const b2End = row.break2End ? formatMinutesToClock(parseClockFromLabel(row.break2End)) : null;
 
+    // Match depot address to depot_id
+    const matchedDepotId = matchedRoute?.depot_address
+      ? depots.find((d) => d.depot_address === matchedRoute.depot_address)?.depot_id ?? null
+      : null;
+
     const newRun: RunRow = {
       run_id: crypto.randomUUID(),
       run_name: row.routeName,
       split_number: 0,
-      depot: matchedRoute?.depot_address ?? null,
+      depot: matchedDepotId,
       service_days: serviceDaysJson,
       route_area: null,
       start_time: formatMinutesToClock(startMin),
@@ -1107,6 +1133,7 @@ export default function RunStructureTab({
                 <TableHeader>
                   <TableRow>
                     <ImportedSortableHead column="routeName" label="Route" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
+                    {depots.length > 0 && <TableHead>Depot</TableHead>}
                     <ImportedSortableHead column="shiftStart" label="Shift Start" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
                     <ImportedSortableHead column="shiftEnd" label="Shift End" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
                     <ImportedSortableHead column="durationHours" label="Duration" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
@@ -1140,7 +1167,7 @@ export default function RunStructureTab({
                 <TableBody>
                   {sortedRunCut.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={importedBreaksExpanded ? (readonlyView ? 6 : 7) : (readonlyView ? 5 : 6)} className="text-cc-text-muted">
+                      <TableCell colSpan={importedBreaksExpanded ? (readonlyView ? 6 : 7) : (readonlyView ? 5 : 6) + (depots.length > 0 ? 1 : 0)} className="text-cc-text-muted">
                         No routes for selected date
                       </TableCell>
                     </TableRow>
@@ -1148,6 +1175,11 @@ export default function RunStructureTab({
                   {sortedRunCut.map((row, idx) => (
                     <TableRow key={`${row.routeName}-${idx}`}>
                       <TableCell>{row.routeName}</TableCell>
+                      {depots.length > 0 && (
+                        <TableCell className="text-xs text-cc-text-muted">
+                          {row.depotAddress ? (depotAddressToName.get(row.depotAddress) ?? row.depotAddress) : '\u2014'}
+                        </TableCell>
+                      )}
                       <TableCell>{row.shiftStart}</TableCell>
                       <TableCell>{row.shiftEnd}</TableCell>
                       <TableCell>{row.durationHours} hrs</TableCell>

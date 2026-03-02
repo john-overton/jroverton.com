@@ -3,6 +3,7 @@ import type { RouteRow } from './types';
 
 export interface CurrentRunCutRow {
   routeName: string;
+  depotAddress: string | null;
   shiftStart: string;
   shiftEnd: string;
   durationHours: number;
@@ -41,11 +42,11 @@ function formatMinutes(minutes: number): string {
 }
 
 function routeStartDate(route: RouteRow): Date | null {
-  return asDate(route.actual_start_time ?? '') ?? asDate(route.scheduled_start_time);
+  return asDate(route.scheduled_start_time) ?? asDate(route.actual_start_time ?? '');
 }
 
 function routeEndDate(route: RouteRow): Date | null {
-  return asDate(route.actual_end_time ?? '') ?? asDate(route.scheduled_end_time);
+  return asDate(route.scheduled_end_time) ?? asDate(route.actual_end_time ?? '');
 }
 
 function roundUpToInterval(minutes: number, interval: number): number {
@@ -142,6 +143,7 @@ export function buildRunCutForDate(
     }
     rows.push({
       routeName: name,
+      depotAddress: route.depot_address ?? null,
       shiftStart: formatMinutes(roundedStart),
       shiftEnd: formatMinutes(roundedEnd),
       durationHours: Math.round(((roundedEnd - roundedStart) / 60) * 10) / 10,
@@ -231,6 +233,7 @@ export function buildCurrentRunCut(
 
     rows.push({
       routeName,
+      depotAddress: null,
       shiftStart: formatMinutes(roundedStart),
       shiftEnd: formatMinutes(roundedEnd),
       durationHours: Math.round(((roundedEnd - roundedStart) / 60) * 10) / 10,
