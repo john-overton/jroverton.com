@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 
+import { assertJwtForSession, verifyJwtFromRequest } from '@/lib/parallax/auth';
 import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
@@ -18,11 +19,14 @@ function requireEditSessionAuth(request: NextRequest, editToken: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const editToken = request.nextUrl.searchParams.get('token') ?? '';
-    if (!editToken) {
-      throw new ApiError(400, 'missing_token', 'token query parameter is required.');
+    const claims = verifyJwtFromRequest(request);
+    if (claims.access !== 'edit') {
+      throw new ApiError(403, 'insufficient_access', 'Edit access is required.');
     }
-    requireEditSessionAuth(request, editToken);
+    const editToken = claims.sub;
+    assertValidTokenParam(editToken);
+    const session = requireSessionByEditToken(editToken);
+    assertJwtForSession(claims, session, 'edit');
     const templates = listImportTemplates(editToken);
     return successResponse({ items: templates, count: templates.length });
   } catch (err) {

@@ -89,17 +89,20 @@ function DraggableRouteRow({
   packageId,
   route,
   blocks,
+  readonlyView,
   children,
 }: {
   packageId: string;
   route: CollapsedRoute;
   blocks: DailyBlock[];
+  readonlyView: boolean;
   children: React.ReactNode;
 }) {
   const id = `${packageId}::${route.new_route_name}::${route.start_time_minutes}::${route.days.join(',')}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
     data: { sourcePackageId: packageId, blocks, route },
+    disabled: readonlyView,
   });
   return (
     <TableRow
@@ -107,9 +110,11 @@ function DraggableRouteRow({
       className={`bg-cc-surface-1/50 ${isDragging ? 'opacity-30' : ''}`}
     >
       <TableCell className="w-6 px-1">
-        <span {...attributes} {...listeners} className="cursor-grab inline-flex items-center text-cc-text-muted hover:text-cc-accent">
-          <GripVertical size={12} />
-        </span>
+        {!readonlyView && (
+          <span {...attributes} {...listeners} className="cursor-grab inline-flex items-center text-cc-text-muted hover:text-cc-accent">
+            <GripVertical size={12} />
+          </span>
+        )}
       </TableCell>
       {children}
     </TableRow>
@@ -530,12 +535,14 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
   // ── Drag and drop ─────────────────────────────────────────────────
 
   function handleDragStart(event: DragStartEvent) {
+    if (readonlyView) return;
     const data = event.active.data.current as { route: CollapsedRoute } | undefined;
     if (data?.route) setActiveDragRoute(data.route);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveDragRoute(null);
+    if (readonlyView) return;
     const { active, over } = event;
     if (!over || !bidResult) return;
 
@@ -966,6 +973,7 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
                           packageId={pkg.bid_id}
                           route={route}
                           blocks={routeBlocks}
+                          readonlyView={readonlyView}
                         >
                           <TableCell />
                           <TableCell />
@@ -1018,6 +1026,7 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
                         packageId="unassigned"
                         route={route}
                         blocks={routeBlocks}
+                        readonlyView={readonlyView}
                       >
                         <TableCell />
                         <TableCell />

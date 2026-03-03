@@ -23,7 +23,7 @@ import {
   saveSessionState,
 } from './session-db';
 import { generateToken } from './tokens';
-import type { BidResult, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
+import type { AccessLevel, BidResult, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
 
 const MAX_TOKEN_GENERATION_ATTEMPTS = 8;
 
@@ -62,7 +62,7 @@ export async function createClearcutSession(input?: {
   return record;
 }
 
-export function getSessionState(record: SessionRecord): SessionState {
+export function getSessionState(record: SessionRecord, access: AccessLevel = 'edit'): SessionState {
   touchSessionAccess(record.edit_token);
   const optimization = getOptimization(record.edit_token);
 
@@ -77,7 +77,7 @@ export function getSessionState(record: SessionRecord): SessionState {
 
   return {
     session: {
-      edit_token: record.edit_token,
+      edit_token: access === 'edit' ? record.edit_token : null,
       readonly_token: record.readonly_token,
       name: record.name,
       created_at: record.created_at,

@@ -346,8 +346,7 @@ export async function listImportTemplates(
   token: string,
   jwt: string,
 ): Promise<ListTemplatesResponse> {
-  const params = new URLSearchParams({ token });
-  return request<ListTemplatesResponse>(`/api/parallax/import-templates?${params.toString()}`, { jwt });
+  return request<ListTemplatesResponse>(`/api/parallax/import-templates`, { jwt });
 }
 
 export async function createImportTemplateRecord(

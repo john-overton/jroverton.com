@@ -206,17 +206,20 @@ export interface OptimizationRow {
 }
 
 export interface SessionState {
-  session: Pick<
-    SessionRecord,
-    | 'edit_token'
-    | 'readonly_token'
-    | 'name'
-    | 'created_at'
-    | 'updated_at'
-    | 'accessed_at'
-    | 'trip_count'
-    | 'route_count'
-  > & { has_password: boolean };
+  session: Omit<
+    Pick<
+      SessionRecord,
+      | 'edit_token'
+      | 'readonly_token'
+      | 'name'
+      | 'created_at'
+      | 'updated_at'
+      | 'accessed_at'
+      | 'trip_count'
+      | 'route_count'
+    >,
+    'edit_token'
+  > & { edit_token: string | null; has_password: boolean };
   settings: SettingsRow;
   optimization: OptimizationRow;
   trips: TripRow[];

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy, Plus, SquareSplitHorizontal, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy, Download, Plus, SquareSplitHorizontal, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/parallax/components/shadcn/button';
@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/parallax/components/shadcn/table';
+import { exportRoutesToExcel } from '@/lib/parallax/bid-export';
 import type { DepotRow, NewRouteRow, ServiceDay } from '@/lib/parallax/types';
 
 import { ALL_SERVICE_DAYS, SERVICE_DAY_FULL_NAME, parseClockToMinutes, formatMinutesToClock, parseServiceDays } from './shared';
@@ -500,6 +501,15 @@ export default function RouteEditorPanel({
               </SelectContent>
             </Select>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportRoutesToExcel(localNewRoutes, depots)}
+            disabled={localNewRoutes.length === 0}
+            type="button"
+          >
+            <Download size={14} className="mr-1.5" /> Export Excel
+          </Button>
           {!readonlyView && (
             <Button size="sm" onClick={addNewRoute} disabled={!!draftNewRoute} type="button">
               <Plus size={14} className="mr-1.5" /> Add Route

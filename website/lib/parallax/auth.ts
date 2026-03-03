@@ -17,10 +17,10 @@ function getJwtSecret(): string {
   return secret;
 }
 
-export function signSessionJwt(editToken: string, access: AccessLevel): string {
+export function signSessionJwt(subjectToken: string, access: AccessLevel): string {
   return jwt.sign(
     {
-      sub: editToken,
+      sub: subjectToken,
       access,
     } satisfies ClearCutJwtClaims,
     getJwtSecret(),
@@ -69,7 +69,8 @@ export function assertJwtForSession(
   session: SessionRecord,
   requiredAccess: AccessLevel,
 ): void {
-  if (claims.sub !== session.edit_token) {
+  const expectedSub = claims.access === 'edit' ? session.edit_token : session.readonly_token;
+  if (claims.sub !== expectedSub) {
     throw new ApiError(403, 'jwt_session_mismatch', 'JWT is not valid for this session.');
   }
 

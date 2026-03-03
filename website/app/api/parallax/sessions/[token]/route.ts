@@ -28,10 +28,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const resolved = requireSessionByToken(token);
     const existingBearer = parseBearerToken(request);
 
+    const access = resolved.tokenType === 'readonly' ? 'readonly' : 'edit';
     let issuedJwt: string | null = null;
     if (existingBearer) {
       const claims = verifyJwtFromRequest(request);
-      if (claims.sub !== resolved.session.edit_token) {
+      const expectedSub = claims.access === 'edit' ? resolved.session.edit_token : resolved.session.readonly_token;
+      if (claims.sub !== expectedSub) {
         throw new ApiError(403, 'jwt_session_mismatch', 'JWT is not valid for this session.');
       }
     } else if (resolved.tokenType === 'edit' && resolved.session.password_hash) {
@@ -40,12 +42,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       });
     } else {
       issuedJwt = signSessionJwt(
-        resolved.session.edit_token,
-        resolved.tokenType === 'readonly' ? 'readonly' : 'edit',
+        resolved.tokenType === 'readonly' ? resolved.session.readonly_token : resolved.session.edit_token,
+        access,
       );
     }
 
-    const state = getSessionState(resolved.session);
+    const state = getSessionState(resolved.session, access);
     return successResponse({
       ...state,
       ...(issuedJwt ? { jwt: issuedJwt } : {}),

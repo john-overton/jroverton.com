@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
-import { formatMinutesToClock } from '@/app/parallax/components/ui/shared';
+import { formatMinutesToClock, parseServiceDays } from '@/app/parallax/components/ui/shared';
 import { collapseRoutes } from './bid-algorithm';
-import type { BidPackage, BidResult, CollapsedRoute, DepotRow } from './types';
+import type { BidPackage, BidResult, CollapsedRoute, DepotRow, NewRouteRow } from './types';
 
 function packageToRow(pkg: BidPackage, depotNameMap: Map<string, string>) {
   // Build a readable run summary from daily blocks
@@ -74,6 +74,62 @@ function setColumnWidths(sheet: XLSX.WorkSheet) {
     { wch: 18 },  // Consistency
     { wch: 15 },  // Depot
   ];
+}
+
+export function exportRoutesToExcel(routes: NewRouteRow[], depots: DepotRow[]): void {
+  const depotNameMap = new Map<string, string>();
+  for (const d of depots) depotNameMap.set(d.depot_id, d.depot_name);
+
+  const rows = routes.map((r) => {
+    const days = parseServiceDays(r.service_days);
+    return {
+      'Route Name': r.new_route_name,
+      Depot: r.depot ? (depotNameMap.get(r.depot) ?? r.depot) : '',
+      Split: r.split_number || '',
+      'Service Days': days.join(', '),
+      'Start Time': r.start_time,
+      'End Time': r.end_time,
+      'Service Hours': r.platform_hours,
+      'Pay Hours': r.pay_hours,
+      'Break 1 Start': r.break_1_start ?? '',
+      'Break 1 End': r.break_1_end ?? '',
+      'Break 2 Start': r.break_2_start ?? '',
+      'Break 2 End': r.break_2_end ?? '',
+      'Break 3 Start': r.break_3_start ?? '',
+      'Break 3 End': r.break_3_end ?? '',
+    };
+  });
+
+  const wb = XLSX.utils.book_new();
+  const sheet = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{}]);
+  sheet['!cols'] = [
+    { wch: 18 },  // Route Name
+    { wch: 15 },  // Depot
+    { wch: 6 },   // Split
+    { wch: 20 },  // Service Days
+    { wch: 12 },  // Start Time
+    { wch: 12 },  // End Time
+    { wch: 14 },  // Service Hours
+    { wch: 12 },  // Pay Hours
+    { wch: 14 },  // Break 1 Start
+    { wch: 14 },  // Break 1 End
+    { wch: 14 },  // Break 2 Start
+    { wch: 14 },  // Break 2 End
+    { wch: 14 },  // Break 3 Start
+    { wch: 14 },  // Break 3 End
+  ];
+  XLSX.utils.book_append_sheet(wb, sheet, 'Routes');
+
+  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `routes-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function exportBidsToExcel(result: BidResult, depots: DepotRow[]): void {
