@@ -362,6 +362,8 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
   const [settingsLocked, setSettingsLocked] = useState(false);
   const [config, setConfig] = useState<BidConfig>({ ...DEFAULT_BID_CONFIG });
   const [typeFilter, setTypeFilter] = useState<'all' | 'FTE' | 'PT'>('all');
+  const [dayFilter, setDayFilter] = useState<Set<ServiceDay>>(new Set());
+  const [depotFilter, setDepotFilter] = useState<string>('all');
   const [bidSortKey, setBidSortKey] = useState<BidSortColumn>('bid_rank');
   const [bidSortDir, setBidSortDir] = useState<'asc' | 'desc'>('asc');
   const [expandedBids, setExpandedBids] = useState<Set<string>>(new Set());
@@ -450,6 +452,24 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
     exportBidsToExcel(bidResult, depots);
   }
 
+  function toggleDayFilter(day: ServiceDay) {
+    setDayFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  }
+
+  const uniqueDepots = useMemo(() => {
+    if (!bidResult) return [];
+    const ids = new Set<string>();
+    for (const pkg of bidResult.packages) {
+      if (pkg.depot) ids.add(pkg.depot);
+    }
+    return [...ids].sort((a, b) => (depotNameMap.get(a) ?? a).localeCompare(depotNameMap.get(b) ?? b));
+  }, [bidResult, depotNameMap]);
+
   function toggleBidSort(key: BidSortColumn) {
     if (bidSortKey === key) {
       setBidSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -461,7 +481,13 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
 
   const filteredPackages = useMemo(() => {
     if (!bidResult) return [];
-    const filtered = typeFilter === 'all' ? bidResult.packages : bidResult.packages.filter((p) => p.type === typeFilter);
+    let filtered = typeFilter === 'all' ? bidResult.packages : bidResult.packages.filter((p) => p.type === typeFilter);
+    if (dayFilter.size > 0) {
+      filtered = filtered.filter((p) => p.days_on.some((d) => dayFilter.has(d)));
+    }
+    if (depotFilter !== 'all') {
+      filtered = filtered.filter((p) => p.depot === depotFilter);
+    }
     const dir = bidSortDir === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
       let cmp: number;
@@ -499,7 +525,7 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
       if (cmp !== 0) return cmp * dir;
       return a.bid_rank - b.bid_rank;
     });
-  }, [bidResult, typeFilter, bidSortKey, bidSortDir, depotNameMap]);
+  }, [bidResult, typeFilter, dayFilter, depotFilter, bidSortKey, bidSortDir, depotNameMap]);
 
   // ── Drag and drop ─────────────────────────────────────────────────
 
@@ -781,18 +807,46 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
         </div>
 
         {bidResult && (
-          <div className="flex gap-0.5 items-center">
-            <span className="text-xs text-cc-text-muted mr-1">Show:</span>
-            {(['all', 'FTE', 'PT'] as const).map((t) => (
-              <button
-                key={t}
-                className={`px-2 py-0.5 text-[10px] rounded ${typeFilter === t ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                onClick={() => setTypeFilter(t)}
-                type="button"
-              >
-                {t === 'all' ? 'All' : t}
-              </button>
-            ))}
+          <div className="flex gap-3 items-center flex-wrap">
+            <div className="flex gap-0.5 items-center">
+              <span className="text-xs text-cc-text-muted mr-1">Type:</span>
+              {(['all', 'FTE', 'PT'] as const).map((t) => (
+                <button
+                  key={t}
+                  className={`px-2 py-0.5 text-[10px] rounded ${typeFilter === t ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                  onClick={() => setTypeFilter(t)}
+                  type="button"
+                >
+                  {t === 'all' ? 'All' : t}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-0.5 items-center">
+              <span className="text-xs text-cc-text-muted mr-1">Days:</span>
+              {ALL_SERVICE_DAYS.map((day) => (
+                <button
+                  key={day}
+                  className={`px-1 py-0.5 text-[10px] rounded ${dayFilter.has(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                  onClick={() => toggleDayFilter(day)}
+                  type="button"
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
+            {uniqueDepots.length > 1 && (
+              <Select value={depotFilter} onValueChange={setDepotFilter}>
+                <SelectTrigger className="h-7 text-xs w-auto min-w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Depots</SelectItem>
+                  {uniqueDepots.map((id) => (
+                    <SelectItem key={id} value={id}>{depotNameMap.get(id) ?? id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         )}
       </div>

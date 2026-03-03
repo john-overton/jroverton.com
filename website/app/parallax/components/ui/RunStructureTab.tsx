@@ -177,8 +177,8 @@ export default function RunStructureTab({
   // ── Imported run cut data ─────────────────────────────────────────
 
   const availableDates = useMemo(
-    () => getAvailableDates(routes, selectedDays),
-    [routes, selectedDays],
+    () => getAvailableDates(routes, []),
+    [routes],
   );
 
   useEffect(() => {
