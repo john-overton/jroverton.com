@@ -12,7 +12,7 @@ import type { ClearcutMetrics } from '@/lib/parallax/metrics';
 import { estimateFtePtCounts } from '@/lib/parallax/bid-algorithm';
 import type { CurrentRunCutRow } from '@/lib/parallax/run-structure';
 import { buildRunCutForDate, getAvailableDates } from '@/lib/parallax/run-structure';
-import type { BidResult, DepotRow, OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/parallax/types';
+import type { BidResult, DepotRow, NewRouteRow, OptimizationRow, RouteRow, ServiceDay } from '@/lib/parallax/types';
 
 import HelpPanel from './HelpPanel';
 import ImportedRoutesPanel from './ImportedRoutesPanel';
@@ -50,7 +50,7 @@ interface RunStructureTabProps {
   fullDayMetrics: ClearcutMetrics;
   optimization: OptimizationRow;
   routes: RouteRow[];
-  runs: RunRow[];
+  newRoutes: NewRouteRow[];
   selectedDays: number[];
   readonlyView: boolean;
   intervalMinutes: number;
@@ -58,7 +58,7 @@ interface RunStructureTabProps {
     key: 'target_productivity' | 'max_driver_spread_hrs' | 'peak_vehicles' | 'run_structure_json',
     value: number | string | null,
   ) => void;
-  onRunsChange: (runs: RunRow[]) => void;
+  onNewRoutesChange: (newRoutes: NewRouteRow[]) => void;
   depots: DepotRow[];
   filteredRoutes: RouteRow[];
   savedBidResult: BidResult | null;
@@ -69,28 +69,28 @@ export default function RunStructureTab({
   metrics,
   fullDayMetrics,
   routes,
-  runs,
+  newRoutes,
   selectedDays,
   readonlyView,
   filteredRoutes,
   intervalMinutes,
-  onRunsChange,
+  onNewRoutesChange,
   depots,
   savedBidResult,
   onBidResultChange,
 }: RunStructureTabProps) {
   const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
   const [subTab, setSubTab] = useState<'imported' | 'bids' | 'runeditor' | 'help'>('runeditor');
-  const [localRuns, setLocalRuns] = useState<RunRow[]>(runs);
+  const [localNewRoutes, setLocalNewRoutes] = useState<NewRouteRow[]>(newRoutes);
   const [selectedRunCutDate, setSelectedRunCutDate] = useState<string | null>(null);
-  const [runDayFilter, setRunDayFilter] = useState<ServiceDay | 'all'>('all');
+  const [newRouteDayFilter, setNewRouteDayFilter] = useState<ServiceDay | 'all'>('all');
   const [depotFilter, setDepotFilter] = useState<string>('all');
   const [copyDaysSelection, setCopyDaysSelection] = useState<ServiceDay[]>([...ALL_SERVICE_DAYS]);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ownPersistRef = useRef(false);
 
-  // ── Undo/Redo: runs ────────────────────────────────────────────────
-  const { pushState: pushRunState, undo: undoRun, redo: redoRun, clearHistory: clearRunHistory, canUndo: canRunUndo, canRedo: canRunRedo } = useUndoRedo<RunRow[]>();
+  // ── Undo/Redo: new routes ──────────────────────────────────────────
+  const { pushState: pushNewRouteState, undo: undoNewRoute, redo: redoNewRoute, clearHistory: clearNewRouteHistory, canUndo: canNewRouteUndo, canRedo: canNewRouteRedo } = useUndoRedo<NewRouteRow[]>();
 
   // ── Undo/Redo: bids (lifted from ShiftBidsPanel) ──────────────────
   const { pushState: pushBidState, undo: undoBid, redo: redoBid, clearHistory: clearBidHistory, canUndo: canBidUndo, canRedo: canBidRedo } = useUndoRedo<BidResult>();
@@ -100,27 +100,27 @@ export default function RunStructureTab({
   // ── Toast ──────────────────────────────────────────────────────────
   const { toasts, showToast, dismissToast } = useToast();
 
-  // Sync from server when runs prop changes (skip if it's our own save bouncing back)
+  // Sync from server when newRoutes prop changes (skip if it's our own save bouncing back)
   useEffect(() => {
     if (ownPersistRef.current) {
       ownPersistRef.current = false;
       return;
     }
-    setLocalRuns(runs);
-    clearRunHistory();
-  }, [runs, clearRunHistory]);
+    setLocalNewRoutes(newRoutes);
+    clearNewRouteHistory();
+  }, [newRoutes, clearNewRouteHistory]);
 
-  // Debounced save for runs
-  const persistRuns = useCallback(
-    (nextRuns: RunRow[]) => {
+  // Debounced save for new routes
+  const persistNewRoutes = useCallback(
+    (nextNewRoutes: NewRouteRow[]) => {
       if (readonlyView) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         ownPersistRef.current = true;
-        onRunsChange(nextRuns);
+        onNewRoutesChange(nextNewRoutes);
       }, 500);
     },
-    [readonlyView, onRunsChange],
+    [readonlyView, onNewRoutesChange],
   );
 
   // Debounced save for bids
@@ -135,21 +135,21 @@ export default function RunStructureTab({
     [readonlyView, onBidResultChange],
   );
 
-  function updateLocalRuns(nextRuns: RunRow[]) {
-    pushRunState(localRuns);
-    setLocalRuns(nextRuns);
-    persistRuns(nextRuns);
+  function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[]) {
+    pushNewRouteState(localNewRoutes);
+    setLocalNewRoutes(nextNewRoutes);
+    persistNewRoutes(nextNewRoutes);
   }
 
   // ── Consolidated undo/redo ─────────────────────────────────────────
 
-  const activeCanUndo = subTab === 'runeditor' ? canRunUndo : subTab === 'bids' ? canBidUndo : false;
-  const activeCanRedo = subTab === 'runeditor' ? canRunRedo : subTab === 'bids' ? canBidRedo : false;
+  const activeCanUndo = subTab === 'runeditor' ? canNewRouteUndo : subTab === 'bids' ? canBidUndo : false;
+  const activeCanRedo = subTab === 'runeditor' ? canNewRouteRedo : subTab === 'bids' ? canBidRedo : false;
 
   function handleUndo() {
     if (subTab === 'runeditor') {
-      const previous = undoRun(localRuns);
-      if (previous) { setLocalRuns(previous); persistRuns(previous); }
+      const previous = undoNewRoute(localNewRoutes);
+      if (previous) { setLocalNewRoutes(previous); persistNewRoutes(previous); }
     } else if (subTab === 'bids' && bidResult) {
       const previous = undoBid(bidResult);
       if (previous) { setBidResult(previous); persistBidResult(previous); }
@@ -158,8 +158,8 @@ export default function RunStructureTab({
 
   function handleRedo() {
     if (subTab === 'runeditor') {
-      const next = redoRun(localRuns);
-      if (next) { setLocalRuns(next); persistRuns(next); }
+      const next = redoNewRoute(localNewRoutes);
+      if (next) { setLocalNewRoutes(next); persistNewRoutes(next); }
     } else if (subTab === 'bids' && bidResult) {
       const next = redoBid(bidResult);
       if (next) { setBidResult(next); persistBidResult(next); }
@@ -193,21 +193,21 @@ export default function RunStructureTab({
     [routes, selectedRunCutDate, fullDayMetrics.blocks, intervalMinutes],
   );
 
-  // ── Filtered runs for display + chart ─────────────────────────────
+  // ── Filtered new routes for display + chart ──────────────────────
 
-  const filteredRuns = useMemo(() => {
-    let result = localRuns;
-    if (runDayFilter !== 'all') {
-      result = result.filter((run) => {
-        const days = parseServiceDays(run.service_days);
-        return days.includes(runDayFilter);
+  const filteredNewRoutes = useMemo(() => {
+    let result = localNewRoutes;
+    if (newRouteDayFilter !== 'all') {
+      result = result.filter((newRoute) => {
+        const days = parseServiceDays(newRoute.service_days);
+        return days.includes(newRouteDayFilter);
       });
     }
     if (depotFilter !== 'all') {
-      result = result.filter((run) => run.depot === depotFilter);
+      result = result.filter((newRoute) => newRoute.depot === depotFilter);
     }
     return result;
-  }, [localRuns, runDayFilter, depotFilter]);
+  }, [localNewRoutes, newRouteDayFilter, depotFilter]);
 
   // ── Vehicle counts by block ───────────────────────────────────────
 
@@ -319,22 +319,22 @@ export default function RunStructureTab({
     return map;
   }, [depots]);
 
-  // Run vehicles by block (for chart)
-  const { runVehiclesByBlockFullDay, nrOnBreakByBlockFullDay } = useMemo(() => {
+  // New route vehicles by block (for chart)
+  const { newRouteVehiclesByBlockFullDay, nrOnBreakByBlockFullDay } = useMemo(() => {
     const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
     const breaks = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
-    for (const run of filteredRuns) {
-      const runDays = parseServiceDays(run.service_days);
-      const matchesDays = selectedDays.length === 0 || runDays.some((d) => selectedDaySet.has(SERVICE_DAY_TO_DOW[d]));
+    for (const newRoute of filteredNewRoutes) {
+      const routeDays = parseServiceDays(newRoute.service_days);
+      const matchesDays = selectedDays.length === 0 || routeDays.some((d) => selectedDaySet.has(SERVICE_DAY_TO_DOW[d]));
       if (!matchesDays) continue;
 
-      const startMin = parseClockToMinutes(run.start_time, 0);
-      const endMin = parseClockToMinutes(run.end_time, 0);
+      const startMin = parseClockToMinutes(newRoute.start_time, 0);
+      const endMin = parseClockToMinutes(newRoute.end_time, 0);
       if (endMin <= startMin) continue;
-      const rb1S = parseClockToMinutes(run.break_1_start ?? '', -1);
-      const rb1E = parseClockToMinutes(run.break_1_end ?? '', -1);
-      const rb2S = parseClockToMinutes(run.break_2_start ?? '', -1);
-      const rb2E = parseClockToMinutes(run.break_2_end ?? '', -1);
+      const rb1S = parseClockToMinutes(newRoute.break_1_start ?? '', -1);
+      const rb1E = parseClockToMinutes(newRoute.break_1_end ?? '', -1);
+      const rb2S = parseClockToMinutes(newRoute.break_2_start ?? '', -1);
+      const rb2E = parseClockToMinutes(newRoute.break_2_end ?? '', -1);
       for (let i = 0; i < fullDayMetrics.blocks.length; i++) {
         const block = fullDayMetrics.blocks[i];
         if (startMin < block.endMinutes && endMin > block.startMinutes) {
@@ -345,17 +345,17 @@ export default function RunStructureTab({
         }
       }
     }
-    return { runVehiclesByBlockFullDay: counts, nrOnBreakByBlockFullDay: breaks };
-  }, [filteredRuns, fullDayMetrics.blocks, selectedDays.length, selectedDaySet]);
+    return { newRouteVehiclesByBlockFullDay: counts, nrOnBreakByBlockFullDay: breaks };
+  }, [filteredNewRoutes, fullDayMetrics.blocks, selectedDays.length, selectedDaySet]);
 
-  const runVehiclesByBlock = useMemo(() => {
+  const newRouteVehiclesByBlock = useMemo(() => {
     return metrics.blocks.map((viewBlock) => {
       const fullIdx = fullDayMetrics.blocks.findIndex(
         (b) => b.startMinutes === viewBlock.startMinutes,
       );
-      return fullIdx >= 0 ? runVehiclesByBlockFullDay[fullIdx] : 0;
+      return fullIdx >= 0 ? newRouteVehiclesByBlockFullDay[fullIdx] : 0;
     });
-  }, [metrics.blocks, fullDayMetrics.blocks, runVehiclesByBlockFullDay]);
+  }, [metrics.blocks, fullDayMetrics.blocks, newRouteVehiclesByBlockFullDay]);
 
   const nrOnBreakByBlock = useMemo(() => {
     return metrics.blocks.map((viewBlock) => {
@@ -383,25 +383,25 @@ export default function RunStructureTab({
     return { totalHours: Math.round(totalHours * 10) / 10, maxVehicles, productivity };
   }, [currentRunCut, currentVehiclesByBlockFullDay, avgDailyTrips]);
 
-  const runStats = useMemo(() => {
+  const newRouteStats = useMemo(() => {
     let totalServiceHours = 0;
-    for (const run of filteredRuns) {
-      totalServiceHours += Number(run.platform_hours) || 0;
+    for (const newRoute of filteredNewRoutes) {
+      totalServiceHours += Number(newRoute.platform_hours) || 0;
     }
-    const maxVehicles = Math.max(...runVehiclesByBlockFullDay, 0);
+    const maxVehicles = Math.max(...newRouteVehiclesByBlockFullDay, 0);
     const productivity = totalServiceHours > 0
       ? Math.round((avgDailyTrips / totalServiceHours) * 100) / 100
       : 0;
-    const { fte: estFTE, pt: estPT } = estimateFtePtCounts(filteredRuns);
+    const { fte: estFTE, pt: estPT } = estimateFtePtCounts(filteredNewRoutes);
     return {
-      count: filteredRuns.length,
+      count: filteredNewRoutes.length,
       totalServiceHours: Math.round(totalServiceHours * 10) / 10,
       maxVehicles,
       productivity,
       estFTE,
       estPT,
     };
-  }, [filteredRuns, runVehiclesByBlockFullDay, avgDailyTrips]);
+  }, [filteredNewRoutes, newRouteVehiclesByBlockFullDay, avgDailyTrips]);
 
   // ── Copy functions ────────────────────────────────────────────────
 
@@ -453,14 +453,14 @@ export default function RunStructureTab({
       return Number.isNaN(num) ? 999 : num;
     }
 
-    function computeServiceHours(run: RunRow): number {
-      const startMin = parseClockToMinutes(run.start_time, 0);
-      const endMin = parseClockToMinutes(run.end_time, 0);
+    function computeServiceHours(newRoute: NewRouteRow): number {
+      const startMin = parseClockToMinutes(newRoute.start_time, 0);
+      const endMin = parseClockToMinutes(newRoute.end_time, 0);
       const spread = Math.max(0, endMin - startMin);
       let breakMin = 0;
       for (const breakNum of [1, 2, 3] as const) {
-        const bStart = run[`break_${breakNum}_start`];
-        const bEnd = run[`break_${breakNum}_end`];
+        const bStart = newRoute[`break_${breakNum}_start`];
+        const bEnd = newRoute[`break_${breakNum}_end`];
         if (bStart && bEnd) {
           const bs = parseClockToMinutes(bStart, 0);
           const be = parseClockToMinutes(bEnd, 0);
@@ -470,12 +470,12 @@ export default function RunStructureTab({
       return Math.round(((spread - breakMin) / 60) * 10) / 10;
     }
 
-    const rawRuns: (RunRow & { _originalName: string })[] = dateRoutes.map((route, idx) => {
+    const rawNewRoutes: (NewRouteRow & { _originalName: string })[] = dateRoutes.map((route, idx) => {
       const start = asDate(route.scheduled_start_time) ?? asDate(route.actual_start_time);
       const end = asDate(route.scheduled_end_time) ?? asDate(route.actual_end_time);
       const startMin = start ? dateToMinutesOfDay(start) : 360;
       const endMin = end ? dateToMinutesOfDay(end) : 840;
-      const originalName = route.route_name ?? route.route_id ?? `Route ${localRuns.length + idx + 1}`;
+      const originalName = route.route_name ?? route.route_id ?? `Route ${localNewRoutes.length + idx + 1}`;
 
       const b1S = asDate(route.break1_start);
       const b1E = asDate(route.break1_end);
@@ -486,9 +486,9 @@ export default function RunStructureTab({
       const break2Start = b2S ? formatMinutesToClock(dateToMinutesOfDay(b2S)) : null;
       const break2End = b2E ? formatMinutesToClock(dateToMinutesOfDay(b2E)) : null;
 
-      const runRow = {
-        run_id: crypto.randomUUID(),
-        run_name: originalName,
+      const newRouteRow = {
+        new_route_id: crypto.randomUUID(),
+        new_route_name: originalName,
         _originalName: originalName,
         split_number: 0,
         depot: (route.depot_address ? addressToDepotId.get(route.depot_address) : null) ?? null,
@@ -505,16 +505,16 @@ export default function RunStructureTab({
         break_3_start: null,
         break_3_end: null,
       };
-      const svcHrs = computeServiceHours(runRow);
-      runRow.platform_hours = String(svcHrs);
-      runRow.pay_hours = String(svcHrs);
+      const svcHrs = computeServiceHours(newRouteRow);
+      newRouteRow.platform_hours = String(svcHrs);
+      newRouteRow.pay_hours = String(svcHrs);
 
-      return runRow;
+      return newRouteRow;
     });
 
     const splitGroups = new Map<string, { suffix: string; index: number }[]>();
-    for (let i = 0; i < rawRuns.length; i++) {
-      const parsed = parseSplitName(rawRuns[i]._originalName);
+    for (let i = 0; i < rawNewRoutes.length; i++) {
+      const parsed = parseSplitName(rawNewRoutes[i]._originalName);
       if (parsed) {
         const key = parsed.baseName.toLowerCase();
         if (!splitGroups.has(key)) splitGroups.set(key, []);
@@ -526,17 +526,17 @@ export default function RunStructureTab({
       if (members.length < 2) continue;
       members.sort((a, b) => splitSortKey(a.suffix) - splitSortKey(b.suffix));
       for (let s = 0; s < members.length; s++) {
-        const run = rawRuns[members[s].index];
-        const parsed = parseSplitName(run._originalName);
+        const newRoute = rawNewRoutes[members[s].index];
+        const parsed = parseSplitName(newRoute._originalName);
         if (parsed) {
-          run.run_name = parsed.baseName;
-          run.split_number = s + 1;
+          newRoute.new_route_name = parsed.baseName;
+          newRoute.split_number = s + 1;
         }
       }
     }
 
-    const newRuns: RunRow[] = rawRuns.map(({ _originalName, ...rest }) => rest);
-    updateLocalRuns([...localRuns, ...newRuns]);
+    const copiedNewRoutes: NewRouteRow[] = rawNewRoutes.map(({ _originalName, ...rest }) => rest);
+    updateLocalNewRoutes([...localNewRoutes, ...copiedNewRoutes]);
     showToast(`Day copied to ${copyDaysSelection.join(', ')}`);
   }
 
@@ -568,14 +568,14 @@ export default function RunStructureTab({
       ? depots.find((d) => d.depot_address === matchedRoute.depot_address)?.depot_id ?? null
       : null;
 
-    function computeServiceHours(run: RunRow): number {
-      const sMin = parseClockToMinutes(run.start_time, 0);
-      const eMin = parseClockToMinutes(run.end_time, 0);
+    function computeServiceHours(newRoute: NewRouteRow): number {
+      const sMin = parseClockToMinutes(newRoute.start_time, 0);
+      const eMin = parseClockToMinutes(newRoute.end_time, 0);
       const spread = Math.max(0, eMin - sMin);
       let breakMin = 0;
       for (const breakNum of [1, 2, 3] as const) {
-        const bStart = run[`break_${breakNum}_start`];
-        const bEnd = run[`break_${breakNum}_end`];
+        const bStart = newRoute[`break_${breakNum}_start`];
+        const bEnd = newRoute[`break_${breakNum}_end`];
         if (bStart && bEnd) {
           const bs = parseClockToMinutes(bStart, 0);
           const be = parseClockToMinutes(bEnd, 0);
@@ -585,9 +585,9 @@ export default function RunStructureTab({
       return Math.round(((spread - breakMin) / 60) * 10) / 10;
     }
 
-    const newRun: RunRow = {
-      run_id: crypto.randomUUID(),
-      run_name: row.routeName,
+    const copiedNewRoute: NewRouteRow = {
+      new_route_id: crypto.randomUUID(),
+      new_route_name: row.routeName,
       split_number: 0,
       depot: matchedDepotId,
       service_days: serviceDaysJson,
@@ -603,11 +603,11 @@ export default function RunStructureTab({
       break_3_start: null,
       break_3_end: null,
     };
-    const svcHrs = computeServiceHours(newRun);
-    newRun.platform_hours = String(svcHrs);
-    newRun.pay_hours = String(svcHrs);
+    const svcHrs = computeServiceHours(copiedNewRoute);
+    copiedNewRoute.platform_hours = String(svcHrs);
+    copiedNewRoute.pay_hours = String(svcHrs);
 
-    updateLocalRuns([...localRuns, newRun]);
+    updateLocalNewRoutes([...localNewRoutes, copiedNewRoute]);
     showToast(`Route copied to ${copyDaysSelection.join(', ')}`);
   }
 
@@ -635,7 +635,7 @@ export default function RunStructureTab({
           pickups={demandMode === 'max' ? metrics.maxPickupsByBlock : metrics.pickupsByBlock}
           onBoard={demandMode === 'max' ? metrics.maxOnBoardByBlock : metrics.onBoardByBlock}
           currentVehicles={chartCurrentVehiclesByBlock}
-          runVehicles={runVehiclesByBlock}
+          runVehicles={newRouteVehiclesByBlock}
           crOnBreak={demandMode === 'max' ? metrics.maxVehiclesOnBreakByBlock : metrics.vehiclesOnBreakByBlock}
           nrOnBreak={nrOnBreakByBlock}
           blocks={metrics.blocks}
@@ -689,7 +689,7 @@ export default function RunStructureTab({
 
         <TabsContent value="bids">
           <ShiftBidsPanel
-            runs={localRuns}
+            newRoutes={localNewRoutes}
             depots={depots}
             readonlyView={readonlyView}
             bidResult={bidResult}
@@ -702,16 +702,16 @@ export default function RunStructureTab({
 
         <TabsContent value="runeditor">
           <RouteEditorPanel
-            localRuns={localRuns}
-            filteredRuns={filteredRuns}
+            localNewRoutes={localNewRoutes}
+            filteredNewRoutes={filteredNewRoutes}
             depots={depots}
             readonlyView={readonlyView}
-            runDayFilter={runDayFilter}
-            onRunDayFilterChange={setRunDayFilter}
+            newRouteDayFilter={newRouteDayFilter}
+            onNewRouteDayFilterChange={setNewRouteDayFilter}
             depotFilter={depotFilter}
             onDepotFilterChange={setDepotFilter}
-            runStats={runStats}
-            onUpdateLocalRuns={updateLocalRuns}
+            newRouteStats={newRouteStats}
+            onUpdateLocalNewRoutes={updateLocalNewRoutes}
             showToast={showToast}
           />
         </TabsContent>

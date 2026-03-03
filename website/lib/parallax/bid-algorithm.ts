@@ -1,4 +1,4 @@
-import type { BidConfig, BidPackage, BidResult, BidType, CollapsedRoute, DailyBlock, RunRow, ServiceDay } from './types';
+import type { BidConfig, BidPackage, BidResult, BidType, CollapsedRoute, DailyBlock, NewRouteRow, ServiceDay } from './types';
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -40,41 +40,41 @@ function parseServiceDays(json: string): ServiceDay[] {
   }
 }
 
-// ── Phase 1: Build Daily Blocks (one per run per day) ────────────────
+// ── Phase 1: Build Daily Blocks (one per new route per day) ────────────────
 
-export function buildDailyBlocks(runs: RunRow[]): DailyBlock[] {
-  // Key: "runId|day" — each run (including each split) gets its own block
+export function buildDailyBlocks(newRoutes: NewRouteRow[]): DailyBlock[] {
+  // Key: "newRouteId|day" — each new route (including each split) gets its own block
   const groups = new Map<string, {
-    run_name: string; day: ServiceDay; run_ids: string[]; depot: string | null;
+    new_route_name: string; day: ServiceDay; new_route_ids: string[]; depot: string | null;
     pay_hours: number; starts: number[]; ends: number[];
     break_1_start: string | null; break_1_end: string | null;
     break_2_start: string | null; break_2_end: string | null;
     break_3_start: string | null; break_3_end: string | null;
   }>();
 
-  for (const run of runs) {
-    const days = parseServiceDays(run.service_days);
-    const startMin = parseClockToMinutes(run.start_time, 0);
-    const endMin = parseClockToMinutes(run.end_time, 0);
-    const payHrs = Number(run.pay_hours) || 0;
+  for (const newRoute of newRoutes) {
+    const days = parseServiceDays(newRoute.service_days);
+    const startMin = parseClockToMinutes(newRoute.start_time, 0);
+    const endMin = parseClockToMinutes(newRoute.end_time, 0);
+    const payHrs = Number(newRoute.pay_hours) || 0;
 
     for (const day of days) {
-      const key = `${run.run_id}|${day}`;
+      const key = `${newRoute.new_route_id}|${day}`;
       let group = groups.get(key);
       if (!group) {
         group = {
-          run_name: run.run_name, day, run_ids: [], depot: null, pay_hours: 0, starts: [], ends: [],
-          break_1_start: run.break_1_start, break_1_end: run.break_1_end,
-          break_2_start: run.break_2_start, break_2_end: run.break_2_end,
-          break_3_start: run.break_3_start, break_3_end: run.break_3_end,
+          new_route_name: newRoute.new_route_name, day, new_route_ids: [], depot: null, pay_hours: 0, starts: [], ends: [],
+          break_1_start: newRoute.break_1_start, break_1_end: newRoute.break_1_end,
+          break_2_start: newRoute.break_2_start, break_2_end: newRoute.break_2_end,
+          break_3_start: newRoute.break_3_start, break_3_end: newRoute.break_3_end,
         };
         groups.set(key, group);
       }
-      group.run_ids.push(run.run_id);
+      group.new_route_ids.push(newRoute.new_route_id);
       group.pay_hours += payHrs;
       group.starts.push(startMin);
       group.ends.push(endMin);
-      if (run.depot && !group.depot) group.depot = run.depot;
+      if (newRoute.depot && !group.depot) group.depot = newRoute.depot;
     }
   }
 
@@ -83,9 +83,9 @@ export function buildDailyBlocks(runs: RunRow[]): DailyBlock[] {
     const startMin = Math.min(...g.starts);
     const endMin = Math.max(...g.ends);
     blocks.push({
-      run_name: g.run_name,
+      new_route_name: g.new_route_name,
       day: g.day,
-      run_ids: g.run_ids,
+      new_route_ids: g.new_route_ids,
       depot: g.depot,
       pay_hours: Math.round(g.pay_hours * 10) / 10,
       start_time_minutes: startMin,
@@ -211,10 +211,10 @@ function assembleFTEPackages(
   blocks: DailyBlock[],
   config: BidConfig,
 ): { ftePackages: WorkingPackage[]; remainingBlocks: DailyBlock[] } {
-  // Group blocks by run_id so each run (including splits) is evaluated independently
+  // Group blocks by new_route_id so each new route (including splits) is evaluated independently
   const runGroups = new Map<string, DailyBlock[]>();
   for (const block of blocks) {
-    const key = block.run_ids[0];
+    const key = block.new_route_ids[0];
     if (!runGroups.has(key)) runGroups.set(key, []);
     runGroups.get(key)!.push(block);
   }
@@ -225,7 +225,7 @@ function assembleFTEPackages(
   );
 
   const packages: WorkingPackage[] = [];
-  const assigned = new Set<string>(); // run_name keys that have been assigned
+  const assigned = new Set<string>(); // new_route_name keys that have been assigned
 
   // First pass: groups that already meet FTE threshold on their own
   for (const [key, groupBlocks] of sortedGroups) {
@@ -308,10 +308,10 @@ function assemblePTPackages(
 ): WorkingPackage[] {
   if (blocks.length === 0) return [];
 
-  // Group by run_id so each run (including splits) is independent
+  // Group by new_route_id so each new route (including splits) is independent
   const runGroups = new Map<string, DailyBlock[]>();
   for (const block of blocks) {
-    const key = block.run_ids[0];
+    const key = block.new_route_ids[0];
     if (!runGroups.has(key)) runGroups.set(key, []);
     runGroups.get(key)!.push(block);
   }
@@ -381,7 +381,7 @@ function finalizeBidPackage(wp: WorkingPackage, type: BidType, config: BidConfig
     bid_id: crypto.randomUUID(),
     bid_rank: 0, // assigned during ranking
     type,
-    assigned_runs: [...new Set(wp.blocks.flatMap((b) => b.run_ids))],
+    assigned_new_routes: [...new Set(wp.blocks.flatMap((b) => b.new_route_ids))],
     daily_blocks: wp.blocks,
     weekly_pay_hours: wp.weeklyHours,
     days_on: daysOn,
@@ -452,13 +452,13 @@ function buildComparator(priority: BidConfig['rank_priority']): (a: BidPackage, 
 
 // ── Main entry point ────────────────────────────────────────────────
 
-export function generateBidPackages(runs: RunRow[], config: BidConfig): BidResult {
-  if (runs.length === 0) {
+export function generateBidPackages(newRoutes: NewRouteRow[], config: BidConfig): BidResult {
+  if (newRoutes.length === 0) {
     return { config, packages: [], fte_count: 0, pt_count: 0, unassigned_blocks: [] };
   }
 
   // Phase 1: Build daily blocks (split reunion)
-  const allBlocks = buildDailyBlocks(runs);
+  const allBlocks = buildDailyBlocks(newRoutes);
 
   // Phase 2: FTE assembly
   const { ftePackages, remainingBlocks } = assembleFTEPackages(allBlocks, config);
@@ -501,7 +501,7 @@ export function collapseRoutes(blocks: DailyBlock[]): CollapsedRoute[] {
   const map = new Map<string, CollapsedRoute>();
   for (const b of blocks) {
     const key = [
-      b.run_name,
+      b.new_route_name,
       b.depot ?? '',
       b.start_time_minutes,
       b.end_time_minutes,
@@ -519,7 +519,7 @@ export function collapseRoutes(blocks: DailyBlock[]): CollapsedRoute[] {
       existing.pay_hours += b.pay_hours;
     } else {
       map.set(key, {
-        run_name: b.run_name,
+        new_route_name: b.new_route_name,
         depot: b.depot,
         start_time_minutes: b.start_time_minutes,
         end_time_minutes: b.end_time_minutes,
@@ -540,19 +540,19 @@ export function collapseRoutes(blocks: DailyBlock[]): CollapsedRoute[] {
 // ── Quick FTE/PT estimation for stats bar ───────────────────────────
 
 export function estimateFtePtCounts(
-  runs: RunRow[],
+  newRoutes: NewRouteRow[],
   fteMinHours = 35,
   fteMaxHours = 40,
 ): { fte: number; pt: number } {
-  if (runs.length === 0) return { fte: 0, pt: 0 };
+  if (newRoutes.length === 0) return { fte: 0, pt: 0 };
 
-  // Group by run_name to handle splits, then compute weekly hours
+  // Group by new_route_name to handle splits, then compute weekly hours
   const runGroups = new Map<string, { dailyPayHours: number; dayCount: number }>();
 
-  for (const run of runs) {
-    const key = run.run_name.toLowerCase();
-    const days = parseServiceDays(run.service_days);
-    const payHrs = Number(run.pay_hours) || 0;
+  for (const newRoute of newRoutes) {
+    const key = newRoute.new_route_name.toLowerCase();
+    const days = parseServiceDays(newRoute.service_days);
+    const payHrs = Number(newRoute.pay_hours) || 0;
 
     let group = runGroups.get(key);
     if (!group) {

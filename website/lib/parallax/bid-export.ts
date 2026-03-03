@@ -5,12 +5,12 @@ import type { BidPackage, BidResult, CollapsedRoute, DepotRow } from './types';
 
 function packageToRow(pkg: BidPackage, depotNameMap: Map<string, string>) {
   // Build a readable run summary from daily blocks
-  const runNames = [...new Set(pkg.daily_blocks.map((b) => b.run_name))].join(', ');
+  const runNames = [...new Set(pkg.daily_blocks.map((b) => b.new_route_name))].join(', ');
 
   return {
     Rank: pkg.bid_rank,
     Type: pkg.type,
-    Runs: runNames,
+    Routes: runNames,
     'Days On': pkg.days_on.join(', '),
     'Days Off': pkg.days_off.join(', '),
     'Weekly Pay Hours': pkg.weekly_pay_hours,
@@ -36,7 +36,7 @@ function routeDetailRow(
 
   return {
     'Bid Rank': pkg.bid_rank,
-    'Run Name': route.run_name,
+    'Route Name': route.new_route_name,
     Days: route.days.join(', '),
     Depot: route.depot ? (depotNameMap.get(route.depot) ?? route.depot) : '',
     'Start Time': formatMinutesToClock(route.start_time_minutes),
@@ -49,7 +49,7 @@ function routeDetailRow(
 function setDetailColumnWidths(sheet: XLSX.WorkSheet) {
   sheet['!cols'] = [
     { wch: 10 },  // Bid Rank
-    { wch: 18 },  // Run Name
+    { wch: 18 },  // Route Name
     { wch: 20 },  // Days
     { wch: 15 },  // Depot
     { wch: 12 },  // Start Time
@@ -63,7 +63,7 @@ function setColumnWidths(sheet: XLSX.WorkSheet) {
   sheet['!cols'] = [
     { wch: 6 },   // Rank
     { wch: 5 },   // Type
-    { wch: 30 },  // Runs
+    { wch: 30 },  // Routes
     { wch: 20 },  // Days On
     { wch: 20 },  // Days Off
     { wch: 16 },  // Weekly Pay Hours

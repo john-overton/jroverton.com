@@ -10,7 +10,7 @@ import type {
   DepotRow,
   OptimizationRow,
   RouteRow,
-  RunRow,
+  NewRouteRow,
   SessionStateUpdateInput,
   SettingsRow,
   TripRow,
@@ -64,9 +64,9 @@ const ROUTE_COLUMNS = [
   'distance_from_last_drop',
 ] as const;
 
-const RUN_COLUMNS = [
-  'run_id',
-  'run_name',
+const NEW_ROUTE_COLUMNS = [
+  'new_route_id',
+  'new_route_name',
   'split_number',
   'depot',
   'service_days',
@@ -176,15 +176,17 @@ function ensureTripColumns(db: Database.Database): void {
   }
 }
 
-function ensureRunsTable(db: Database.Database): void {
-  const tables = db
+function ensureNewRoutesTable(db: Database.Database): void {
+  // Check if old 'runs' table exists and migrate
+  const oldTables = db
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='runs'")
     .all() as Array<{ name: string }>;
-  if (tables.length === 0) {
+
+  if (oldTables.length > 0) {
     db.exec(`
-      CREATE TABLE IF NOT EXISTS runs (
-        run_id TEXT NOT NULL PRIMARY KEY,
-        run_name TEXT NOT NULL,
+      CREATE TABLE IF NOT EXISTS new_routes (
+        new_route_id TEXT NOT NULL PRIMARY KEY,
+        new_route_name TEXT NOT NULL,
         split_number INTEGER NOT NULL DEFAULT 0,
         depot TEXT,
         service_days TEXT NOT NULL DEFAULT '["M","T","W","Th","F"]',
@@ -200,7 +202,50 @@ function ensureRunsTable(db: Database.Database): void {
         break_3_start TEXT,
         break_3_end TEXT
       );
-      CREATE INDEX IF NOT EXISTS idx_runs_name ON runs(run_name);
+      INSERT OR IGNORE INTO new_routes (
+        new_route_id, new_route_name, split_number, depot,
+        service_days, route_area, start_time, end_time,
+        platform_hours, pay_hours,
+        break_1_start, break_1_end, break_2_start, break_2_end,
+        break_3_start, break_3_end
+      )
+      SELECT run_id, run_name, split_number, depot,
+        service_days, route_area, start_time, end_time,
+        platform_hours, pay_hours,
+        break_1_start, break_1_end, break_2_start, break_2_end,
+        break_3_start, break_3_end
+      FROM runs;
+      DROP TABLE runs;
+      CREATE INDEX IF NOT EXISTS idx_new_routes_name ON new_routes(new_route_name);
+    `);
+    return;
+  }
+
+  // Fresh creation if new_routes doesn't exist
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='new_routes'")
+    .all() as Array<{ name: string }>;
+  if (tables.length === 0) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS new_routes (
+        new_route_id TEXT NOT NULL PRIMARY KEY,
+        new_route_name TEXT NOT NULL,
+        split_number INTEGER NOT NULL DEFAULT 0,
+        depot TEXT,
+        service_days TEXT NOT NULL DEFAULT '["M","T","W","Th","F"]',
+        route_area TEXT,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        platform_hours TEXT NOT NULL DEFAULT '0',
+        pay_hours TEXT NOT NULL DEFAULT '0',
+        break_1_start TEXT,
+        break_1_end TEXT,
+        break_2_start TEXT,
+        break_2_end TEXT,
+        break_3_start TEXT,
+        break_3_end TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_new_routes_name ON new_routes(new_route_name);
     `);
   }
 }
@@ -256,7 +301,7 @@ function openSessionDb(editToken: string): Database.Database {
   ensureTripPassengerTypeColumn(db);
   ensureSettingsOtpWindowColumns(db);
   ensureRouteColumns(db);
-  ensureRunsTable(db);
+  ensureNewRoutesTable(db);
   ensureDepotsTable(db);
   ensureBidResultColumn(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
@@ -341,9 +386,9 @@ export function listRoutes(editToken: string): RouteRow[] {
   });
 }
 
-export function listRuns(editToken: string): RunRow[] {
+export function listNewRoutes(editToken: string): NewRouteRow[] {
   return withSessionDb(editToken, (db) => {
-    return db.prepare('SELECT * FROM runs ORDER BY run_name, split_number').all() as RunRow[];
+    return db.prepare('SELECT * FROM new_routes ORDER BY new_route_name, split_number').all() as NewRouteRow[];
   });
 }
 
@@ -397,6 +442,22 @@ export function replaceRoutes(editToken: string, routes: RouteRow[]): void {
       }
     });
     transaction(routes);
+  });
+}
+
+export function replaceNewRoutes(editToken: string, newRoutes: NewRouteRow[]): void {
+  withSessionDb(editToken, (db) => {
+    const insertNewRoute = db.prepare(
+      `INSERT INTO new_routes (${NEW_ROUTE_COLUMNS.join(',')})
+       VALUES (${NEW_ROUTE_COLUMNS.map(() => '?').join(',')})`,
+    );
+    const transaction = db.transaction((rows: NewRouteRow[]) => {
+      db.prepare('DELETE FROM new_routes').run();
+      for (const row of rows) {
+        insertNewRoute.run(...NEW_ROUTE_COLUMNS.map((column) => row[column as keyof NewRouteRow]));
+      }
+    });
+    transaction(newRoutes);
   });
 }
 
@@ -485,14 +546,14 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
         }
       }
 
-      if (input.runs) {
-        const insertRun = db.prepare(
-          `INSERT INTO runs (${RUN_COLUMNS.join(',')})
-           VALUES (${RUN_COLUMNS.map(() => '?').join(',')})`,
+      if (input.new_routes) {
+        const insertNewRoute = db.prepare(
+          `INSERT INTO new_routes (${NEW_ROUTE_COLUMNS.join(',')})
+           VALUES (${NEW_ROUTE_COLUMNS.map(() => '?').join(',')})`,
         );
-        db.prepare('DELETE FROM runs').run();
-        for (const row of input.runs) {
-          insertRun.run(...RUN_COLUMNS.map((column) => row[column as keyof RunRow]));
+        db.prepare('DELETE FROM new_routes').run();
+        for (const row of input.new_routes) {
+          insertNewRoute.run(...NEW_ROUTE_COLUMNS.map((column) => row[column as keyof NewRouteRow]));
         }
       }
 

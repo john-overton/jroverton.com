@@ -212,6 +212,7 @@ interface ImportTabProps {
   session: {
     uploadTrips: (file: File) => Promise<ImportResponse | undefined>;
     uploadRoutes: (file: File) => Promise<ImportResponse | undefined>;
+    uploadNewRoutes: (file: File) => Promise<ImportResponse | undefined>;
     previewImport: (file: File, sheetName?: string) => Promise<ImportPreviewResponse>;
     validateImport: (preview: ImportPreviewResponse, config: ImportMappingConfig) => Promise<ImportValidateResponse>;
     applyImport: (
@@ -263,6 +264,7 @@ export default function ImportTab({
   const [flatImportLog, setFlatImportLog] = useState<{
     trips: Array<{ row: number; reason: string }>;
     routes: Array<{ row: number; reason: string }>;
+    newRoutes?: Array<{ row: number; reason: string }>;
   } | null>(null);
   const [showFlatImportLog, setShowFlatImportLog] = useState(false);
   const [tripVisibleColumns, setTripVisibleColumns] = useState<Record<TripDataColumnKey, boolean>>({
@@ -397,7 +399,7 @@ export default function ImportTab({
     currentRoutePage * ROUTE_DATA_PAGE_SIZE,
   );
 
-  function downloadSampleCsv(kind: 'trips' | 'routes') {
+  function downloadSampleCsv(kind: 'trips' | 'routes' | 'new_routes') {
     const tripSample = [
       'trip_id,trip_date,scheduled_pickup_time,scheduled_appointment_time,pickup_arrive_time,pickup_leave_time,dropoff_arrive_time,dropoff_leave_time,route_id,pickup_address,pickup_lat,pickup_lon,dropoff_address,dropoff_lat,dropoff_lon,status,passenger_type,passenger_count,pick_odometer,drop_odometer',
       'TRIP-001,2026-02-01,2026-02-01 08:00:00,2026-02-01 08:30:00,2026-02-01 07:58:00,2026-02-01 08:02:00,2026-02-01 08:27:00,2026-02-01 08:31:00,ROUTE-001,123 Main St,,,456 Oak St,,,completed,ambulatory,1,1000,1010',
@@ -406,13 +408,18 @@ export default function ImportTab({
       'route_id,route_date,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1_start,break1_end,break2_start,break2_end,depot_address,depot_lat,depot_lon,distance_to_first_pick,distance_from_last_drop',
       'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 11:30:00,,, 100 Depot Way,40.7128,-74.0060,3.2,4.5',
     ].join('\n');
+    const newRouteSample = [
+      'new_route_name,start_time,end_time,service_days,depot_address,route_area,split_number,break_1_start,break_1_end,break_2_start,break_2_end',
+      'North Loop,06:00,14:00,"M,T,W,Th,F",100 Depot Way,,0,10:00,10:30,,',
+      'South Loop,14:00,22:00,"M,T,W,Th,F",100 Depot Way,,0,18:00,18:30,,',
+    ].join('\n');
 
-    const content = kind === 'trips' ? tripSample : routeSample;
+    const content = kind === 'trips' ? tripSample : kind === 'routes' ? routeSample : newRouteSample;
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = kind === 'trips' ? 'parallax-flat-trip-sample.csv' : 'parallax-flat-route-sample.csv';
+    anchor.download = kind === 'trips' ? 'parallax-flat-trip-sample.csv' : kind === 'routes' ? 'parallax-flat-route-sample.csv' : 'parallax-flat-new-route-sample.csv';
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -422,18 +429,22 @@ export default function ImportTab({
   return (
     <>
       <SectionCard title="Data Import">
+        <div className="text-[13px] text-cc-text-secondary mb-4 bg-cc-surface-2 border border-cc-border rounded-lg px-4 py-3 leading-relaxed">
+          Upload past route and trip data to analyze demand or build a new route structure based on existing routes (trip data is not required). If you already have a new route structure you want to modify or break into bids, you can upload that directly.
+        </div>
         <FlatFileImport
           readonlyView={readonlyView}
           onDownloadSample={downloadSampleCsv}
-          onImport={async (tripFile, routeFile) => {
+          onImport={async (tripFile, routeFile, newRouteFile) => {
             if (readonlyView) return;
-            setStatus('Importing routes and trips...');
+            setStatus('Importing files...');
             setError(null);
             setFlatImportLog(null);
             try {
               const skippedMessages: string[] = [];
               let routeSkipped: Array<{ row: number; reason: string }> = [];
               let tripSkipped: Array<{ row: number; reason: string }> = [];
+              let newRouteSkipped: Array<{ row: number; reason: string }> = [];
               if (routeFile) {
                 const routeResult = await session.uploadRoutes(routeFile);
                 if (routeResult?.skipped_rows?.length) {
@@ -448,8 +459,15 @@ export default function ImportTab({
                   tripSkipped = tripResult.skipped_rows;
                 }
               }
-              if (routeSkipped.length > 0 || tripSkipped.length > 0) {
-                setFlatImportLog({ routes: routeSkipped, trips: tripSkipped });
+              if (newRouteFile) {
+                const newRouteResult = await session.uploadNewRoutes(newRouteFile);
+                if (newRouteResult?.skipped_rows?.length) {
+                  skippedMessages.push(`${newRouteResult.skipped_rows.length} new route row(s) skipped.`);
+                  newRouteSkipped = newRouteResult.skipped_rows;
+                }
+              }
+              if (routeSkipped.length > 0 || tripSkipped.length > 0 || newRouteSkipped.length > 0) {
+                setFlatImportLog({ routes: routeSkipped, trips: tripSkipped, newRoutes: newRouteSkipped });
               }
               const statusParts = ['Import complete.'];
               if (skippedMessages.length > 0) {
@@ -765,18 +783,22 @@ function FlatFileImport({
   onImport,
 }: {
   readonlyView: boolean;
-  onDownloadSample: (kind: 'trips' | 'routes') => void;
-  onImport: (tripFile: File | null, routeFile: File | null) => Promise<void>;
+  onDownloadSample: (kind: 'trips' | 'routes' | 'new_routes') => void;
+  onImport: (tripFile: File | null, routeFile: File | null, newRouteFile: File | null) => Promise<void>;
 }) {
   const [tripFile, setTripFile] = useState<File | null>(null);
   const [routeFile, setRouteFile] = useState<File | null>(null);
+  const [newRouteFile, setNewRouteFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const routeInputRef = useRef<HTMLInputElement>(null);
   const tripInputRef = useRef<HTMLInputElement>(null);
+  const newRouteInputRef = useRef<HTMLInputElement>(null);
   const [routeDragOver, setRouteDragOver] = useState(false);
   const [tripDragOver, setTripDragOver] = useState(false);
+  const [newRouteDragOver, setNewRouteDragOver] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [tripError, setTripError] = useState<string | null>(null);
+  const [newRouteError, setNewRouteError] = useState<string | null>(null);
 
   function validateFile(file: File): { valid: true } | { valid: false; reason: string } {
     if (file.size === 0) return { valid: false, reason: 'File is empty (0 bytes).' };
@@ -813,11 +835,24 @@ function FlatFileImport({
     setTripFile(file);
   }
 
+  function handleNewRouteFile(file: File | null) {
+    if (!file) { setNewRouteFile(null); return; }
+    const result = validateFile(file);
+    if (!result.valid) {
+      setNewRouteError(result.reason);
+      setNewRouteFile(null);
+      if (newRouteInputRef.current) newRouteInputRef.current.value = '';
+      return;
+    }
+    setNewRouteError(null);
+    setNewRouteFile(file);
+  }
+
   async function handleImport() {
-    if (readonlyView || (!tripFile && !routeFile)) return;
+    if (readonlyView || (!tripFile && !routeFile && !newRouteFile)) return;
     setImporting(true);
     try {
-      await onImport(tripFile, routeFile);
+      await onImport(tripFile, routeFile, newRouteFile);
     } finally {
       setImporting(false);
     }
@@ -825,7 +860,7 @@ function FlatFileImport({
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="border border-cc-border rounded-[10px] overflow-hidden">
           <div className="bg-cc-surface-2 px-4 py-2.5 flex items-center justify-between">
             <div className="font-semibold text-sm">Route File (CSV/XLSX)</div>
@@ -836,7 +871,7 @@ function FlatFileImport({
               className="text-xs text-cc-text-muted h-auto py-1"
               onClick={() => onDownloadSample('routes')}
             >
-              Download Sample CSV
+              Sample CSV
             </Button>
           </div>
           <div
@@ -886,7 +921,7 @@ function FlatFileImport({
               className="text-xs text-cc-text-muted h-auto py-1"
               onClick={() => onDownloadSample('trips')}
             >
-              Download Sample CSV
+              Sample CSV
             </Button>
           </div>
           <div
@@ -926,16 +961,66 @@ function FlatFileImport({
             {tripError && <div className="text-cc-danger text-[13px] mt-1.5">{tripError}</div>}
           </div>
         </div>
+        <div className="border border-cc-border rounded-[10px] overflow-hidden">
+          <div className="bg-cc-surface-2 px-4 py-2.5 flex items-center justify-between">
+            <div className="font-semibold text-sm">New Route File (CSV/XLSX)</div>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              className="text-xs text-cc-text-muted h-auto py-1"
+              onClick={() => onDownloadSample('new_routes')}
+            >
+              Sample CSV
+            </Button>
+          </div>
+          <div
+            className={`p-4 transition-colors ${newRouteDragOver ? 'border-2 border-dashed border-cc-accent bg-cc-accent/5' : ''}`}
+            style={{ background: readonlyView && !newRouteDragOver ? 'var(--color-cc-surface-2)' : undefined }}
+            onDragOver={(e) => { e.preventDefault(); setNewRouteDragOver(true); }}
+            onDragEnter={(e) => { e.preventDefault(); setNewRouteDragOver(true); }}
+            onDragLeave={() => setNewRouteDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setNewRouteDragOver(false);
+              if (readonlyView) return;
+              handleNewRouteFile(e.dataTransfer.files[0] ?? null);
+            }}
+          >
+            <input
+              ref={newRouteInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              disabled={readonlyView}
+              onChange={(event) => handleNewRouteFile(event.target.files?.[0] ?? null)}
+            />
+            <div className="flex border border-cc-border rounded-md overflow-hidden">
+              <button
+                type="button"
+                disabled={readonlyView}
+                className="shrink-0 bg-cc-accent text-white text-sm px-4 py-2 font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                onClick={() => newRouteInputRef.current?.click()}
+              >
+                Browse
+              </button>
+              <div className="flex-1 flex items-center px-3 text-sm text-cc-text-muted truncate bg-cc-surface-1">
+                {newRouteFile ? <span className="text-cc-success truncate">{newRouteFile.name}</span> : 'No file selected — or drag & drop here'}
+              </div>
+            </div>
+            {newRouteError && <div className="text-cc-danger text-[13px] mt-1.5">{newRouteError}</div>}
+          </div>
+        </div>
       </div>
       <Button
         className="mt-3"
         type="button"
-        disabled={readonlyView || importing || (!tripFile && !routeFile)}
+        disabled={readonlyView || importing || (!tripFile && !routeFile && !newRouteFile)}
         onClick={handleImport}
       >
         {importing ? 'Importing...' : 'Import Files'}
       </Button>
-      {!tripFile && !routeFile && (
+      {!tripFile && !routeFile && !newRouteFile && (
         <div className="text-[13px] text-cc-text-muted mt-2">
           Select at least one file to import. Routes are imported first so trips can be validated against them.
         </div>
@@ -950,10 +1035,12 @@ function FlatImportLogModal(props: {
   log: {
     trips: Array<{ row: number; reason: string }>;
     routes: Array<{ row: number; reason: string }>;
+    newRoutes?: Array<{ row: number; reason: string }>;
   };
 }) {
   const hasTrips = props.log.trips.length > 0;
   const hasRoutes = props.log.routes.length > 0;
+  const hasNewRoutes = (props.log.newRoutes?.length ?? 0) > 0;
 
   return (
     <Dialog open={props.show} onOpenChange={(open) => { if (!open) props.onClose(); }}>
@@ -981,7 +1068,7 @@ function FlatImportLogModal(props: {
             </div>
           )}
           {hasTrips && (
-            <div className="border border-cc-border rounded-lg p-3">
+            <div className="border border-cc-border rounded-lg p-3 mb-3">
               <div className="font-semibold mb-1.5">
                 Trip file skipped rows ({props.log.trips.length})
               </div>
@@ -994,7 +1081,21 @@ function FlatImportLogModal(props: {
               </ul>
             </div>
           )}
-          {!hasTrips && !hasRoutes && (
+          {hasNewRoutes && (
+            <div className="border border-cc-border rounded-lg p-3 mb-3">
+              <div className="font-semibold mb-1.5">
+                New route file skipped rows ({props.log.newRoutes!.length})
+              </div>
+              <ul className="mb-0 max-h-[220px] overflow-auto">
+                {props.log.newRoutes!.map((err, idx) => (
+                  <li key={`flat-new-route-error-${idx}`} className="text-[13px]">
+                    Row {err.row}: {err.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {!hasTrips && !hasRoutes && !hasNewRoutes && (
             <p className="text-[13px] text-cc-text-muted">No skipped rows were reported for the last import.</p>
           )}
         </div>

@@ -18,7 +18,7 @@ import {
   getSettings,
   listDepots,
   listRoutes,
-  listRuns,
+  listNewRoutes,
   listTrips,
   saveSessionState,
 } from './session-db';
@@ -91,7 +91,7 @@ export function getSessionState(record: SessionRecord): SessionState {
     optimization,
     trips: listTrips(record.edit_token),
     routes: listRoutes(record.edit_token),
-    runs: listRuns(record.edit_token),
+    new_routes: listNewRoutes(record.edit_token),
     depots: listDepots(record.edit_token),
     bid_result: bidResult,
   };

@@ -27,7 +27,7 @@ import {
 } from '@/app/parallax/components/shadcn/table';
 import { DEFAULT_BID_CONFIG, collapseRoutes, computeMaxConsecutiveWork, generateBidPackages, rankPackages, recomputePackageMetrics } from '@/lib/parallax/bid-algorithm';
 import { exportBidsToExcel } from '@/lib/parallax/bid-export';
-import type { BidConfig, BidResult, BidType, CollapsedRoute, DailyBlock, DepotRow, RunRow, ServiceDay } from '@/lib/parallax/types';
+import type { BidConfig, BidResult, BidType, CollapsedRoute, DailyBlock, DepotRow, NewRouteRow, ServiceDay } from '@/lib/parallax/types';
 
 import { ALL_SERVICE_DAYS, formatMinutesToClock } from './shared';
 
@@ -58,7 +58,7 @@ function DraggableRouteRow({
   blocks: DailyBlock[];
   children: React.ReactNode;
 }) {
-  const id = `${packageId}::${route.run_name}::${route.start_time_minutes}::${route.days.join(',')}`;
+  const id = `${packageId}::${route.new_route_name}::${route.start_time_minutes}::${route.days.join(',')}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
     data: { sourcePackageId: packageId, blocks, route },
@@ -169,7 +169,7 @@ function validateBlockMove(
 // ── Main component ──────────────────────────────────────────────────
 
 interface ShiftBidsPanelProps {
-  runs: RunRow[];
+  newRoutes: NewRouteRow[];
   depots: DepotRow[];
   readonlyView: boolean;
   bidResult: BidResult | null;
@@ -179,7 +179,7 @@ interface ShiftBidsPanelProps {
   showToast: (message: string) => void;
 }
 
-export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, onBidResultChange, pushBidUndoState, clearBidHistory, showToast }: ShiftBidsPanelProps) {
+export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidResult, onBidResultChange, pushBidUndoState, clearBidHistory, showToast }: ShiftBidsPanelProps) {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [settingsLocked, setSettingsLocked] = useState(false);
   const [config, setConfig] = useState<BidConfig>({ ...DEFAULT_BID_CONFIG });
@@ -247,7 +247,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
   }
 
   function doGenerate() {
-    const newResult = generateBidPackages(runs, config);
+    const newResult = generateBidPackages(newRoutes, config);
     setExpandedBids(new Set());
     setSettingsLocked(true);
     setSettingsOpen(false);
@@ -374,7 +374,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
   function getBlocksForCollapsedRoute(pkg: { daily_blocks: DailyBlock[] }, route: CollapsedRoute): DailyBlock[] {
     return pkg.daily_blocks.filter(
       (b) =>
-        b.run_name === route.run_name &&
+        b.new_route_name === route.new_route_name &&
         b.start_time_minutes === route.start_time_minutes &&
         b.end_time_minutes === route.end_time_minutes &&
         route.days.includes(b.day),
@@ -480,14 +480,14 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
                   disabled={settingsDisabled}
                   onCheckedChange={(checked) => updateConfig('depot_match_required', checked === true)}
                 />
-                <SettingLabel tip="When enabled, all runs in a bid package must share the same depot.">Depot Match Required</SettingLabel>
+                <SettingLabel tip="When enabled, all routes in a bid package must share the same depot.">Depot Match Required</SettingLabel>
               </div>
             </div>
 
             {/* Row 3 */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <SettingLabel tip="How heavily start/end time consistency is weighted when grouping runs. Higher values favor predictable schedules.">Consistency Weight</SettingLabel>
+                <SettingLabel tip="How heavily start/end time consistency is weighted when grouping routes. Higher values favor predictable schedules.">Consistency Weight</SettingLabel>
                 <Select
                   value={config.consistency_weight}
                   disabled={settingsDisabled}
@@ -528,7 +528,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
       {/* ── Action bar ───────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={handleGenerateClick} disabled={runs.length === 0 || readonlyView} type="button">
+          <Button size="sm" onClick={handleGenerateClick} disabled={newRoutes.length === 0 || readonlyView} type="button">
             <Play size={14} className="mr-1.5" />
             {bidResult ? 'Regenerate Bids' : 'Generate Bids'}
           </Button>
@@ -595,7 +595,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
                   <TableHead className="w-6" />
                   <TableHead className="min-w-[50px]">Rank</TableHead>
                   <TableHead className="min-w-[50px]">Type</TableHead>
-                  <TableHead className="min-w-[150px]">Runs</TableHead>
+                  <TableHead className="min-w-[150px]">Routes</TableHead>
                   <TableHead className="min-w-[160px]">Days On</TableHead>
                   <TableHead className="min-w-[100px]">Days Off</TableHead>
                   <TableHead className="min-w-[90px]">Weekly Hrs</TableHead>
@@ -609,7 +609,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
                   <TableRow>
                     <TableCell colSpan={10} className="text-cc-text-muted">
                       {bidResult.packages.length === 0
-                        ? 'No bid packages generated. Add runs and click Generate Bids.'
+                        ? 'No bid packages generated. Add routes and click Generate Bids.'
                         : `No ${typeFilter} packages found.`}
                     </TableCell>
                   </TableRow>
@@ -617,7 +617,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
               )}
               {filteredPackages.map((pkg) => {
                 const isExpanded = expandedBids.has(pkg.bid_id);
-                const runNames = [...new Set(pkg.daily_blocks.map((b) => b.run_name))].join(', ');
+                const routeNames = [...new Set(pkg.daily_blocks.map((b) => b.new_route_name))].join(', ');
                 const collapsed = isExpanded ? collapseRoutes(pkg.daily_blocks) : [];
                 return (
                   <DroppablePackageBody key={pkg.bid_id} packageId={pkg.bid_id}>
@@ -634,7 +634,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
                           {pkg.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs">{runNames}</TableCell>
+                      <TableCell className="text-xs">{routeNames}</TableCell>
                       <TableCell>
                         <div className="flex gap-0.5">
                           {ALL_SERVICE_DAYS.map((day) => (
@@ -677,7 +677,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
                         >
                           <TableCell />
                           <TableCell />
-                          <TableCell className="text-xs pl-6 text-cc-text-secondary">{route.run_name}</TableCell>
+                          <TableCell className="text-xs pl-6 text-cc-text-secondary">{route.new_route_name}</TableCell>
                           <TableCell>
                             <div className="flex gap-0.5">
                               {ALL_SERVICE_DAYS.map((day) => (
@@ -729,7 +729,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
                       >
                         <TableCell />
                         <TableCell />
-                        <TableCell className="text-xs pl-6 text-cc-text-secondary">{route.run_name}</TableCell>
+                        <TableCell className="text-xs pl-6 text-cc-text-secondary">{route.new_route_name}</TableCell>
                         <TableCell>
                           <div className="flex gap-0.5">
                             {ALL_SERVICE_DAYS.map((day) => (
@@ -766,7 +766,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
           <DragOverlay>
             {activeDragRoute && (
               <div className="bg-cc-surface-1 border border-cc-accent rounded px-3 py-1.5 shadow-lg text-xs">
-                <strong>{activeDragRoute.run_name}</strong>
+                <strong>{activeDragRoute.new_route_name}</strong>
                 <span className="text-cc-text-muted ml-2">
                   {activeDragRoute.days.join(', ')} &middot; {formatMinutesToClock(activeDragRoute.start_time_minutes)} - {formatMinutesToClock(activeDragRoute.end_time_minutes)}
                 </span>
@@ -779,7 +779,7 @@ export default function ShiftBidsPanel({ runs, depots, readonlyView, bidResult, 
       {/* ── Empty state ──────────────────────────────────────────── */}
       {!bidResult && (
         <div className="text-xs text-cc-text-muted py-6 text-center">
-          Configure settings above and click Generate Bids to create shift bid packages from your runs.
+          Configure settings above and click Generate Bids to create shift bid packages from your routes.
         </div>
       )}
 

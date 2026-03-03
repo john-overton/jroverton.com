@@ -76,7 +76,7 @@ export interface CloneSessionResponse {
 
 export interface ImportResponse {
   imported: true;
-  type: 'trips' | 'routes';
+  type: 'trips' | 'routes' | 'new_routes';
   trip_count: number;
   route_count: number;
   skipped_rows?: Array<{ row: number; reason: string }>;
@@ -236,6 +236,16 @@ export async function importRoutes(token: string, jwt: string, file: File): Prom
   const formData = new FormData();
   formData.set('file', file);
   return request<ImportResponse>(`/api/parallax/sessions/${token}/import/routes`, {
+    method: 'POST',
+    jwt,
+    formData,
+  });
+}
+
+export async function importNewRoutes(token: string, jwt: string, file: File): Promise<ImportResponse> {
+  const formData = new FormData();
+  formData.set('file', file);
+  return request<ImportResponse>(`/api/parallax/sessions/${token}/import/new-routes`, {
     method: 'POST',
     jwt,
     formData,

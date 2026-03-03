@@ -79,9 +79,9 @@ export interface RouteRow {
 
 export type ServiceDay = 'M' | 'T' | 'W' | 'Th' | 'F' | 'Sa' | 'Su';
 
-export interface RunRow {
-  run_id: string;
-  run_name: string;
+export interface NewRouteRow {
+  new_route_id: string;
+  new_route_name: string;
   split_number: number;
   depot: string | null;
   service_days: string;
@@ -114,9 +114,9 @@ export interface BidConfig {
 }
 
 export interface DailyBlock {
-  run_name: string;
+  new_route_name: string;
   day: ServiceDay;
-  run_ids: string[];
+  new_route_ids: string[];
   depot: string | null;
   pay_hours: number;
   start_time_minutes: number;
@@ -131,7 +131,7 @@ export interface DailyBlock {
 }
 
 export interface CollapsedRoute {
-  run_name: string;
+  new_route_name: string;
   depot: string | null;
   start_time_minutes: number;
   end_time_minutes: number;
@@ -149,7 +149,7 @@ export interface BidPackage {
   bid_id: string;
   bid_rank: number;
   type: BidType;
-  assigned_runs: string[];
+  assigned_new_routes: string[];
   daily_blocks: DailyBlock[];
   weekly_pay_hours: number;
   days_on: ServiceDay[];
@@ -221,7 +221,7 @@ export interface SessionState {
   optimization: OptimizationRow;
   trips: TripRow[];
   routes: RouteRow[];
-  runs: RunRow[];
+  new_routes: NewRouteRow[];
   depots: DepotRow[];
   bid_result: BidResult | null;
 }
@@ -231,7 +231,7 @@ export interface SessionStateUpdateInput {
   optimization?: Partial<Omit<OptimizationRow, 'id'>>;
   trips?: TripRow[];
   routes?: RouteRow[];
-  runs?: RunRow[];
+  new_routes?: NewRouteRow[];
   depots?: DepotRow[];
 }
 

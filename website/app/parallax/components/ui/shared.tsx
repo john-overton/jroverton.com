@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/parallax/components/shadcn/table';
-import type { RouteRow, ServiceDay, TripRow } from '@/lib/parallax/types';
+import type { NewRouteRow, RouteRow, ServiceDay, TripRow } from '@/lib/parallax/types';
 import type { YardTripRow } from '@/lib/parallax/metrics';
 import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
@@ -85,6 +85,7 @@ export function parseDateTime(value: string | null | undefined): Date | null {
 export function deriveSliderBounds(params: {
   trips: TripRow[];
   routes: RouteRow[];
+  newRoutes?: NewRouteRow[];
   fallbackStartMinutes: number;
   fallbackEndMinutes: number;
 }): { startMinutes: number; endMinutes: number } {
@@ -95,6 +96,11 @@ export function deriveSliderBounds(params: {
   function updateFromDate(d: Date | null) {
     if (!d) return;
     const m = d.getHours() * 60 + d.getMinutes();
+    if (m < earliestMinutes) earliestMinutes = m;
+    if (m > latestMinutes) latestMinutes = m;
+  }
+
+  function updateFromMinutes(m: number) {
     if (m < earliestMinutes) earliestMinutes = m;
     if (m > latestMinutes) latestMinutes = m;
   }
@@ -115,6 +121,16 @@ export function deriveSliderBounds(params: {
   for (const route of params.routes) {
     updateFromDate(parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time));
     updateFromDate(parseDateTime(route.actual_end_time) ?? parseDateTime(route.scheduled_end_time));
+  }
+
+  // New routes use HH:MM format, not datetime
+  if (params.newRoutes) {
+    for (const nr of params.newRoutes) {
+      const startMin = parseClockToMinutes(nr.start_time, -1);
+      const endMin = parseClockToMinutes(nr.end_time, -1);
+      if (startMin >= 0) updateFromMinutes(startMin);
+      if (endMin >= 0) updateFromMinutes(endMin);
+    }
   }
 
   if (earliestMinutes === Infinity || latestMinutes === -Infinity) {

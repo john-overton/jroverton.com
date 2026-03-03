@@ -103,9 +103,9 @@ CREATE TABLE IF NOT EXISTS optimization (
   bid_result_json TEXT
 );
 
-CREATE TABLE IF NOT EXISTS runs (
-  run_id TEXT NOT NULL PRIMARY KEY,
-  run_name TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS new_routes (
+  new_route_id TEXT NOT NULL PRIMARY KEY,
+  new_route_name TEXT NOT NULL,
   split_number INTEGER NOT NULL DEFAULT 0,
   depot TEXT,
   service_days TEXT NOT NULL DEFAULT '["M","T","W","Th","F"]',
@@ -122,5 +122,5 @@ CREATE TABLE IF NOT EXISTS runs (
   break_3_end TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_runs_name ON runs(run_name);
+CREATE INDEX IF NOT EXISTS idx_new_routes_name ON new_routes(new_route_name);
 `;

@@ -15,7 +15,7 @@ import {
 import { ClearcutClientError } from '@/lib/parallax/client';
 import { extractNewDepotsFromRoutes } from '@/lib/parallax/depot-utils';
 import { computeClearcutMetrics } from '@/lib/parallax/metrics';
-import type { BidResult, DepotRow, RunRow } from '@/lib/parallax/types';
+import type { BidResult, DepotRow, NewRouteRow } from '@/lib/parallax/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/parallax/use-clearcut-session';
 import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
@@ -114,10 +114,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       deriveSliderBounds({
         trips: ready?.state.trips ?? [],
         routes: ready?.state.routes ?? [],
+        newRoutes: ready?.state.new_routes ?? [],
         fallbackStartMinutes: fallbackServiceStartMinutes,
         fallbackEndMinutes: fallbackServiceEndMinutes,
       }),
-    [fallbackServiceEndMinutes, fallbackServiceStartMinutes, ready?.state.trips, ready?.state.routes],
+    [fallbackServiceEndMinutes, fallbackServiceStartMinutes, ready?.state.trips, ready?.state.routes, ready?.state.new_routes],
   );
   const serviceStartMinutes = sliderBounds.startMinutes;
   const serviceEndMinutes = sliderBounds.endMinutes;
@@ -169,7 +170,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const rangeEndClock = allTimeBlocks[timeEndIndex]
     ? formatMinutesToClock(allTimeBlocks[timeEndIndex].minutes)
     : null;
-  // Depots that actually appear in imported routes (not custom depots only used for runs)
+  // Depots that actually appear in imported routes (not custom depots only used for new routes)
   const routeLinkedDepots = useMemo(() => {
     if (!ready) return [];
     const routeAddresses = new Set(
@@ -245,7 +246,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
         : null,
     [ready, metricsOptions, intervalMinutes],
   );
-  const hasData = ready ? ready.state.session.trip_count > 0 || ready.state.session.route_count > 0 : false;
+  const hasTrips = ready ? ready.state.session.trip_count > 0 : false;
+  const hasData = ready ? hasTrips || ready.state.session.route_count > 0 || ready.state.new_routes.length > 0 : false;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const depotDisplayName = useMemo(() => {
     if (selectedDepot === 'all') return 'All Depots';
@@ -584,12 +586,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     });
   }
 
-  function onRunsChange(runs: RunRow[]) {
+  function onNewRoutesChange(newRoutes: NewRouteRow[]) {
     if (!ready || readonlyView) {
       return;
     }
-    session.saveState({ runs }).catch((saveError) => {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save runs.');
+    session.saveState({ new_routes: newRoutes }).catch((saveError) => {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save new routes.');
     });
   }
 
@@ -677,6 +679,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             if (v === 'map') setHasVisitedMap(true);
           }}
           hasData={hasData}
+          hasTrips={hasTrips}
           paletteId={paletteId}
           onPaletteChange={setPaletteId}
           onRename={onRename}
@@ -929,6 +932,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           session={{
             uploadTrips: session.uploadTrips,
             uploadRoutes: session.uploadRoutes,
+            uploadNewRoutes: session.uploadNewRoutes,
             previewImport: session.previewImport,
             validateImport: session.validateImport,
             applyImport: session.applyImport,
@@ -971,12 +975,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           fullDayMetrics={fullDayMetrics!}
           optimization={ready.state.optimization}
           routes={ready.state.routes}
-          runs={ready.state.runs}
+          newRoutes={ready.state.new_routes}
           selectedDays={selectedDayIds}
           readonlyView={readonlyView}
           intervalMinutes={intervalMinutes}
           onOptimizationChange={onOptimizationChange}
-          onRunsChange={onRunsChange}
+          onNewRoutesChange={onNewRoutesChange}
           depots={ready.state.depots}
           filteredRoutes={filteredRoutes}
           savedBidResult={ready.state.bid_result}

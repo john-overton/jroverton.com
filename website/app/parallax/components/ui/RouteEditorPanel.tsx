@@ -20,21 +20,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/parallax/components/shadcn/table';
-import type { DepotRow, RunRow, ServiceDay } from '@/lib/parallax/types';
+import type { DepotRow, NewRouteRow, ServiceDay } from '@/lib/parallax/types';
 
 import { ALL_SERVICE_DAYS, SERVICE_DAY_FULL_NAME, parseClockToMinutes, formatMinutesToClock, parseServiceDays } from './shared';
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
 /** Service hours = (end - start) minus break durations */
-function computeServiceHours(run: RunRow): number {
-  const startMin = parseClockToMinutes(run.start_time, 0);
-  const endMin = parseClockToMinutes(run.end_time, 0);
+function computeServiceHours(newRoute: NewRouteRow): number {
+  const startMin = parseClockToMinutes(newRoute.start_time, 0);
+  const endMin = parseClockToMinutes(newRoute.end_time, 0);
   const spread = Math.max(0, endMin - startMin);
   let breakMin = 0;
   for (const breakNum of [1, 2, 3] as const) {
-    const bStart = run[`break_${breakNum}_start`];
-    const bEnd = run[`break_${breakNum}_end`];
+    const bStart = newRoute[`break_${breakNum}_start`];
+    const bEnd = newRoute[`break_${breakNum}_end`];
     if (bStart && bEnd) {
       const bs = parseClockToMinutes(bStart, 0);
       const be = parseClockToMinutes(bEnd, 0);
@@ -53,12 +53,12 @@ function breakDurationLabel(start: string | null, end: string | null): string | 
   return `${e - s}m`;
 }
 
-/** Clamp a break time string to fall within the run's start/end window */
-function clampBreakTime(time: string, runStart: string, runEnd: string): string {
+/** Clamp a break time string to fall within the new route's start/end window */
+function clampBreakTime(time: string, routeStart: string, routeEnd: string): string {
   const t = parseClockToMinutes(time, -1);
   if (t < 0) return time;
-  const s = parseClockToMinutes(runStart, 0);
-  const e = parseClockToMinutes(runEnd, 1440);
+  const s = parseClockToMinutes(routeStart, 0);
+  const e = parseClockToMinutes(routeEnd, 1440);
   const clamped = Math.max(s, Math.min(e, t));
   return formatMinutesToClock(clamped);
 }
@@ -84,10 +84,10 @@ function splitSortKey(suffix: string): number {
   return Number.isNaN(num) ? 999 : num;
 }
 
-function applySplitDetection(runs: RunRow[]): RunRow[] {
+function applySplitDetection(newRoutes: NewRouteRow[]): NewRouteRow[] {
   const groups = new Map<string, { suffix: string; index: number }[]>();
-  for (let i = 0; i < runs.length; i++) {
-    const parsed = parseSplitName(runs[i].run_name);
+  for (let i = 0; i < newRoutes.length; i++) {
+    const parsed = parseSplitName(newRoutes[i].new_route_name);
     if (parsed) {
       const key = parsed.baseName.toLowerCase();
       if (!groups.has(key)) groups.set(key, []);
@@ -105,21 +105,21 @@ function applySplitDetection(runs: RunRow[]): RunRow[] {
   }
 
   let changed = false;
-  for (let i = 0; i < runs.length; i++) {
+  for (let i = 0; i < newRoutes.length; i++) {
     const expected = splitNumbers.get(i) ?? 0;
-    if (runs[i].split_number !== expected) { changed = true; break; }
+    if (newRoutes[i].split_number !== expected) { changed = true; break; }
   }
-  if (!changed) return runs;
+  if (!changed) return newRoutes;
 
-  return runs.map((run, i) => {
+  return newRoutes.map((newRoute, i) => {
     const expected = splitNumbers.get(i) ?? 0;
-    return run.split_number === expected ? run : { ...run, split_number: expected };
+    return newRoute.split_number === expected ? newRoute : { ...newRoute, split_number: expected };
   });
 }
 
 // ── Sortable table header ───────────────────────────────────────────
 
-type SortColumn = 'run_name' | 'start_time' | 'end_time' | 'platform_hours' | 'split_number';
+type SortColumn = 'new_route_name' | 'start_time' | 'end_time' | 'platform_hours' | 'split_number';
 
 function SortableHead({
   column,
@@ -158,15 +158,15 @@ function SortableHead({
 // ── Main component ──────────────────────────────────────────────────
 
 interface RouteEditorPanelProps {
-  localRuns: RunRow[];
-  filteredRuns: RunRow[];
+  localNewRoutes: NewRouteRow[];
+  filteredNewRoutes: NewRouteRow[];
   depots: DepotRow[];
   readonlyView: boolean;
-  runDayFilter: ServiceDay | 'all';
-  onRunDayFilterChange: (filter: ServiceDay | 'all') => void;
+  newRouteDayFilter: ServiceDay | 'all';
+  onNewRouteDayFilterChange: (filter: ServiceDay | 'all') => void;
   depotFilter: string;
   onDepotFilterChange: (filter: string) => void;
-  runStats: {
+  newRouteStats: {
     count: number;
     totalServiceHours: number;
     maxVehicles: number;
@@ -174,30 +174,30 @@ interface RouteEditorPanelProps {
     estFTE: number;
     estPT: number;
   };
-  onUpdateLocalRuns: (nextRuns: RunRow[]) => void;
+  onUpdateLocalNewRoutes: (nextNewRoutes: NewRouteRow[]) => void;
   showToast: (message: string) => void;
 }
 
 export default function RouteEditorPanel({
-  localRuns,
-  filteredRuns,
+  localNewRoutes,
+  filteredNewRoutes,
   depots,
   readonlyView,
-  runDayFilter,
-  onRunDayFilterChange,
+  newRouteDayFilter,
+  onNewRouteDayFilterChange,
   depotFilter,
   onDepotFilterChange,
-  runStats,
-  onUpdateLocalRuns,
+  newRouteStats,
+  onUpdateLocalNewRoutes,
 }: RouteEditorPanelProps) {
-  const [draftRun, setDraftRun] = useState<RunRow | null>(null);
-  const [sortKey, setSortKey] = useState<SortColumn>('run_name');
+  const [draftNewRoute, setDraftNewRoute] = useState<NewRouteRow | null>(null);
+  const [sortKey, setSortKey] = useState<SortColumn>('new_route_name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [breaksExpanded, setBreaksExpanded] = useState(false);
   const [frozenOrder, setFrozenOrder] = useState<string[] | null>(null);
-  const [highlightedRunId, setHighlightedRunId] = useState<string | null>(null);
+  const [highlightedNewRouteId, setHighlightedNewRouteId] = useState<string | null>(null);
   const sortFreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastEditedRunIdRef = useRef<string | null>(null);
+  const lastEditedNewRouteIdRef = useRef<string | null>(null);
 
   // Cleanup sort-freeze timer on unmount
   useEffect(() => {
@@ -209,13 +209,13 @@ export default function RouteEditorPanel({
   // ── Split overlap detection ──────────────────────────────────────
   const splitOverlapIds = useMemo(() => {
     const overlapping = new Set<string>();
-    const groups = new Map<string, RunRow[]>();
-    for (const run of localRuns) {
-      if (run.split_number === 0) continue;
-      const parsed = parseSplitName(run.run_name);
-      const key = parsed ? parsed.baseName.toLowerCase() : run.run_name.toLowerCase();
+    const groups = new Map<string, NewRouteRow[]>();
+    for (const newRoute of localNewRoutes) {
+      if (newRoute.split_number === 0) continue;
+      const parsed = parseSplitName(newRoute.new_route_name);
+      const key = parsed ? parsed.baseName.toLowerCase() : newRoute.new_route_name.toLowerCase();
       if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(run);
+      groups.get(key)!.push(newRoute);
     }
     for (const [, siblings] of groups) {
       if (siblings.length < 2) continue;
@@ -226,16 +226,16 @@ export default function RouteEditorPanel({
           const bStart = parseClockToMinutes(siblings[j].start_time, 0);
           const bEnd = parseClockToMinutes(siblings[j].end_time, 0);
           if (aStart < bEnd && bStart < aEnd) {
-            overlapping.add(siblings[i].run_id);
-            overlapping.add(siblings[j].run_id);
+            overlapping.add(siblings[i].new_route_id);
+            overlapping.add(siblings[j].new_route_id);
           }
         }
       }
     }
     return overlapping;
-  }, [localRuns]);
+  }, [localNewRoutes]);
 
-  // ── Sorted runs for display ──────────────────────────────────────
+  // ── Sorted new routes for display ──────────────────────────────────────
 
   function toggleSort(key: typeof sortKey) {
     if (sortKey === key) {
@@ -246,9 +246,9 @@ export default function RouteEditorPanel({
     }
   }
 
-  const sortedRuns = useMemo(() => {
+  const sortedNewRoutes = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
-    return [...filteredRuns].sort((a, b) => {
+    return [...filteredNewRoutes].sort((a, b) => {
       let cmp: number;
       switch (sortKey) {
         case 'start_time':
@@ -261,53 +261,53 @@ export default function RouteEditorPanel({
         case 'split_number':
           cmp = a.split_number - b.split_number;
           break;
-        case 'run_name':
+        case 'new_route_name':
         default:
-          cmp = a.run_name.localeCompare(b.run_name);
+          cmp = a.new_route_name.localeCompare(b.new_route_name);
           break;
       }
       if (cmp !== 0) return cmp * dir;
-      if (sortKey !== 'run_name') {
-        const nameCmp = a.run_name.localeCompare(b.run_name);
+      if (sortKey !== 'new_route_name') {
+        const nameCmp = a.new_route_name.localeCompare(b.new_route_name);
         if (nameCmp !== 0) return nameCmp;
       }
       return a.split_number - b.split_number;
     });
-  }, [filteredRuns, sortKey, sortDir]);
+  }, [filteredNewRoutes, sortKey, sortDir]);
 
   // Display order: use frozen order during edits, otherwise follow sort
-  const displayRuns = useMemo(() => {
-    if (!frozenOrder) return sortedRuns;
-    const runMap = new Map(filteredRuns.map((r) => [r.run_id, r]));
-    const ordered: RunRow[] = [];
+  const displayNewRoutes = useMemo(() => {
+    if (!frozenOrder) return sortedNewRoutes;
+    const routeMap = new Map(filteredNewRoutes.map((r) => [r.new_route_id, r]));
+    const ordered: NewRouteRow[] = [];
     for (const id of frozenOrder) {
-      const run = runMap.get(id);
-      if (run) {
-        ordered.push(run);
-        runMap.delete(id);
+      const newRoute = routeMap.get(id);
+      if (newRoute) {
+        ordered.push(newRoute);
+        routeMap.delete(id);
       }
     }
-    for (const run of runMap.values()) {
-      ordered.push(run);
+    for (const newRoute of routeMap.values()) {
+      ordered.push(newRoute);
     }
     return ordered;
-  }, [frozenOrder, sortedRuns, filteredRuns]);
+  }, [frozenOrder, sortedNewRoutes, filteredNewRoutes]);
 
   // ── Actions ──────────────────────────────────────────────────────
 
-  function updateLocalRuns(nextRuns: RunRow[]) {
-    const withSplits = applySplitDetection(nextRuns);
-    onUpdateLocalRuns(withSplits);
+  function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[]) {
+    const withSplits = applySplitDetection(nextNewRoutes);
+    onUpdateLocalNewRoutes(withSplits);
   }
 
-  function addRun() {
-    if (draftRun) return;
-    const defaultDays = runDayFilter !== 'all'
-      ? JSON.stringify([runDayFilter])
+  function addNewRoute() {
+    if (draftNewRoute) return;
+    const defaultDays = newRouteDayFilter !== 'all'
+      ? JSON.stringify([newRouteDayFilter])
       : '["M","T","W","Th","F"]';
-    setDraftRun({
-      run_id: crypto.randomUUID(),
-      run_name: `Route ${localRuns.length + 1}`,
+    setDraftNewRoute({
+      new_route_id: crypto.randomUUID(),
+      new_route_name: `Route ${localNewRoutes.length + 1}`,
       split_number: 0,
       depot: null,
       service_days: defaultDays,
@@ -325,58 +325,58 @@ export default function RouteEditorPanel({
     });
   }
 
-  function updateDraft(field: keyof RunRow, value: string | number | null) {
-    if (!draftRun) return;
-    const next = { ...draftRun, [field]: value };
+  function updateDraft(field: keyof NewRouteRow, value: string | number | null) {
+    if (!draftNewRoute) return;
+    const next = { ...draftNewRoute, [field]: value };
     if (field.startsWith('break_') && typeof value === 'string' && value) {
-      next[field as keyof RunRow] = clampBreakTime(value, next.start_time, next.end_time) as never;
+      next[field as keyof NewRouteRow] = clampBreakTime(value, next.start_time, next.end_time) as never;
     }
     if (field === 'start_time' || field === 'end_time' || field.startsWith('break_')) {
       const svcHrs = computeServiceHours(next);
       next.platform_hours = String(svcHrs);
       next.pay_hours = String(svcHrs);
     }
-    setDraftRun(next);
+    setDraftNewRoute(next);
   }
 
   function toggleDraftServiceDay(day: ServiceDay) {
-    if (!draftRun) return;
-    const days = parseServiceDays(draftRun.service_days);
+    if (!draftNewRoute) return;
+    const days = parseServiceDays(draftNewRoute.service_days);
     const next = days.includes(day) ? days.filter((d) => d !== day) : [...days, day];
     const sorted = ALL_SERVICE_DAYS.filter((d) => next.includes(d));
     updateDraft('service_days', JSON.stringify(sorted));
   }
 
   function saveDraft() {
-    if (!draftRun) return;
-    updateLocalRuns([...localRuns, draftRun]);
-    setDraftRun(null);
+    if (!draftNewRoute) return;
+    updateLocalNewRoutes([...localNewRoutes, draftNewRoute]);
+    setDraftNewRoute(null);
   }
 
   function cancelDraft() {
-    setDraftRun(null);
+    setDraftNewRoute(null);
   }
 
-  function addSplit(run: RunRow) {
-    const siblings = localRuns.filter((r) => r.run_name === run.run_name && r.split_number > 0);
+  function addSplit(newRoute: NewRouteRow) {
+    const siblings = localNewRoutes.filter((r) => r.new_route_name === newRoute.new_route_name && r.split_number > 0);
     const nextSplitNumber = siblings.length > 0
       ? Math.max(...siblings.map((s) => s.split_number)) + 1
       : 2;
 
-    let nextRuns = localRuns;
-    if (run.split_number === 0) {
-      nextRuns = nextRuns.map((r) =>
-        r.run_id === run.run_id ? { ...r, split_number: 1 } : r,
+    let nextNewRoutes = localNewRoutes;
+    if (newRoute.split_number === 0) {
+      nextNewRoutes = nextNewRoutes.map((r) =>
+        r.new_route_id === newRoute.new_route_id ? { ...r, split_number: 1 } : r,
       );
     }
 
-    const newSplit: RunRow = {
-      run_id: crypto.randomUUID(),
-      run_name: run.run_name,
+    const newSplit: NewRouteRow = {
+      new_route_id: crypto.randomUUID(),
+      new_route_name: newRoute.new_route_name,
       split_number: nextSplitNumber,
-      depot: run.depot,
-      service_days: run.service_days,
-      route_area: run.route_area,
+      depot: newRoute.depot,
+      service_days: newRoute.service_days,
+      route_area: newRoute.route_area,
       start_time: '14:00',
       end_time: '20:00',
       platform_hours: '6.0',
@@ -388,44 +388,44 @@ export default function RouteEditorPanel({
       break_3_start: null,
       break_3_end: null,
     };
-    updateLocalRuns([...nextRuns, newSplit]);
+    updateLocalNewRoutes([...nextNewRoutes, newSplit]);
   }
 
-  function deleteRun(runId: string) {
-    updateLocalRuns(localRuns.filter((r) => r.run_id !== runId));
+  function deleteNewRoute(newRouteId: string) {
+    updateLocalNewRoutes(localNewRoutes.filter((r) => r.new_route_id !== newRouteId));
   }
 
-  function duplicateRun(run: RunRow) {
-    const copy: RunRow = {
-      ...run,
-      run_id: crypto.randomUUID(),
-      run_name: `${run.run_name} copy`,
+  function duplicateNewRoute(newRoute: NewRouteRow) {
+    const copy: NewRouteRow = {
+      ...newRoute,
+      new_route_id: crypto.randomUUID(),
+      new_route_name: `${newRoute.new_route_name} copy`,
       split_number: 0,
     };
-    updateLocalRuns([...localRuns, copy]);
+    updateLocalNewRoutes([...localNewRoutes, copy]);
   }
 
-  function updateRun(runId: string, field: keyof RunRow, value: string | number | null) {
+  function updateNewRoute(newRouteId: string, field: keyof NewRouteRow, value: string | number | null) {
     // Freeze current display order on first edit so the row doesn't jump
-    setFrozenOrder((prev) => prev ?? sortedRuns.map((r) => r.run_id));
-    lastEditedRunIdRef.current = runId;
+    setFrozenOrder((prev) => prev ?? sortedNewRoutes.map((r) => r.new_route_id));
+    lastEditedNewRouteIdRef.current = newRouteId;
 
     // Reset the 5-second debounce before re-sorting
     if (sortFreezeTimerRef.current) clearTimeout(sortFreezeTimerRef.current);
     sortFreezeTimerRef.current = setTimeout(() => {
       setFrozenOrder(null);
-      setHighlightedRunId(runId);
-      setTimeout(() => setHighlightedRunId(null), 2000);
+      setHighlightedNewRouteId(newRouteId);
+      setTimeout(() => setHighlightedNewRouteId(null), 2000);
       sortFreezeTimerRef.current = null;
-      lastEditedRunIdRef.current = null;
+      lastEditedNewRouteIdRef.current = null;
     }, 5000);
 
-    updateLocalRuns(
-      localRuns.map((r) => {
-        if (r.run_id !== runId) return r;
+    updateLocalNewRoutes(
+      localNewRoutes.map((r) => {
+        if (r.new_route_id !== newRouteId) return r;
         const next = { ...r, [field]: value };
         if (field.startsWith('break_') && typeof value === 'string' && value) {
-          next[field as keyof RunRow] = clampBreakTime(value, next.start_time, next.end_time) as never;
+          next[field as keyof NewRouteRow] = clampBreakTime(value, next.start_time, next.end_time) as never;
         }
         if (field === 'start_time' || field === 'end_time' || field.startsWith('break_')) {
           const svcHrs = computeServiceHours(next);
@@ -437,15 +437,15 @@ export default function RouteEditorPanel({
     );
   }
 
-  function toggleServiceDay(runId: string, day: ServiceDay) {
-    const run = localRuns.find((r) => r.run_id === runId);
-    if (!run) return;
-    const days = parseServiceDays(run.service_days);
+  function toggleServiceDay(newRouteId: string, day: ServiceDay) {
+    const newRoute = localNewRoutes.find((r) => r.new_route_id === newRouteId);
+    if (!newRoute) return;
+    const days = parseServiceDays(newRoute.service_days);
     const next = days.includes(day)
       ? days.filter((d) => d !== day)
       : [...days, day];
     const sorted = ALL_SERVICE_DAYS.filter((d) => next.includes(d));
-    updateRun(runId, 'service_days', JSON.stringify(sorted));
+    updateNewRoute(newRouteId, 'service_days', JSON.stringify(sorted));
   }
 
   // ── Render ──────────────────────────────────────────────────────
@@ -464,26 +464,26 @@ export default function RouteEditorPanel({
 
       <div className="flex items-center justify-between mb-3 mt-3 flex-wrap gap-2">
         <div className="flex gap-4 text-[13px] flex-wrap items-center">
-          <span>Routes: <strong>{runStats.count}</strong></span>
-          <span>Service Hrs: <strong>{runStats.totalServiceHours}</strong></span>
-          <span>Peak Vehicles: <strong>{runStats.maxVehicles}</strong></span>
-          <span>Productivity: <strong>{runStats.productivity}</strong></span>
-          <span>Est. FTE: <strong>{runStats.estFTE}</strong></span>
-          <span>Est. PT: <strong>{runStats.estPT}</strong></span>
+          <span>Routes: <strong>{newRouteStats.count}</strong></span>
+          <span>Service Hrs: <strong>{newRouteStats.totalServiceHours}</strong></span>
+          <span>Peak Vehicles: <strong>{newRouteStats.maxVehicles}</strong></span>
+          <span>Productivity: <strong>{newRouteStats.productivity}</strong></span>
+          <span>Est. FTE: <strong>{newRouteStats.estFTE}</strong></span>
+          <span>Est. PT: <strong>{newRouteStats.estPT}</strong></span>
         </div>
         <div className="flex items-center gap-2">
           {/* Day filter */}
           <div className="flex gap-0.5 items-center">
             <span className="text-xs text-cc-text-muted mr-1">Show:</span>
             <button
-              className={`px-2 py-0.5 text-[10px] rounded ${runDayFilter === 'all' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-              onClick={() => onRunDayFilterChange('all')}
+              className={`px-2 py-0.5 text-[10px] rounded ${newRouteDayFilter === 'all' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+              onClick={() => onNewRouteDayFilterChange('all')}
             >All</button>
             {ALL_SERVICE_DAYS.map((day) => (
               <button
                 key={day}
-                className={`px-1.5 py-0.5 text-[10px] rounded ${runDayFilter === day ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                onClick={() => onRunDayFilterChange(day)}
+                className={`px-1.5 py-0.5 text-[10px] rounded ${newRouteDayFilter === day ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => onNewRouteDayFilterChange(day)}
               >{day}</button>
             ))}
           </div>
@@ -501,16 +501,16 @@ export default function RouteEditorPanel({
             </Select>
           )}
           {!readonlyView && (
-            <Button size="sm" onClick={addRun} disabled={!!draftRun} type="button">
+            <Button size="sm" onClick={addNewRoute} disabled={!!draftNewRoute} type="button">
               <Plus size={14} className="mr-1.5" /> Add Route
             </Button>
           )}
         </div>
       </div>
 
-      {runDayFilter !== 'all' && filteredRuns.length !== localRuns.length && (
+      {newRouteDayFilter !== 'all' && filteredNewRoutes.length !== localNewRoutes.length && (
         <div className="text-xs text-cc-text-muted mb-2">
-          Showing {filteredRuns.length} of {localRuns.length} routes for {SERVICE_DAY_FULL_NAME[runDayFilter]}
+          Showing {filteredNewRoutes.length} of {localNewRoutes.length} routes for {SERVICE_DAY_FULL_NAME[newRouteDayFilter]}
         </div>
       )}
 
@@ -529,8 +529,8 @@ export default function RouteEditorPanel({
         </span>
       </div>
 
-      {draftRun && (() => {
-        const draftDays = parseServiceDays(draftRun.service_days);
+      {draftNewRoute && (() => {
+        const draftDays = parseServiceDays(draftNewRoute.service_days);
         return (
           <div className="mb-3 border border-cc-accent/30 rounded-md bg-cc-accent/5 p-2">
             <div className="text-xs font-medium text-cc-accent mb-1.5">New Route</div>
@@ -559,16 +559,16 @@ export default function RouteEditorPanel({
                   <TableRow>
                     <TableCell>
                       <Input
-                        value={draftRun.run_name}
+                        value={draftNewRoute.new_route_name}
                         className="h-7 text-xs"
-                        onChange={(e) => updateDraft('run_name', e.target.value)}
+                        onChange={(e) => updateDraft('new_route_name', e.target.value)}
                         autoFocus
                       />
                     </TableCell>
                     {depots.length > 0 && (
                       <TableCell>
                         <Select
-                          value={draftRun.depot ?? 'none'}
+                          value={draftNewRoute.depot ?? 'none'}
                           onValueChange={(v) => updateDraft('depot', v === 'none' ? null : v)}
                         >
                           <SelectTrigger className="h-7 text-xs">
@@ -586,7 +586,7 @@ export default function RouteEditorPanel({
                     <TableCell>
                       <Input
                         type="time"
-                        value={draftRun.start_time}
+                        value={draftNewRoute.start_time}
                         className="h-7 text-xs"
                         onChange={(e) => updateDraft('start_time', e.target.value)}
                       />
@@ -594,13 +594,13 @@ export default function RouteEditorPanel({
                     <TableCell>
                       <Input
                         type="time"
-                        value={draftRun.end_time}
+                        value={draftNewRoute.end_time}
                         className="h-7 text-xs"
                         onChange={(e) => updateDraft('end_time', e.target.value)}
                       />
                     </TableCell>
                     <TableCell>
-                      <span className="text-xs">{draftRun.platform_hours}</span>
+                      <span className="text-xs">{draftNewRoute.platform_hours}</span>
                     </TableCell>
                     {breaksExpanded ? (
                       <>
@@ -608,19 +608,19 @@ export default function RouteEditorPanel({
                           <div className="flex gap-1 items-center">
                             <Input
                               type="time"
-                              value={draftRun.break_1_start ?? ''}
+                              value={draftNewRoute.break_1_start ?? ''}
                               className="h-7 text-xs"
-                              min={draftRun.start_time}
-                              max={draftRun.end_time}
+                              min={draftNewRoute.start_time}
+                              max={draftNewRoute.end_time}
                               onChange={(e) => updateDraft('break_1_start', e.target.value || null)}
                             />
                             <span className="text-xs text-cc-text-muted">-</span>
                             <Input
                               type="time"
-                              value={draftRun.break_1_end ?? ''}
+                              value={draftNewRoute.break_1_end ?? ''}
                               className="h-7 text-xs"
-                              min={draftRun.break_1_start ?? draftRun.start_time}
-                              max={draftRun.end_time}
+                              min={draftNewRoute.break_1_start ?? draftNewRoute.start_time}
+                              max={draftNewRoute.end_time}
                               onChange={(e) => updateDraft('break_1_end', e.target.value || null)}
                             />
                           </div>
@@ -629,19 +629,19 @@ export default function RouteEditorPanel({
                           <div className="flex gap-1 items-center">
                             <Input
                               type="time"
-                              value={draftRun.break_2_start ?? ''}
+                              value={draftNewRoute.break_2_start ?? ''}
                               className="h-7 text-xs"
-                              min={draftRun.start_time}
-                              max={draftRun.end_time}
+                              min={draftNewRoute.start_time}
+                              max={draftNewRoute.end_time}
                               onChange={(e) => updateDraft('break_2_start', e.target.value || null)}
                             />
                             <span className="text-xs text-cc-text-muted">-</span>
                             <Input
                               type="time"
-                              value={draftRun.break_2_end ?? ''}
+                              value={draftNewRoute.break_2_end ?? ''}
                               className="h-7 text-xs"
-                              min={draftRun.break_2_start ?? draftRun.start_time}
-                              max={draftRun.end_time}
+                              min={draftNewRoute.break_2_start ?? draftNewRoute.start_time}
+                              max={draftNewRoute.end_time}
                               onChange={(e) => updateDraft('break_2_end', e.target.value || null)}
                             />
                           </div>
@@ -651,8 +651,8 @@ export default function RouteEditorPanel({
                       <TableCell>
                         <span className="text-xs text-cc-text-muted">
                           {(() => {
-                            const b1 = breakDurationLabel(draftRun.break_1_start, draftRun.break_1_end);
-                            const b2 = breakDurationLabel(draftRun.break_2_start, draftRun.break_2_end);
+                            const b1 = breakDurationLabel(draftNewRoute.break_1_start, draftNewRoute.break_1_end);
+                            const b2 = breakDurationLabel(draftNewRoute.break_2_start, draftNewRoute.break_2_end);
                             if (b1 && b2) return `${b1}, ${b2}`;
                             if (b1) return b1;
                             if (b2) return b2;
@@ -714,7 +714,7 @@ export default function RouteEditorPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableHead column="run_name" label="Route Name" className="min-w-[120px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              <SortableHead column="new_route_name" label="Route Name" className="min-w-[120px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               {depots.length > 0 && <TableHead className="min-w-[100px]">Depot</TableHead>}
               <SortableHead column="split_number" label="Split" className="min-w-[50px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <SortableHead column="start_time" label="Start" className="min-w-[90px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -749,34 +749,34 @@ export default function RouteEditorPanel({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedRuns.length === 0 && (
+            {sortedNewRoutes.length === 0 && (
               <TableRow>
                 <TableCell colSpan={breaksExpanded ? 9 : 8} className="text-cc-text-muted">
-                  {runDayFilter !== 'all'
-                    ? `No routes for ${runDayFilter}. Add a route or copy from an imported day.`
+                  {newRouteDayFilter !== 'all'
+                    ? `No routes for ${newRouteDayFilter}. Add a route or copy from an imported day.`
                     : 'No routes defined. Add a route or copy from an imported day.'}
                 </TableCell>
               </TableRow>
             )}
-            {displayRuns.map((run) => {
-              const days = parseServiceDays(run.service_days);
+            {displayNewRoutes.map((newRoute) => {
+              const days = parseServiceDays(newRoute.service_days);
               const disabled = readonlyView;
-              const hasOverlap = splitOverlapIds.has(run.run_id);
+              const hasOverlap = splitOverlapIds.has(newRoute.new_route_id);
               return (
-                <TableRow key={run.run_id} className={run.run_id === highlightedRunId ? 'animate-highlight-row' : ''}>
+                <TableRow key={newRoute.new_route_id} className={newRoute.new_route_id === highlightedNewRouteId ? 'animate-highlight-row' : ''}>
                   <TableCell>
                     <Input
-                      value={run.run_name}
+                      value={newRoute.new_route_name}
                       disabled={disabled}
                       className="h-7 text-xs"
-                      onChange={(e) => updateRun(run.run_id, 'run_name', e.target.value)}
+                      onChange={(e) => updateNewRoute(newRoute.new_route_id, 'new_route_name', e.target.value)}
                     />
                   </TableCell>
                   {depots.length > 0 && (
                     <TableCell>
                       <Select
-                        value={run.depot ?? 'none'}
-                        onValueChange={(v) => updateRun(run.run_id, 'depot', v === 'none' ? null : v)}
+                        value={newRoute.depot ?? 'none'}
+                        onValueChange={(v) => updateNewRoute(newRoute.new_route_id, 'depot', v === 'none' ? null : v)}
                         disabled={disabled}
                       >
                         <SelectTrigger className="h-7 text-xs">
@@ -794,7 +794,7 @@ export default function RouteEditorPanel({
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-cc-text-muted">
-                        {run.split_number === 0 ? '\u2014' : run.split_number}
+                        {newRoute.split_number === 0 ? '\u2014' : newRoute.split_number}
                       </span>
                       {hasOverlap && (
                         <span className="text-[10px] text-cc-danger" title="Split times overlap">
@@ -806,23 +806,23 @@ export default function RouteEditorPanel({
                   <TableCell>
                     <Input
                       type="time"
-                      value={run.start_time}
+                      value={newRoute.start_time}
                       disabled={disabled}
                       className="h-7 text-xs"
-                      onChange={(e) => updateRun(run.run_id, 'start_time', e.target.value)}
+                      onChange={(e) => updateNewRoute(newRoute.new_route_id, 'start_time', e.target.value)}
                     />
                   </TableCell>
                   <TableCell>
                     <Input
                       type="time"
-                      value={run.end_time}
+                      value={newRoute.end_time}
                       disabled={disabled}
                       className="h-7 text-xs"
-                      onChange={(e) => updateRun(run.run_id, 'end_time', e.target.value)}
+                      onChange={(e) => updateNewRoute(newRoute.new_route_id, 'end_time', e.target.value)}
                     />
                   </TableCell>
                   <TableCell>
-                    <span className="text-xs">{run.platform_hours}</span>
+                    <span className="text-xs">{newRoute.platform_hours}</span>
                   </TableCell>
                   {breaksExpanded ? (
                     <>
@@ -830,22 +830,22 @@ export default function RouteEditorPanel({
                         <div className="flex gap-1 items-center">
                           <Input
                             type="time"
-                            value={run.break_1_start ?? ''}
+                            value={newRoute.break_1_start ?? ''}
                             disabled={disabled}
                             className="h-7 text-xs"
-                            min={run.start_time}
-                            max={run.end_time}
-                            onChange={(e) => updateRun(run.run_id, 'break_1_start', e.target.value || null)}
+                            min={newRoute.start_time}
+                            max={newRoute.end_time}
+                            onChange={(e) => updateNewRoute(newRoute.new_route_id, 'break_1_start', e.target.value || null)}
                           />
                           <span className="text-xs text-cc-text-muted">-</span>
                           <Input
                             type="time"
-                            value={run.break_1_end ?? ''}
+                            value={newRoute.break_1_end ?? ''}
                             disabled={disabled}
                             className="h-7 text-xs"
-                            min={run.break_1_start ?? run.start_time}
-                            max={run.end_time}
-                            onChange={(e) => updateRun(run.run_id, 'break_1_end', e.target.value || null)}
+                            min={newRoute.break_1_start ?? newRoute.start_time}
+                            max={newRoute.end_time}
+                            onChange={(e) => updateNewRoute(newRoute.new_route_id, 'break_1_end', e.target.value || null)}
                           />
                         </div>
                       </TableCell>
@@ -853,22 +853,22 @@ export default function RouteEditorPanel({
                         <div className="flex gap-1 items-center">
                           <Input
                             type="time"
-                            value={run.break_2_start ?? ''}
+                            value={newRoute.break_2_start ?? ''}
                             disabled={disabled}
                             className="h-7 text-xs"
-                            min={run.start_time}
-                            max={run.end_time}
-                            onChange={(e) => updateRun(run.run_id, 'break_2_start', e.target.value || null)}
+                            min={newRoute.start_time}
+                            max={newRoute.end_time}
+                            onChange={(e) => updateNewRoute(newRoute.new_route_id, 'break_2_start', e.target.value || null)}
                           />
                           <span className="text-xs text-cc-text-muted">-</span>
                           <Input
                             type="time"
-                            value={run.break_2_end ?? ''}
+                            value={newRoute.break_2_end ?? ''}
                             disabled={disabled}
                             className="h-7 text-xs"
-                            min={run.break_2_start ?? run.start_time}
-                            max={run.end_time}
-                            onChange={(e) => updateRun(run.run_id, 'break_2_end', e.target.value || null)}
+                            min={newRoute.break_2_start ?? newRoute.start_time}
+                            max={newRoute.end_time}
+                            onChange={(e) => updateNewRoute(newRoute.new_route_id, 'break_2_end', e.target.value || null)}
                           />
                         </div>
                       </TableCell>
@@ -877,8 +877,8 @@ export default function RouteEditorPanel({
                     <TableCell>
                       <span className="text-xs text-cc-text-muted">
                         {(() => {
-                          const b1 = breakDurationLabel(run.break_1_start, run.break_1_end);
-                          const b2 = breakDurationLabel(run.break_2_start, run.break_2_end);
+                          const b1 = breakDurationLabel(newRoute.break_1_start, newRoute.break_1_end);
+                          const b2 = breakDurationLabel(newRoute.break_2_start, newRoute.break_2_end);
                           if (b1 && b2) return `${b1}, ${b2}`;
                           if (b1) return b1;
                           if (b2) return b2;
@@ -897,7 +897,7 @@ export default function RouteEditorPanel({
                               ? 'bg-cc-accent text-white'
                               : 'bg-cc-surface-2 text-cc-text-muted'
                           }`}
-                          onClick={() => toggleServiceDay(run.run_id, day)}
+                          onClick={() => toggleServiceDay(newRoute.new_route_id, day)}
                           disabled={disabled}
                         >
                           {day}
@@ -913,7 +913,7 @@ export default function RouteEditorPanel({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => addSplit(run)}
+                            onClick={() => addSplit(newRoute)}
                             title="Add split"
                             type="button"
                           >
@@ -923,7 +923,7 @@ export default function RouteEditorPanel({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => duplicateRun(run)}
+                            onClick={() => duplicateNewRoute(newRoute)}
                             title="Copy route"
                             type="button"
                           >
@@ -933,7 +933,7 @@ export default function RouteEditorPanel({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-cc-danger"
-                            onClick={() => deleteRun(run.run_id)}
+                            onClick={() => deleteNewRoute(newRoute.new_route_id)}
                             title="Delete route"
                             type="button"
                           >

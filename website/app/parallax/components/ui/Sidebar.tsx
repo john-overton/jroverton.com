@@ -52,6 +52,7 @@ interface SidebarProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
   hasData: boolean;
+  hasTrips: boolean;
   paletteId: PaletteId;
   onPaletteChange: (id: PaletteId) => void;
   onRename: () => void;
@@ -74,6 +75,7 @@ export default function Sidebar({
   activeTab,
   onTabChange,
   hasData,
+  hasTrips,
   paletteId,
   onPaletteChange,
   onRename,
@@ -88,12 +90,13 @@ export default function Sidebar({
   copiedLink,
   detectedOS,
 }: SidebarProps) {
-  const [analyzeOpen, setAnalyzeOpen] = useState(true);
+  const [analyzeOpen, setAnalyzeOpen] = useState(hasTrips);
   const ShareIcon = detectedOS === 'apple' ? Share : Share2;
 
   const renderNavButton = (item: { key: TabKey; label: string; icon: ReactNode }) => {
     const isActive = activeTab === item.key;
-    const disabled = item.key !== 'import' && !hasData;
+    const isAnalyzeTab = ANALYZE_KEYS.has(item.key);
+    const disabled = item.key === 'import' ? false : isAnalyzeTab ? !hasTrips : !hasData;
     return (
       <Button
         key={item.key}
@@ -149,6 +152,7 @@ export default function Sidebar({
             <Button
               variant="ghost"
               size="sm"
+              disabled={!hasTrips}
               className={`w-full justify-start gap-2 mb-0.5 rounded-md ${
                 ANALYZE_KEYS.has(activeTab) && !analyzeOpen
                   ? 'text-cc-text font-semibold'

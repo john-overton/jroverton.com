@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 
 import { ApiError } from './errors';
-import type { RouteRow, TripRow } from './types';
+import type { NewRouteRow, RouteRow, TripRow } from './types';
 
 const DATETIME_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
@@ -336,4 +336,141 @@ export function parseRoutesFile(fileBuffer: Buffer): ParseResult<RouteRow> {
   }
 
   return { rows: routes, skipped };
+}
+
+// ── New Routes parser ─────────────────────────────────────────────────
+
+const NEW_ROUTE_REQUIRED_COLUMNS = [
+  'new_route_name',
+  'start_time',
+  'end_time',
+] as const;
+
+const CLOCK_REGEX = /^\d{1,2}:\d{2}$/;
+
+function parseClockToMinutes(value: string): number | null {
+  if (!CLOCK_REGEX.test(value)) return null;
+  const [h, m] = value.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 60 + m;
+}
+
+function normalizeClockValue(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!CLOCK_REGEX.test(trimmed)) return null;
+  const [h, m] = trimmed.split(':');
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+}
+
+function computePayHours(startMin: number, endMin: number, breaks: Array<[number, number]>): number {
+  let totalMinutes = endMin - startMin;
+  for (const [bStart, bEnd] of breaks) {
+    if (bStart >= startMin && bEnd <= endMin) {
+      totalMinutes -= (bEnd - bStart);
+    }
+  }
+  return Math.max(0, Math.round((totalMinutes / 60) * 100) / 100);
+}
+
+function parseServiceDaysCsv(value: string | null): string {
+  if (!value) return '["M","T","W","Th","F"]';
+  const valid = ['M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'];
+  const parts = value.split(',').map((s) => s.trim()).filter((s) => valid.includes(s));
+  if (parts.length === 0) return '["M","T","W","Th","F"]';
+  return JSON.stringify(parts);
+}
+
+export interface NewRouteParseResult extends ParseResult<NewRouteRow> {
+  depotAddresses: Map<string, string>;
+}
+
+export function parseNewRoutesFile(fileBuffer: Buffer): NewRouteParseResult {
+  const rows = parseWorkbook(fileBuffer);
+  assertColumnsExist(rows, NEW_ROUTE_REQUIRED_COLUMNS, 'New route file');
+
+  const newRoutes: NewRouteRow[] = [];
+  const skipped: Array<{ row: number; reason: string }> = [];
+  const depotAddresses = new Map<string, string>();
+
+  for (let index = 0; index < rows.length; index++) {
+    const rowIndex = index + 2;
+    const row = rows[index];
+    const routeName = getCellValue(row, 'new_route_name');
+    const startTime = normalizeClockValue(getCellValue(row, 'start_time'));
+    const endTime = normalizeClockValue(getCellValue(row, 'end_time'));
+
+    if (!routeName || !startTime || !endTime) {
+      skipped.push({ row: rowIndex, reason: 'Missing required fields (new_route_name, start_time, or end_time).' });
+      continue;
+    }
+
+    const startMin = parseClockToMinutes(startTime);
+    const endMin = parseClockToMinutes(endTime);
+    if (startMin === null || endMin === null) {
+      skipped.push({ row: rowIndex, reason: 'Invalid time format. Expected HH:MM.' });
+      continue;
+    }
+    if (endMin <= startMin) {
+      skipped.push({ row: rowIndex, reason: 'end_time must be after start_time.' });
+      continue;
+    }
+
+    const break1Start = normalizeClockValue(getCellValue(row, 'break_1_start'));
+    const break1End = normalizeClockValue(getCellValue(row, 'break_1_end'));
+    const break2Start = normalizeClockValue(getCellValue(row, 'break_2_start'));
+    const break2End = normalizeClockValue(getCellValue(row, 'break_2_end'));
+    const break3Start = normalizeClockValue(getCellValue(row, 'break_3_start'));
+    const break3End = normalizeClockValue(getCellValue(row, 'break_3_end'));
+
+    const breaks: Array<[number, number]> = [];
+    if (break1Start && break1End) {
+      const b1s = parseClockToMinutes(break1Start);
+      const b1e = parseClockToMinutes(break1End);
+      if (b1s !== null && b1e !== null && b1e > b1s) breaks.push([b1s, b1e]);
+    }
+    if (break2Start && break2End) {
+      const b2s = parseClockToMinutes(break2Start);
+      const b2e = parseClockToMinutes(break2End);
+      if (b2s !== null && b2e !== null && b2e > b2s) breaks.push([b2s, b2e]);
+    }
+    if (break3Start && break3End) {
+      const b3s = parseClockToMinutes(break3Start);
+      const b3e = parseClockToMinutes(break3End);
+      if (b3s !== null && b3e !== null && b3e > b3s) breaks.push([b3s, b3e]);
+    }
+
+    const platformHours = Math.round(((endMin - startMin) / 60) * 100) / 100;
+    const payHours = computePayHours(startMin, endMin, breaks);
+
+    const splitRaw = getCellValue(row, 'split_number');
+    const splitNumber = splitRaw ? (Number.isFinite(Number(splitRaw)) ? Number(splitRaw) : 0) : 0;
+
+    const newRouteId = crypto.randomUUID();
+    const depotAddress = getCellValue(row, 'depot_address');
+    if (depotAddress) {
+      depotAddresses.set(newRouteId, depotAddress);
+    }
+
+    newRoutes.push({
+      new_route_id: newRouteId,
+      new_route_name: routeName,
+      split_number: splitNumber,
+      depot: null, // resolved later via depot matching
+      service_days: parseServiceDaysCsv(getCellValue(row, 'service_days')),
+      route_area: getCellValue(row, 'route_area'),
+      start_time: startTime,
+      end_time: endTime,
+      platform_hours: String(platformHours),
+      pay_hours: String(payHours),
+      break_1_start: break1Start,
+      break_1_end: break1End,
+      break_2_start: break2Start,
+      break_2_end: break2End,
+      break_3_start: break3Start,
+      break_3_end: break3End,
+    });
+  }
+
+  return { rows: newRoutes, skipped, depotAddresses };
 }

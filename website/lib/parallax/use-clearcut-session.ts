@@ -11,6 +11,7 @@ import {
   deleteSession,
   deleteImportTemplateRecord,
   getSession,
+  importNewRoutes,
   importRoutes,
   importTrips,
   listImportTemplates,
@@ -214,6 +215,16 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
     [loadSession, token, withEditJwt],
   );
 
+  const uploadNewRoutes = useCallback(
+    async (file: File) =>
+      withEditJwt(async (jwt) => {
+        const result = await importNewRoutes(token, jwt, file);
+        await loadSession();
+        return result;
+      }),
+    [loadSession, token, withEditJwt],
+  );
+
   const previewImport = useCallback(
     async (file: File, sheetName?: string): Promise<ImportPreviewResponse> =>
       withEditJwt((jwt) => previewImportFile(token, jwt, file, sheetName)),
@@ -287,6 +298,7 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
     removePassword,
     uploadTrips,
     uploadRoutes,
+    uploadNewRoutes,
     previewImport,
     validateImport,
     applyImport,
