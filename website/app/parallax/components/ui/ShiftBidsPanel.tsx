@@ -1,7 +1,7 @@
 'use client';
 
 import { DndContext, DragOverlay, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleHelp, Download, GripVertical, Play, Save } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleHelp, Download, GripVertical, Play, Plus, Save, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Badge } from '@/app/parallax/components/shadcn/badge';
@@ -25,9 +25,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/parallax/components/shadcn/table';
-import { DEFAULT_BID_CONFIG, collapseRoutes, computeMaxConsecutiveWork, generateBidPackages, rankPackages, recomputePackageMetrics } from '@/lib/parallax/bid-algorithm';
+import { DEFAULT_BID_CONFIG, computeMaxConsecutiveWork, generateBidPackages, rankPackages, recomputePackageMetrics } from '@/lib/parallax/bid-algorithm';
 import { exportBidsToExcel } from '@/lib/parallax/bid-export';
-import type { BidConfig, BidResult, BidType, CollapsedRoute, DailyBlock, DepotRow, NewRouteRow, ServiceDay } from '@/lib/parallax/types';
+import type { BidConfig, BidPackage, BidResult, BidType, DailyBlock, DepotRow, NewRouteRow, ServiceDay } from '@/lib/parallax/types';
 
 import { ALL_SERVICE_DAYS, formatMinutesToClock, parseServiceDays } from './shared';
 
@@ -83,25 +83,35 @@ function BidSortableHead({
   );
 }
 
+// ── Day ordering helper ──────────────────────────────────────────────
+
+const DAY_INDEX: Record<ServiceDay, number> = { M: 0, T: 1, W: 2, Th: 3, F: 4, Sa: 5, Su: 6 };
+
+function sortBlocksByDayThenTime(blocks: DailyBlock[]): DailyBlock[] {
+  return [...blocks].sort((a, b) => {
+    const dayDiff = DAY_INDEX[a.day] - DAY_INDEX[b.day];
+    if (dayDiff !== 0) return dayDiff;
+    return a.start_time_minutes - b.start_time_minutes;
+  });
+}
+
 // ── Drag-and-drop helper components ─────────────────────────────────
 
-function DraggableRouteRow({
+function DraggableBlockRow({
   packageId,
-  route,
-  blocks,
+  block,
   readonlyView,
   children,
 }: {
   packageId: string;
-  route: CollapsedRoute;
-  blocks: DailyBlock[];
+  block: DailyBlock;
   readonlyView: boolean;
   children: React.ReactNode;
 }) {
-  const id = `${packageId}::${route.new_route_name}::${route.start_time_minutes}::${route.days.join(',')}`;
+  const id = `${packageId}::${block.new_route_name}::${block.day}::${block.start_time_minutes}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
-    data: { sourcePackageId: packageId, blocks, route },
+    data: { sourcePackageId: packageId, blocks: [block], block },
     disabled: readonlyView,
   });
   return (
@@ -375,7 +385,7 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
-  const [activeDragRoute, setActiveDragRoute] = useState<CollapsedRoute | null>(null);
+  const [activeDragBlock, setActiveDragBlock] = useState<DailyBlock | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initializedRef = useRef(false);
 
@@ -536,12 +546,12 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
 
   function handleDragStart(event: DragStartEvent) {
     if (readonlyView) return;
-    const data = event.active.data.current as { route: CollapsedRoute } | undefined;
-    if (data?.route) setActiveDragRoute(data.route);
+    const data = event.active.data.current as { block: DailyBlock } | undefined;
+    if (data?.block) setActiveDragBlock(data.block);
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    setActiveDragRoute(null);
+    setActiveDragBlock(null);
     if (readonlyView) return;
     const { active, over } = event;
     if (!over || !bidResult) return;
@@ -627,16 +637,44 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
     showToast('Route moved, rankings updated');
   }
 
-  // ── Collapsed routes with block mapping for DnD ───────────────────
+  // ── Add / Delete packages ────────────────────────────────────────────
 
-  function getBlocksForCollapsedRoute(pkg: { daily_blocks: DailyBlock[] }, route: CollapsedRoute): DailyBlock[] {
-    return pkg.daily_blocks.filter(
-      (b) =>
-        b.new_route_name === route.new_route_name &&
-        b.start_time_minutes === route.start_time_minutes &&
-        b.end_time_minutes === route.end_time_minutes &&
-        route.days.includes(b.day),
-    );
+  function addEmptyPackage() {
+    if (!bidResult || readonlyView) return;
+    pushBidUndoState(bidResult);
+    const newPkg: BidPackage = {
+      bid_id: crypto.randomUUID(),
+      bid_rank: bidResult.packages.length + 1,
+      type: 'PT',
+      assigned_new_routes: [],
+      daily_blocks: [],
+      weekly_pay_hours: 0,
+      days_on: [],
+      days_off: ALL_SERVICE_DAYS as ServiceDay[],
+      consecutive_days_off: 7,
+      max_consecutive_work: 0,
+      start_time_variance: 0,
+      end_time_variance: 0,
+      consistency_score: 100,
+      depot: null,
+    };
+    updateBidResult({
+      ...bidResult,
+      packages: [...bidResult.packages, newPkg],
+    });
+  }
+
+  function deleteEmptyPackage(packageId: string) {
+    if (!bidResult || readonlyView) return;
+    pushBidUndoState(bidResult);
+    const remaining = bidResult.packages.filter((p) => p.bid_id !== packageId);
+    const reranked = rankPackages(remaining, bidResult.config);
+    updateBidResult({
+      ...bidResult,
+      packages: reranked,
+      fte_count: reranked.filter((p) => p.type === 'FTE').length,
+      pt_count: reranked.filter((p) => p.type === 'PT').length,
+    });
   }
 
   // ── Settings disabled state ───────────────────────────────────────
@@ -811,6 +849,16 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
           >
             <Download size={14} className="mr-1.5" /> Export Excel
           </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addEmptyPackage}
+            disabled={!bidResult || readonlyView}
+            type="button"
+          >
+            <Plus size={14} className="mr-1.5" /> Add Package
+          </Button>
         </div>
 
         {bidResult && (
@@ -912,16 +960,28 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
               )}
               {filteredPackages.map((pkg) => {
                 const isExpanded = expandedBids.has(pkg.bid_id);
-                const routeNames = [...new Set(pkg.daily_blocks.map((b) => b.new_route_name))].join(', ');
-                const collapsed = isExpanded ? collapseRoutes(pkg.daily_blocks) : [];
+                const routeNames = [...new Set(pkg.daily_blocks.map((b) => b.new_route_name))].join(', ') || '\u2014';
+                const sortedBlocks = isExpanded ? sortBlocksByDayThenTime(pkg.daily_blocks) : [];
                 const isHighlighted = highlightFilter != null && pkg.daily_blocks.some(
                   (b) => b.new_route_name === highlightFilter.routeName && highlightFilter.days.includes(b.day),
                 );
                 const isDimmed = highlightFilter != null && !isHighlighted;
+                const isEmpty = pkg.daily_blocks.length === 0;
                 return (
                   <DroppablePackageBody key={pkg.bid_id} packageId={pkg.bid_id}>
                     <TableRow className={`cursor-pointer transition-opacity ${isHighlighted ? 'ring-2 ring-cc-accent/30 ring-inset' : ''} ${isDimmed ? 'opacity-40' : ''}`} onClick={() => toggleExpanded(pkg.bid_id)}>
-                      <TableCell className="w-6" />
+                      <TableCell className="w-6">
+                        {isEmpty && !readonlyView && (
+                          <button
+                            className="inline-flex items-center text-cc-text-muted hover:text-cc-danger transition-colors"
+                            onClick={(e) => { e.stopPropagation(); deleteEmptyPackage(pkg.bid_id); }}
+                            title="Delete empty package"
+                            type="button"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs font-medium">
                         <span className="inline-flex items-center gap-1">
                           {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -960,51 +1020,68 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
                         {pkg.depot ? (depotNameMap.get(pkg.depot) ?? pkg.depot) : 'Mixed'}
                       </TableCell>
                     </TableRow>
-                    {isExpanded && collapsed.map((route, idx) => {
-                      const routeBlocks = getBlocksForCollapsedRoute(pkg, route);
+                    {isExpanded && sortedBlocks.length > 0 && (
+                      <TableRow className="bg-cc-surface-1/30">
+                        <TableCell className="w-6" />
+                        <TableCell />
+                        <TableCell className="text-[10px] font-semibold text-cc-text-muted uppercase">Route</TableCell>
+                        <TableCell className="text-[10px] font-semibold text-cc-text-muted uppercase">Day</TableCell>
+                        <TableCell className="text-[10px] font-semibold text-cc-text-muted uppercase">Time</TableCell>
+                        <TableCell className="text-[10px] font-semibold text-cc-text-muted uppercase">Hours</TableCell>
+                        <TableCell className="text-[10px] font-semibold text-cc-text-muted uppercase">Breaks</TableCell>
+                        <TableCell className="text-[10px] font-semibold text-cc-text-muted uppercase" colSpan={2}>Depot</TableCell>
+                      </TableRow>
+                    )}
+                    {isExpanded && sortedBlocks.map((block, idx) => {
                       const breaks = [
-                        route.break_1_start && route.break_1_end ? `${route.break_1_start}-${route.break_1_end}` : null,
-                        route.break_2_start && route.break_2_end ? `${route.break_2_start}-${route.break_2_end}` : null,
-                        route.break_3_start && route.break_3_end ? `${route.break_3_start}-${route.break_3_end}` : null,
+                        block.break_1_start && block.break_1_end ? `${block.break_1_start}-${block.break_1_end}` : null,
+                        block.break_2_start && block.break_2_end ? `${block.break_2_start}-${block.break_2_end}` : null,
+                        block.break_3_start && block.break_3_end ? `${block.break_3_start}-${block.break_3_end}` : null,
                       ].filter(Boolean).join(', ') || '\u2014';
                       return (
-                        <DraggableRouteRow
-                          key={`${pkg.bid_id}-route-${idx}`}
+                        <DraggableBlockRow
+                          key={`${pkg.bid_id}-block-${idx}`}
                           packageId={pkg.bid_id}
-                          route={route}
-                          blocks={routeBlocks}
+                          block={block}
                           readonlyView={readonlyView}
                         >
                           <TableCell />
-                          <TableCell />
-                          <TableCell className="text-xs pl-6 text-cc-text-secondary">{route.new_route_name}</TableCell>
+                          <TableCell className="text-xs pl-6 text-cc-text-secondary">{block.new_route_name}</TableCell>
                           <TableCell>
                             <div className="flex gap-0.5">
-                              {ALL_SERVICE_DAYS.map((day) => (
+                              {ALL_SERVICE_DAYS.map((d) => (
                                 <span
-                                  key={day}
+                                  key={d}
                                   className={`px-1 py-0 text-[10px] rounded ${
-                                    route.days.includes(day)
+                                    d === block.day
                                       ? 'bg-cc-accent/60 text-white'
                                       : 'bg-cc-surface-2 text-cc-text-muted'
                                   }`}
                                 >
-                                  {day}
+                                  {d}
                                 </span>
                               ))}
                             </div>
                           </TableCell>
                           <TableCell className="text-xs text-cc-text-muted">
-                            {formatMinutesToClock(route.start_time_minutes)} - {formatMinutesToClock(route.end_time_minutes)}
+                            {formatMinutesToClock(block.start_time_minutes)} - {formatMinutesToClock(block.end_time_minutes)}
                           </TableCell>
-                          <TableCell className="text-xs">{Math.round(route.pay_hours * 10) / 10}</TableCell>
-                          <TableCell className="text-xs text-cc-text-muted" colSpan={2}>{breaks}</TableCell>
-                          <TableCell className="text-xs text-cc-text-muted">
-                            {route.depot ? (depotNameMap.get(route.depot) ?? route.depot) : '\u2014'}
+                          <TableCell className="text-xs">{Math.round(block.pay_hours * 10) / 10}</TableCell>
+                          <TableCell className="text-xs text-cc-text-muted">{breaks}</TableCell>
+                          <TableCell className="text-xs text-cc-text-muted" colSpan={2}>
+                            {block.depot ? (depotNameMap.get(block.depot) ?? block.depot) : '\u2014'}
                           </TableCell>
-                        </DraggableRouteRow>
+                        </DraggableBlockRow>
                       );
                     })}
+                    {isExpanded && isEmpty && (
+                      <TableRow className="bg-cc-surface-1/50">
+                        <TableCell className="w-6" />
+                        <TableCell colSpan={9} className="text-xs text-cc-text-muted italic">
+                          Empty package — drag blocks here
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </DroppablePackageBody>
                 );
               })}
@@ -1018,46 +1095,41 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
                       Unassigned Blocks ({bidResult.unassigned_blocks.length})
                     </TableCell>
                   </TableRow>
-                  {collapseRoutes(bidResult.unassigned_blocks).map((route, idx) => {
-                    const routeBlocks = getBlocksForCollapsedRoute({ daily_blocks: bidResult.unassigned_blocks }, route);
-                    return (
-                      <DraggableRouteRow
-                        key={`unassigned-route-${idx}`}
-                        packageId="unassigned"
-                        route={route}
-                        blocks={routeBlocks}
-                        readonlyView={readonlyView}
-                      >
-                        <TableCell />
-                        <TableCell />
-                        <TableCell className="text-xs pl-6 text-cc-text-secondary">{route.new_route_name}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-0.5">
-                            {ALL_SERVICE_DAYS.map((day) => (
-                              <span
-                                key={day}
-                                className={`px-1 py-0 text-[10px] rounded ${
-                                  route.days.includes(day)
-                                    ? 'bg-cc-accent/60 text-white'
-                                    : 'bg-cc-surface-2 text-cc-text-muted'
-                                }`}
-                              >
-                                {day}
-                              </span>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-cc-text-muted">
-                          {formatMinutesToClock(route.start_time_minutes)} - {formatMinutesToClock(route.end_time_minutes)}
-                        </TableCell>
-                        <TableCell className="text-xs">{Math.round(route.pay_hours * 10) / 10}</TableCell>
-                        <TableCell className="text-xs text-cc-text-muted" colSpan={2}>{'\u2014'}</TableCell>
-                        <TableCell className="text-xs text-cc-text-muted">
-                          {route.depot ? (depotNameMap.get(route.depot) ?? route.depot) : '\u2014'}
-                        </TableCell>
-                      </DraggableRouteRow>
-                    );
-                  })}
+                  {sortBlocksByDayThenTime(bidResult.unassigned_blocks).map((block, idx) => (
+                    <DraggableBlockRow
+                      key={`unassigned-block-${idx}`}
+                      packageId="unassigned"
+                      block={block}
+                      readonlyView={readonlyView}
+                    >
+                      <TableCell />
+                      <TableCell className="text-xs pl-6 text-cc-text-secondary">{block.new_route_name}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-0.5">
+                          {ALL_SERVICE_DAYS.map((d) => (
+                            <span
+                              key={d}
+                              className={`px-1 py-0 text-[10px] rounded ${
+                                d === block.day
+                                  ? 'bg-cc-accent/60 text-white'
+                                  : 'bg-cc-surface-2 text-cc-text-muted'
+                              }`}
+                            >
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-cc-text-muted">
+                        {formatMinutesToClock(block.start_time_minutes)} - {formatMinutesToClock(block.end_time_minutes)}
+                      </TableCell>
+                      <TableCell className="text-xs">{Math.round(block.pay_hours * 10) / 10}</TableCell>
+                      <TableCell className="text-xs text-cc-text-muted">{'\u2014'}</TableCell>
+                      <TableCell className="text-xs text-cc-text-muted" colSpan={2}>
+                        {block.depot ? (depotNameMap.get(block.depot) ?? block.depot) : '\u2014'}
+                      </TableCell>
+                    </DraggableBlockRow>
+                  ))}
                 </DroppablePackageBody>
               )}
             </table>
@@ -1065,11 +1137,11 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
 
           {/* Drag overlay */}
           <DragOverlay>
-            {activeDragRoute && (
+            {activeDragBlock && (
               <div className="bg-cc-surface-1 border border-cc-accent rounded px-3 py-1.5 shadow-lg text-xs">
-                <strong>{activeDragRoute.new_route_name}</strong>
+                <strong>{activeDragBlock.new_route_name}</strong>
                 <span className="text-cc-text-muted ml-2">
-                  {activeDragRoute.days.join(', ')} &middot; {formatMinutesToClock(activeDragRoute.start_time_minutes)} - {formatMinutesToClock(activeDragRoute.end_time_minutes)}
+                  {activeDragBlock.day} &middot; {formatMinutesToClock(activeDragBlock.start_time_minutes)} - {formatMinutesToClock(activeDragBlock.end_time_minutes)}
                 </span>
               </div>
             )}
