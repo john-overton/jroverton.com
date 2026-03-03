@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { EB_Garamond } from "next/font/google";
 import "./globals.css";
-import 'bootstrap/dist/css/bootstrap.min.css';
 import Script from 'next/script';
 
 const garamond = EB_Garamond({

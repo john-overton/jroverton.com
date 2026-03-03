@@ -124,6 +124,13 @@
   }
 }
 
+/* Radix portals render at document root, outside .parallax scope.
+   Ensure they inherit the correct font. */
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+  font-family: var(--font-inter);
+}
+
 /* Vanishing Point mark — hover animation spreads bars apart.
    Uses group-hover/mark to trigger from any ancestor with group/mark class. */
 .group\/mark:hover .parallax-mark-line {

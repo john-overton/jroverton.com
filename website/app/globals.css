@@ -18,6 +18,7 @@
   --bs-success: var(--accent-green);
   --bs-link-color: var(--accent-blue);
   --bs-link-hover-color: var(--accent-green);
+  --bs-body-font-family: var(--font-typewriter), 'EB Garamond', 'Garamond', serif;
 }
 
 /* Base Styles */

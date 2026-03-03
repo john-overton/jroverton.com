@@ -1,6 +1,8 @@
 // Blog posts registry
 // Import all blog posts here
 import BuildingAstryk, { metadata as buildingAstrykMetadata } from './building-astryk';
+import TheMissingDependency, { metadata as theMissingDependencyMetadata } from './the-missing-dependency';
+import IteratingWithAi, { metadata as iteratingWithAiMetadata } from './iterating-with-ai';
 import { BlogPost } from './types';
 
 // Add all blog posts to this array
@@ -9,7 +11,14 @@ export const blogPosts: BlogPost[] = [
     ...buildingAstrykMetadata,
     component: BuildingAstryk,
   },
-  // Add more blog posts here as you create them
+  {
+    ...theMissingDependencyMetadata,
+    component: TheMissingDependency,
+  },
+  {
+    ...iteratingWithAiMetadata,
+    component: IteratingWithAi,
+  },
 ];
 
 // Sort by date (newest first)

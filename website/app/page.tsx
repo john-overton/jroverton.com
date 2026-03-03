@@ -31,7 +31,7 @@ export default function Home() {
                     Hello, I'm John.
                   </h1>
                   <p className="lead text-secondary mb-4 fs-5">
-                    Digital tinkerer building tools for how I actually work. Currently making Astryk, a notes app with smart checklists and weekly rollups for people who think in tasks. Dad, skier, caffeine-dependent.
+                  Tech guy who ended up solving operations problems. I build software that works the way I actually think. Astryk for staying organized, Sprout Track for families tracking their kid's milestones, and Parallax for seeing operations data from new angles. 20 years of figuring out complex systems and MacGyvering solutions.
                   </p>
                 </div>
               </div>
@@ -130,16 +130,16 @@ export default function Home() {
 
                 <div className="font-typewriter text-secondary">
                   <p className="mb-3">
-                    I've spent years in transit operations building systems that keep fleets moving: paratransit, microtransit, fixed route. The work taught me how to think in logistics and edge cases, and gave me a deep appreciation for software that solves real problems instead of inventing new ones.
+                    I started my career as a systems administrator, but I kept drifting toward the harder question: why isn&apos;t this working? That instinct pulled me into transit operations. Paratransit, microtransit, fixed route. I spent 20 years untangling complex systems and building tools to keep them running. I&apos;ve always been the person who can look at a messy process, understand why it&apos;s breaking, and put something together to fix it. Usually faster and cheaper than anyone expects.
                   </p>
                   <p className="mb-3">
-                    Outside of work, I'm building toward independence. Astryk is my current focus, a productivity tool born from my own frustrations with existing apps. I also run Sprout Track, a baby tracking app I built when my son was born.
+                    That same instinct is what drives everything I build. Sprout Track started because I needed a baby tracking app when my son was born and nothing fit. Now thousands of families self-host it. Astryk is how I stay organized and motivated. Notes and tasks living together the way my brain actually wants to work. And Parallax is the newest, giving operations teams a view of their data they&apos;re not used to seeing.
                   </p>
                   <p className="mb-3">
-                    I believe in owning your outcomes, building things that actually work, and validating ideas by using them myself. If it works for me, there's a decent chance it works for someone else.
+                    Everything lives under Open Glades. The name comes from skiing. An open glade after a snowstorm is an inviting challenge to explore. That&apos;s how I see problems too. I understand how systems work, I can see where they break, and I&apos;d rather drop in and build the fix than wait for someone else to.
                   </p>
                   <p className="mb-4">
-                    When I'm not at a keyboard, I'm skiing, wrenching on cars, playing video games, or outside with my family.
+                    When I&apos;m not at a keyboard, I&apos;m spending time with my family, playing video games, skiing, or wrenching on cars. Probably in that order.
                   </p>
 
                   <div className="mt-4 pt-4 border-top border-secondary border-opacity-25 border-dashed">

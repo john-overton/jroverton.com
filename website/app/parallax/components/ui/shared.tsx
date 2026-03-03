@@ -26,11 +26,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/parallax/components/shadcn/table';
-import type { RouteRow, TripRow } from '@/lib/parallax/types';
+import type { RouteRow, ServiceDay, TripRow } from '@/lib/parallax/types';
 import type { YardTripRow } from '@/lib/parallax/metrics';
 import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
 export const DEMAND_BLOCK_MINUTES = 15;
+
+export const ALL_SERVICE_DAYS: ServiceDay[] = ['M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'];
+export const SERVICE_DAY_TO_DOW: Record<ServiceDay, number> = { Su: 0, M: 1, T: 2, W: 3, Th: 4, F: 5, Sa: 6 };
+export const SERVICE_DAY_FULL_NAME: Record<ServiceDay, string> = { M: 'Monday', T: 'Tuesday', W: 'Wednesday', Th: 'Thursday', F: 'Friday', Sa: 'Saturday', Su: 'Sunday' };
+
+export function parseServiceDays(json: string): ServiceDay[] {
+  try {
+    const arr = JSON.parse(json);
+    return Array.isArray(arr) ? arr.filter((d: string) => ALL_SERVICE_DAYS.includes(d as ServiceDay)) as ServiceDay[] : [];
+  } catch {
+    return [];
+  }
+}
 
 export function parseClockToMinutes(value: string | null | undefined, fallback: number): number {
   if (!value) {
