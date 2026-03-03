@@ -25,7 +25,7 @@ import type { ClearcutMetrics } from '@/lib/parallax/metrics';
 import { estimateFtePtCounts } from '@/lib/parallax/bid-algorithm';
 import type { CurrentRunCutRow } from '@/lib/parallax/run-structure';
 import { buildRunCutForDate, getAvailableDates } from '@/lib/parallax/run-structure';
-import type { DepotRow, OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/parallax/types';
+import type { BidResult, DepotRow, OptimizationRow, RouteRow, RunRow, ServiceDay } from '@/lib/parallax/types';
 
 import { Toast, ToastClose, ToastProvider, ToastTitle, ToastViewport } from '@/app/parallax/components/shadcn/toast';
 import { useToast } from '@/app/parallax/hooks/useToast';
@@ -304,6 +304,8 @@ interface RunStructureTabProps {
   onRunsChange: (runs: RunRow[]) => void;
   depots: DepotRow[];
   filteredRoutes: RouteRow[];
+  savedBidResult: BidResult | null;
+  onBidResultChange: (result: BidResult | null) => void;
 }
 
 export default function RunStructureTab({
@@ -317,6 +319,8 @@ export default function RunStructureTab({
   intervalMinutes,
   onRunsChange,
   depots,
+  savedBidResult,
+  onBidResultChange,
 }: RunStructureTabProps) {
   const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
   const [subTab, setSubTab] = useState<'imported' | 'bids' | 'runeditor'>('runeditor');
@@ -504,6 +508,48 @@ export default function RunStructureTab({
       return fullIdx >= 0 ? chartCurrentVehiclesByBlockFullDay[fullIdx] : 0;
     });
   }, [metrics.blocks, fullDayMetrics.blocks, chartCurrentVehiclesByBlockFullDay]);
+
+  // Date-specific imported routes for the chart (only used on imported tab)
+  const { importedDateVehiclesFullDay, importedDateOnBreakFullDay } = useMemo(() => {
+    const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
+    const breaks = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
+    for (const row of currentRunCut) {
+      const startMin = parseClockFromLabel(row.shiftStart);
+      const endMin = parseClockFromLabel(row.shiftEnd);
+      if (endMin <= startMin) continue;
+      const b1S = row.break1Start ? parseClockFromLabel(row.break1Start) : -1;
+      const b1E = row.break1End ? parseClockFromLabel(row.break1End) : -1;
+      const b2S = row.break2Start ? parseClockFromLabel(row.break2Start) : -1;
+      const b2E = row.break2End ? parseClockFromLabel(row.break2End) : -1;
+      for (let i = 0; i < fullDayMetrics.blocks.length; i++) {
+        const block = fullDayMetrics.blocks[i];
+        if (startMin < block.endMinutes && endMin > block.startMinutes) {
+          const inBreak1 = b1S >= 0 && b1E > b1S && block.startMinutes >= b1S && block.endMinutes <= b1E;
+          const inBreak2 = b2S >= 0 && b2E > b2S && block.startMinutes >= b2S && block.endMinutes <= b2E;
+          if (inBreak1 || inBreak2) { breaks[i] += 1; } else { counts[i] += 1; }
+        }
+      }
+    }
+    return { importedDateVehiclesFullDay: counts, importedDateOnBreakFullDay: breaks };
+  }, [currentRunCut, fullDayMetrics.blocks]);
+
+  const importedDateVehiclesByBlock = useMemo(() => {
+    return metrics.blocks.map((viewBlock) => {
+      const fullIdx = fullDayMetrics.blocks.findIndex(
+        (b) => b.startMinutes === viewBlock.startMinutes,
+      );
+      return fullIdx >= 0 ? importedDateVehiclesFullDay[fullIdx] : 0;
+    });
+  }, [metrics.blocks, fullDayMetrics.blocks, importedDateVehiclesFullDay]);
+
+  const importedDateOnBreakByBlock = useMemo(() => {
+    return metrics.blocks.map((viewBlock) => {
+      const fullIdx = fullDayMetrics.blocks.findIndex(
+        (b) => b.startMinutes === viewBlock.startMinutes,
+      );
+      return fullIdx >= 0 ? importedDateOnBreakFullDay[fullIdx] : 0;
+    });
+  }, [metrics.blocks, fullDayMetrics.blocks, importedDateOnBreakFullDay]);
 
   const selectedDaySet = useMemo(() => new Set(selectedDays), [selectedDays]);
 
@@ -1059,6 +1105,12 @@ export default function RunStructureTab({
           crOnBreak={demandMode === 'max' ? metrics.maxVehiclesOnBreakByBlock : metrics.vehiclesOnBreakByBlock}
           nrOnBreak={nrOnBreakByBlock}
           blocks={metrics.blocks}
+          importedDateVehicles={subTab === 'imported' && selectedRunCutDate ? importedDateVehiclesByBlock : undefined}
+          irOnBreak={subTab === 'imported' && selectedRunCutDate ? importedDateOnBreakByBlock : undefined}
+          importedDateLabel={subTab === 'imported' && selectedRunCutDate ? (() => {
+            const d = new Date(selectedRunCutDate + 'T00:00:00');
+            return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+          })() : undefined}
         />
       </SectionCard>
 
@@ -1231,7 +1283,7 @@ export default function RunStructureTab({
 
           {/* ── Shift Bids sub-tab ────────────────────────────────── */}
           <TabsContent value="bids">
-            <ShiftBidsPanel runs={localRuns} depots={depots} readonlyView={readonlyView} />
+            <ShiftBidsPanel runs={localRuns} depots={depots} readonlyView={readonlyView} savedBidResult={savedBidResult} onBidResultChange={onBidResultChange} />
           </TabsContent>
 
           {/* ── Route Editor sub-tab ──────────────────────────────── */}

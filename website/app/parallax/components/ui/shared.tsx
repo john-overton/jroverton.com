@@ -235,19 +235,20 @@ export function HeatStrip({ values, blocks, onBlockClick, activeIndex, valueLabe
   );
 }
 
-function ChartTooltip({ active, payload, label, nameMap }: {
+function ChartTooltip({ active, payload, label, nameMap, breakColors }: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string }>;
   label?: string;
   nameMap: Record<string, string>;
+  breakColors?: Record<string, string>;
 }) {
   if (!active || !payload?.length) return null;
   const dataPoint = (payload[0] as unknown as { payload: Record<string, number> }).payload;
   const onBreak = dataPoint.onBreak ?? 0;
   const crOnBreak = dataPoint.crOnBreak ?? 0;
   const nrOnBreak = dataPoint.nrOnBreak ?? 0;
+  const irOnBreak = dataPoint.irOnBreak ?? 0;
   const breakStyle = { color: 'var(--color-cc-text-muted)', lineHeight: 1.6 } as const;
-  const dotStyle = { color: 'var(--color-cc-warning)' } as const;
   return (
     <div style={{
       borderRadius: 8,
@@ -266,17 +267,22 @@ function ChartTooltip({ active, payload, label, nameMap }: {
       ))}
       {onBreak > 0 && (
         <div style={breakStyle}>
-          <span style={dotStyle}>●</span> On Break: {onBreak}
+          <span style={{ color: breakColors?.onBreak ?? 'var(--color-cc-warning)' }}>●</span> On Break: {onBreak}
         </div>
       )}
       {crOnBreak > 0 && (
         <div style={breakStyle}>
-          <span style={dotStyle}>●</span> CR On Break: {crOnBreak}
+          <span style={{ color: breakColors?.crOnBreak ?? 'var(--color-cc-warning)' }}>●</span> CR On Break: {crOnBreak}
         </div>
       )}
       {nrOnBreak > 0 && (
         <div style={breakStyle}>
-          <span style={dotStyle}>●</span> NR On Break: {nrOnBreak}
+          <span style={{ color: breakColors?.nrOnBreak ?? 'var(--color-cc-warning)' }}>●</span> NR On Break: {nrOnBreak}
+        </div>
+      )}
+      {irOnBreak > 0 && (
+        <div style={breakStyle}>
+          <span style={{ color: breakColors?.irOnBreak ?? 'var(--color-cc-warning)' }}>●</span> {nameMap.importedDateVehicles ? `${nameMap.importedDateVehicles} On Break` : 'IR On Break'}: {irOnBreak}
         </div>
       )}
     </div>
@@ -346,7 +352,7 @@ export function DemandCompositeChart({
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} width={38} domain={[0, yMax]} />
-          <Tooltip content={<ChartTooltip nameMap={nameMap} />} />
+          <Tooltip content={<ChartTooltip nameMap={nameMap} breakColors={{ onBreak: chartColors[1] }} />} />
           <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
           <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
           <Line
@@ -547,6 +553,9 @@ export function RunStructureChart({
   crOnBreak,
   nrOnBreak,
   blocks,
+  importedDateVehicles,
+  irOnBreak,
+  importedDateLabel,
 }: {
   pickups: number[];
   onBoard: number[];
@@ -555,8 +564,14 @@ export function RunStructureChart({
   crOnBreak?: number[];
   nrOnBreak?: number[];
   blocks: Array<{ label: string }>;
+  importedDateVehicles?: number[];
+  irOnBreak?: number[];
+  importedDateLabel?: string;
 }) {
   const { chartColors } = useClearcutTheme();
+  const showImportedDate = importedDateVehicles && importedDateVehicles.length > 0;
+
+  const importedDateColor = chartColors[5];
   const data = useMemo(
     () =>
       blocks.map((block, index) => ({
@@ -567,8 +582,10 @@ export function RunStructureChart({
         runVehicles: Math.round((runVehicles[index] ?? 0) * 10) / 10,
         crOnBreak: Math.round((crOnBreak?.[index] ?? 0) * 10) / 10,
         nrOnBreak: Math.round((nrOnBreak?.[index] ?? 0) * 10) / 10,
+        importedDateVehicles: showImportedDate ? Math.round((importedDateVehicles[index] ?? 0) * 10) / 10 : undefined,
+        irOnBreak: showImportedDate ? Math.round((irOnBreak?.[index] ?? 0) * 10) / 10 : undefined,
       })),
-    [blocks, onBoard, pickups, currentVehicles, runVehicles, crOnBreak, nrOnBreak],
+    [blocks, onBoard, pickups, currentVehicles, runVehicles, crOnBreak, nrOnBreak, importedDateVehicles, irOnBreak, showImportedDate],
   );
 
   const nameMap = useMemo(() => ({
@@ -576,7 +593,8 @@ export function RunStructureChart({
     runVehicles: 'New Routes',
     onBoard: 'Active Trips',
     pickups: 'Pickups',
-  }), []);
+    importedDateVehicles: importedDateLabel ?? 'Selected Date',
+  }), [importedDateLabel]);
 
   return (
     <div className="h-[260px]">
@@ -585,12 +603,13 @@ export function RunStructureChart({
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} width={38} />
-          <Tooltip content={<ChartTooltip nameMap={nameMap} />} />
+          <Tooltip content={<ChartTooltip nameMap={nameMap} breakColors={{ crOnBreak: chartColors[1], nrOnBreak: chartColors[3], irOnBreak: importedDateColor }} />} />
           <Legend
             formatter={(value) => {
               if (value === 'currentVehicles') return 'Current Routes';
               if (value === 'runVehicles') return 'New Routes';
               if (value === 'onBoard') return 'Active Trips';
+              if (value === 'importedDateVehicles') return importedDateLabel ?? 'Selected Date';
               return 'Pickups';
             }}
           />
@@ -598,6 +617,9 @@ export function RunStructureChart({
           <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
           <Line type="monotone" dataKey="currentVehicles" stroke={chartColors[1]} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
           <Line type="monotone" dataKey="runVehicles" stroke={chartColors[3]} strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4 }} />
+          {showImportedDate && (
+            <Line type="monotone" dataKey="importedDateVehicles" stroke={importedDateColor} strokeWidth={3} strokeDasharray="1 6" strokeLinecap="round" dot={false} activeDot={{ r: 4 }} />
+          )}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

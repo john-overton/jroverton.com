@@ -15,7 +15,7 @@ import {
 import { ClearcutClientError } from '@/lib/parallax/client';
 import { extractNewDepotsFromRoutes } from '@/lib/parallax/depot-utils';
 import { computeClearcutMetrics } from '@/lib/parallax/metrics';
-import type { DepotRow, RunRow } from '@/lib/parallax/types';
+import type { BidResult, DepotRow, RunRow } from '@/lib/parallax/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/parallax/use-clearcut-session';
 import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
@@ -593,6 +593,16 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     });
   }
 
+  function onBidResultChange(bidResult: BidResult | null) {
+    if (!ready || readonlyView) {
+      return;
+    }
+    const json = bidResult ? JSON.stringify(bidResult) : '';
+    session.saveState({ optimization: { bid_result_json: json } }).catch((saveError) => {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save bid results.');
+    });
+  }
+
   function onDepotsChange(depots: DepotRow[]) {
     if (!ready || readonlyView) {
       return;
@@ -969,6 +979,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onRunsChange={onRunsChange}
           depots={ready.state.depots}
           filteredRoutes={filteredRoutes}
+          savedBidResult={ready.state.bid_result}
+          onBidResultChange={onBidResultChange}
         />
       )}
       {tab === 'deadhead' && <DeadheadTab metrics={metrics} />}

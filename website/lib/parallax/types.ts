@@ -202,6 +202,7 @@ export interface OptimizationRow {
   max_driver_spread_hrs: number | null;
   peak_vehicles: number | null;
   run_structure_json: string | null;
+  bid_result_json: string | null;
 }
 
 export interface SessionState {
@@ -222,6 +223,7 @@ export interface SessionState {
   routes: RouteRow[];
   runs: RunRow[];
   depots: DepotRow[];
+  bid_result: BidResult | null;
 }
 
 export interface SessionStateUpdateInput {

@@ -222,6 +222,16 @@ function ensureDepotsTable(db: Database.Database): void {
   }
 }
 
+function ensureBidResultColumn(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('optimization')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('bid_result_json')) {
+    db.exec('ALTER TABLE optimization ADD COLUMN bid_result_json TEXT;');
+  }
+}
+
 function normalizePassengerType(value: string | null | undefined): TripRow['passenger_type'] {
   if (value && PASSENGER_TYPES.has(value as TripRow['passenger_type'])) {
     return value as TripRow['passenger_type'];
@@ -248,6 +258,7 @@ function openSessionDb(editToken: string): Database.Database {
   ensureRouteColumns(db);
   ensureRunsTable(db);
   ensureDepotsTable(db);
+  ensureBidResultColumn(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
   db.prepare('INSERT OR IGNORE INTO optimization (id) VALUES (1)').run();
   return db;
@@ -436,6 +447,7 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
           max_driver_spread_hrs: null,
           peak_vehicles: null,
           run_structure_json: null,
+          bid_result_json: null,
           ...input.optimization,
         };
         db.prepare(
@@ -444,7 +456,8 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
                min_otp_target = COALESCE(@min_otp_target, min_otp_target),
                max_driver_spread_hrs = COALESCE(@max_driver_spread_hrs, max_driver_spread_hrs),
                peak_vehicles = COALESCE(@peak_vehicles, peak_vehicles),
-               run_structure_json = COALESCE(@run_structure_json, run_structure_json)
+               run_structure_json = COALESCE(@run_structure_json, run_structure_json),
+               bid_result_json = COALESCE(@bid_result_json, bid_result_json)
            WHERE id = 1`,
         ).run(optimizationParams);
       }

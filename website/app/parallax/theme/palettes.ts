@@ -81,7 +81,7 @@ export const palettes = [
       danger: '#DC2626',
       info: '#0284C7',
     }),
-    chartColors: ['#059669', '#0284C7', '#DC2626', '#D97706', '#7C3AED', '#4F46E5'],
+    chartColors: ['#059669', '#0284C7', '#DC2626', '#D97706', '#7C3AED', '#6B21A8'],
     mapColors: { pickup: '#059669', dropoff: '#E8590C' },
   },
   {

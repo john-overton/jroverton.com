@@ -7,11 +7,11 @@ const ALL_SERVICE_DAYS: ServiceDay[] = ['M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'];
 const DAY_INDEX: Record<ServiceDay, number> = { M: 0, T: 1, W: 2, Th: 3, F: 4, Sa: 5, Su: 6 };
 
 export const DEFAULT_BID_CONFIG: BidConfig = {
-  fte_min_hours: 35,
+  fte_min_hours: 30,
   fte_max_hours: 40,
   min_rest_hours: 10,
   max_consecutive_days: 6,
-  depot_match_required: false,
+  depot_match_required: true,
   consistency_weight: 'high',
   rank_priority: 'hours',
   max_allowable_variance: 180,
@@ -102,7 +102,7 @@ export function buildDailyBlocks(runs: RunRow[]): DailyBlock[] {
 
 // ── Consecutive days off / work helpers ──────────────────────────────
 
-function computeConsecutiveDaysOff(daysOn: ServiceDay[]): number {
+export function computeConsecutiveDaysOff(daysOn: ServiceDay[]): number {
   if (daysOn.length === 0) return 7;
   if (daysOn.length === 7) return 0;
 
@@ -121,7 +121,7 @@ function computeConsecutiveDaysOff(daysOn: ServiceDay[]): number {
   return Math.min(maxOff, 7);
 }
 
-function computeMaxConsecutiveWork(daysOn: ServiceDay[]): number {
+export function computeMaxConsecutiveWork(daysOn: ServiceDay[]): number {
   if (daysOn.length === 0) return 0;
 
   const onSet = new Set(daysOn.map((d) => DAY_INDEX[d]));
@@ -395,7 +395,7 @@ function finalizeBidPackage(wp: WorkingPackage, type: BidType, config: BidConfig
   };
 }
 
-function rankPackages(packages: BidPackage[], config: BidConfig): BidPackage[] {
+export function rankPackages(packages: BidPackage[], config: BidConfig): BidPackage[] {
   const ftePackages = packages.filter((p) => p.type === 'FTE');
   const ptPackages = packages.filter((p) => p.type === 'PT');
 
@@ -480,6 +480,19 @@ export function generateBidPackages(runs: RunRow[], config: BidConfig): BidResul
     pt_count: ptBids.length,
     unassigned_blocks: [],
   };
+}
+
+// ── Recompute package metrics after manual edits (drag-and-drop) ────
+
+export function recomputePackageMetrics(pkg: BidPackage, config: BidConfig): BidPackage {
+  const weeklyHours = Math.round(pkg.daily_blocks.reduce((s, b) => s + b.pay_hours, 0) * 10) / 10;
+  const depots = new Set(pkg.daily_blocks.map((b) => b.depot).filter(Boolean));
+  const depot = depots.size === 1 ? [...depots][0]! : null;
+
+  const wp: WorkingPackage = { blocks: pkg.daily_blocks, weeklyHours, depot };
+  const type: BidType = weeklyHours >= config.fte_min_hours ? 'FTE' : 'PT';
+  const recomputed = finalizeBidPackage(wp, type, config);
+  return { ...recomputed, bid_id: pkg.bid_id, bid_rank: pkg.bid_rank };
 }
 
 // ── Collapse daily blocks into display rows ─────────────────────────

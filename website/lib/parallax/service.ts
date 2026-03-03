@@ -23,7 +23,7 @@ import {
   saveSessionState,
 } from './session-db';
 import { generateToken } from './tokens';
-import type { SessionRecord, SessionState, SessionStateUpdateInput } from './types';
+import type { BidResult, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
 
 const MAX_TOKEN_GENERATION_ATTEMPTS = 8;
 
@@ -64,6 +64,17 @@ export async function createClearcutSession(input?: {
 
 export function getSessionState(record: SessionRecord): SessionState {
   touchSessionAccess(record.edit_token);
+  const optimization = getOptimization(record.edit_token);
+
+  let bidResult: BidResult | null = null;
+  if (optimization.bid_result_json) {
+    try {
+      bidResult = JSON.parse(optimization.bid_result_json) as BidResult;
+    } catch {
+      bidResult = null;
+    }
+  }
+
   return {
     session: {
       edit_token: record.edit_token,
@@ -77,11 +88,12 @@ export function getSessionState(record: SessionRecord): SessionState {
       has_password: Boolean(record.password_hash),
     },
     settings: getSettings(record.edit_token),
-    optimization: getOptimization(record.edit_token),
+    optimization,
     trips: listTrips(record.edit_token),
     routes: listRoutes(record.edit_token),
     runs: listRuns(record.edit_token),
     depots: listDepots(record.edit_token),
+    bid_result: bidResult,
   };
 }
 

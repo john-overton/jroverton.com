@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS optimization (
   min_otp_target REAL,
   max_driver_spread_hrs REAL,
   peak_vehicles INTEGER,
-  run_structure_json TEXT
+  run_structure_json TEXT,
+  bid_result_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS runs (
