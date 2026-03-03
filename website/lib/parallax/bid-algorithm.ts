@@ -199,6 +199,16 @@ function scoreCompatibility(
   return depotBonus + adjacencyBonus + consistencyBonus;
 }
 
+// ── Same-route-name soft bonus (keeps days together when possible) ──
+
+function sameRouteNameBonus(existingBlocks: DailyBlock[], candidate: DailyBlock): number {
+  let count = 0;
+  for (const b of existingBlocks) {
+    if (b.new_route_name === candidate.new_route_name) count++;
+  }
+  return count * 5;
+}
+
 // ── Phase 2: FTE Package Assembly ───────────────────────────────────
 
 interface WorkingPackage {
@@ -211,57 +221,29 @@ function assembleFTEPackages(
   blocks: DailyBlock[],
   config: BidConfig,
 ): { ftePackages: WorkingPackage[]; remainingBlocks: DailyBlock[] } {
-  // Group blocks by new_route_id so each new route (including splits) is evaluated independently
-  const runGroups = new Map<string, DailyBlock[]>();
-  for (const block of blocks) {
-    const key = block.new_route_ids[0];
-    if (!runGroups.has(key)) runGroups.set(key, []);
-    runGroups.get(key)!.push(block);
-  }
-
-  // Sort groups by total weekly hours descending (bigger groups first)
-  const sortedGroups = [...runGroups.entries()].sort(
-    (a, b) => b[1].reduce((s, bl) => s + bl.pay_hours, 0) - a[1].reduce((s, bl) => s + bl.pay_hours, 0),
-  );
+  // Sort blocks by pay_hours descending (biggest blocks first for greedy packing)
+  const sortedBlocks = [...blocks].sort((a, b) => b.pay_hours - a.pay_hours);
 
   const packages: WorkingPackage[] = [];
-  const assigned = new Set<string>(); // new_route_name keys that have been assigned
+  const assigned = new Set<DailyBlock>();
 
-  // First pass: groups that already meet FTE threshold on their own
-  for (const [key, groupBlocks] of sortedGroups) {
-    const weeklyHours = groupBlocks.reduce((s, b) => s + b.pay_hours, 0);
-    if (weeklyHours >= config.fte_min_hours && weeklyHours <= config.fte_max_hours) {
-      const daysOn = [...new Set(groupBlocks.map((b) => b.day))];
-      if (computeMaxConsecutiveWork(daysOn) <= config.max_consecutive_days) {
-        packages.push({
-          blocks: groupBlocks,
-          weeklyHours: Math.round(weeklyHours * 10) / 10,
-          depot: groupBlocks[0].depot,
-        });
-        assigned.add(key);
-      }
-    }
-  }
+  for (const block of sortedBlocks) {
+    if (assigned.has(block)) continue;
 
-  // Second pass: try to combine remaining groups into FTE packages
-  const remainingGroups = sortedGroups.filter(([key]) => !assigned.has(key));
-
-  for (const [key, groupBlocks] of remainingGroups) {
-    if (assigned.has(key)) continue;
-
-    // Try to fit into an existing package
+    // Find the best existing package to add this block to
     let bestPackageIdx = -1;
     let bestScore = -Infinity;
 
     for (let i = 0; i < packages.length; i++) {
       const pkg = packages[i];
-      const combinedHours = pkg.weeklyHours + groupBlocks.reduce((s, b) => s + b.pay_hours, 0);
+      const combinedHours = pkg.weeklyHours + block.pay_hours;
       if (combinedHours > config.fte_max_hours) continue;
 
-      const combinedDays = [...new Set([...pkg.blocks.map((b) => b.day), ...groupBlocks.map((b) => b.day)])];
+      const combinedDays = [...new Set([...pkg.blocks.map((b) => b.day), block.day])];
       if (computeMaxConsecutiveWork(combinedDays) > config.max_consecutive_days) continue;
 
-      const score = scoreCompatibility(pkg.blocks, groupBlocks, config);
+      const score = scoreCompatibility(pkg.blocks, [block], config)
+        + sameRouteNameBonus(pkg.blocks, block);
       if (score > bestScore) {
         bestScore = score;
         bestPackageIdx = i;
@@ -270,19 +252,16 @@ function assembleFTEPackages(
 
     if (bestPackageIdx >= 0 && bestScore > -Infinity) {
       const pkg = packages[bestPackageIdx];
-      pkg.blocks = [...pkg.blocks, ...groupBlocks];
+      pkg.blocks = [...pkg.blocks, block];
       pkg.weeklyHours = Math.round(pkg.blocks.reduce((s, b) => s + b.pay_hours, 0) * 10) / 10;
-      assigned.add(key);
     } else {
-      // Start a new package with this group
-      const weeklyHours = groupBlocks.reduce((s, b) => s + b.pay_hours, 0);
       packages.push({
-        blocks: groupBlocks,
-        weeklyHours: Math.round(weeklyHours * 10) / 10,
-        depot: groupBlocks[0].depot,
+        blocks: [block],
+        weeklyHours: Math.round(block.pay_hours * 10) / 10,
+        depot: block.depot,
       });
-      assigned.add(key);
     }
+    assigned.add(block);
   }
 
   // Split packages into FTE-qualifying and remaining
@@ -308,39 +287,30 @@ function assemblePTPackages(
 ): WorkingPackage[] {
   if (blocks.length === 0) return [];
 
-  // Group by new_route_id so each new route (including splits) is independent
-  const runGroups = new Map<string, DailyBlock[]>();
-  for (const block of blocks) {
-    const key = block.new_route_ids[0];
-    if (!runGroups.has(key)) runGroups.set(key, []);
-    runGroups.get(key)!.push(block);
-  }
+  // Sort blocks by pay_hours descending (biggest blocks first for greedy packing)
+  const sortedBlocks = [...blocks].sort((a, b) => b.pay_hours - a.pay_hours);
 
   const packages: WorkingPackage[] = [];
-  const assigned = new Set<string>();
+  const assigned = new Set<DailyBlock>();
 
-  // Sort groups by hours descending
-  const sortedGroups = [...runGroups.entries()].sort(
-    (a, b) => b[1].reduce((s, bl) => s + bl.pay_hours, 0) - a[1].reduce((s, bl) => s + bl.pay_hours, 0),
-  );
+  for (const block of sortedBlocks) {
+    if (assigned.has(block)) continue;
 
-  for (const [key, groupBlocks] of sortedGroups) {
-    if (assigned.has(key)) continue;
-
-    // Try to fit into an existing PT package
+    // Find the best existing PT package to add this block to
     let bestPackageIdx = -1;
     let bestScore = -Infinity;
 
     for (let i = 0; i < packages.length; i++) {
       const pkg = packages[i];
-      const combinedHours = pkg.weeklyHours + groupBlocks.reduce((s, b) => s + b.pay_hours, 0);
+      const combinedHours = pkg.weeklyHours + block.pay_hours;
       // PT packages must stay below FTE threshold
       if (combinedHours >= config.fte_min_hours) continue;
 
-      const combinedDays = [...new Set([...pkg.blocks.map((b) => b.day), ...groupBlocks.map((b) => b.day)])];
+      const combinedDays = [...new Set([...pkg.blocks.map((b) => b.day), block.day])];
       if (computeMaxConsecutiveWork(combinedDays) > config.max_consecutive_days) continue;
 
-      const score = scoreCompatibility(pkg.blocks, groupBlocks, config);
+      const score = scoreCompatibility(pkg.blocks, [block], config)
+        + sameRouteNameBonus(pkg.blocks, block);
       if (score > bestScore) {
         bestScore = score;
         bestPackageIdx = i;
@@ -349,17 +319,16 @@ function assemblePTPackages(
 
     if (bestPackageIdx >= 0 && bestScore > -Infinity) {
       const pkg = packages[bestPackageIdx];
-      pkg.blocks = [...pkg.blocks, ...groupBlocks];
+      pkg.blocks = [...pkg.blocks, block];
       pkg.weeklyHours = Math.round(pkg.blocks.reduce((s, b) => s + b.pay_hours, 0) * 10) / 10;
     } else {
-      const weeklyHours = groupBlocks.reduce((s, b) => s + b.pay_hours, 0);
       packages.push({
-        blocks: groupBlocks,
-        weeklyHours: Math.round(weeklyHours * 10) / 10,
-        depot: groupBlocks[0].depot,
+        blocks: [block],
+        weeklyHours: Math.round(block.pay_hours * 10) / 10,
+        depot: block.depot,
       });
     }
-    assigned.add(key);
+    assigned.add(block);
   }
 
   return packages;

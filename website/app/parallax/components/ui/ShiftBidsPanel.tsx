@@ -1,7 +1,7 @@
 'use client';
 
 import { DndContext, DragOverlay, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
-import { ChevronDown, ChevronRight, CircleHelp, Download, GripVertical, Play, Save } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleHelp, Download, GripVertical, Play, Save } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Badge } from '@/app/parallax/components/shadcn/badge';
@@ -29,7 +29,7 @@ import { DEFAULT_BID_CONFIG, collapseRoutes, computeMaxConsecutiveWork, generate
 import { exportBidsToExcel } from '@/lib/parallax/bid-export';
 import type { BidConfig, BidResult, BidType, CollapsedRoute, DailyBlock, DepotRow, NewRouteRow, ServiceDay } from '@/lib/parallax/types';
 
-import { ALL_SERVICE_DAYS, formatMinutesToClock } from './shared';
+import { ALL_SERVICE_DAYS, formatMinutesToClock, parseServiceDays } from './shared';
 
 function SettingLabel({ children, tip }: { children: React.ReactNode; tip: string }) {
   return (
@@ -42,6 +42,44 @@ function SettingLabel({ children, tip }: { children: React.ReactNode; tip: strin
         </span>
       </span>
     </Label>
+  );
+}
+
+// ── Sortable bid table header ────────────────────────────────────────
+
+type BidSortColumn = 'bid_rank' | 'type' | 'routes' | 'weekly_pay_hours' | 'consecutive_days_off' | 'consistency_score' | 'depot';
+
+function BidSortableHead({
+  column,
+  label,
+  className,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  column: BidSortColumn;
+  label: string;
+  className?: string;
+  sortKey: BidSortColumn;
+  sortDir: 'asc' | 'desc';
+  onSort: (key: BidSortColumn) => void;
+}) {
+  const active = sortKey === column;
+  return (
+    <TableHead className={className}>
+      <button
+        className="inline-flex items-center gap-1 hover:text-cc-accent transition-colors"
+        onClick={() => onSort(column)}
+        type="button"
+      >
+        {label}
+        {active ? (
+          sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+        ) : (
+          <span className="w-3" />
+        )}
+      </button>
+    </TableHead>
   );
 }
 
@@ -166,6 +204,144 @@ function validateBlockMove(
   return violations;
 }
 
+// ── Route info tooltip (fixed-position to escape overflow clipping) ──
+
+function RouteInfoTip({ lines }: { lines: string[] }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  function show() {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    setPos({ top: rect.top - 4, left: rect.right + 8 });
+  }
+
+  return (
+    <>
+      <span
+        ref={ref}
+        className="inline-flex items-center cursor-help text-cc-text-muted hover:text-cc-text-secondary transition-colors"
+        onMouseEnter={show}
+        onMouseLeave={() => setPos(null)}
+      >
+        <CircleHelp size={11} />
+      </span>
+      {pos && (
+        <div
+          className="fixed z-[100] w-48 p-2 rounded-md bg-cc-surface-1 border border-cc-border shadow-lg text-[11px] text-cc-text-secondary leading-snug pointer-events-none"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          {lines.map((line, i) => (
+            <div key={i} className={i === 0 ? 'font-semibold mb-0.5' : ''}>{line}</div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Route Reference Panel ────────────────────────────────────────────
+
+function RouteReferencePanel({
+  newRoutes,
+  depotNameMap,
+  highlightFilter,
+  onHighlightFilterChange,
+}: {
+  newRoutes: NewRouteRow[];
+  depotNameMap: Map<string, string>;
+  highlightFilter?: { routeName: string; days: ServiceDay[] } | null;
+  onHighlightFilterChange?: (filter: { routeName: string; days: ServiceDay[] } | null) => void;
+}) {
+  const routeData = useMemo(() => {
+    const map = new Map<string, {
+      name: string;
+      days: ServiceDay[];
+      depot: string | null;
+      start_time: string;
+      end_time: string;
+      breaks: string[];
+    }>();
+
+    for (const nr of newRoutes) {
+      const key = nr.new_route_name;
+      if (!map.has(key)) {
+        const breaks: string[] = [];
+        if (nr.break_1_start && nr.break_1_end) breaks.push(`${nr.break_1_start}\u2013${nr.break_1_end}`);
+        if (nr.break_2_start && nr.break_2_end) breaks.push(`${nr.break_2_start}\u2013${nr.break_2_end}`);
+        if (nr.break_3_start && nr.break_3_end) breaks.push(`${nr.break_3_start}\u2013${nr.break_3_end}`);
+        map.set(key, {
+          name: key,
+          days: parseServiceDays(nr.service_days),
+          depot: nr.depot,
+          start_time: nr.start_time,
+          end_time: nr.end_time,
+          breaks,
+        });
+      } else {
+        const existing = map.get(key)!;
+        const moreDays = parseServiceDays(nr.service_days);
+        for (const d of moreDays) {
+          if (!existing.days.includes(d)) existing.days.push(d);
+        }
+      }
+    }
+
+    return [...map.values()]
+      .map((r) => ({ ...r, days: ALL_SERVICE_DAYS.filter((d) => r.days.includes(d)) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [newRoutes]);
+
+  if (newRoutes.length === 0) return null;
+
+  return (
+    <div className="shrink-0 overflow-y-auto p-1 pr-3">
+      <div className="text-[10px] font-semibold text-cc-text-muted uppercase tracking-wide mb-1.5">Routes</div>
+      <div className="space-y-0.5">
+        {routeData.map((route) => {
+          const isActive = highlightFilter?.routeName === route.name;
+          const tipLines = [route.name];
+          if (route.depot) tipLines.push(`Depot: ${depotNameMap.get(route.depot) ?? route.depot}`);
+          tipLines.push(`Time: ${route.start_time} \u2013 ${route.end_time}`);
+          if (route.breaks.length > 0) tipLines.push(`Breaks: ${route.breaks.join(', ')}`);
+          tipLines.push(`Days: ${route.days.join(', ')}`);
+          return (
+            <div
+              key={route.name}
+              className={`rounded px-1.5 py-1 cursor-pointer transition-colors text-xs whitespace-nowrap ${isActive ? 'bg-cc-accent/15 ring-1 ring-cc-accent/40' : 'hover:bg-cc-surface-2'}`}
+              onClick={() => onHighlightFilterChange?.(isActive ? null : { routeName: route.name, days: route.days })}
+            >
+              <div className="flex items-center gap-1">
+                <RouteInfoTip lines={tipLines} />
+                <span className="font-medium text-[11px] leading-tight">{route.name}</span>
+              </div>
+              <div className="flex gap-0.5 mt-0.5">
+                {ALL_SERVICE_DAYS.map((day) => (
+                  <span
+                    key={day}
+                    className={`px-0.5 text-[8px] rounded ${route.days.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                  >
+                    {day}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {highlightFilter && (
+        <button
+          className="mt-1.5 text-[10px] text-cc-accent hover:underline"
+          onClick={() => onHighlightFilterChange?.(null)}
+          type="button"
+        >
+          Clear filter
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ──────────────────────────────────────────────────
 
 interface ShiftBidsPanelProps {
@@ -177,13 +353,17 @@ interface ShiftBidsPanelProps {
   pushBidUndoState: (state: BidResult) => void;
   clearBidHistory: () => void;
   showToast: (message: string) => void;
+  highlightFilter?: { routeName: string; days: ServiceDay[] } | null;
+  onHighlightFilterChange?: (filter: { routeName: string; days: ServiceDay[] } | null) => void;
 }
 
-export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidResult, onBidResultChange, pushBidUndoState, clearBidHistory, showToast }: ShiftBidsPanelProps) {
+export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidResult, onBidResultChange, pushBidUndoState, clearBidHistory, showToast, highlightFilter, onHighlightFilterChange }: ShiftBidsPanelProps) {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [settingsLocked, setSettingsLocked] = useState(false);
   const [config, setConfig] = useState<BidConfig>({ ...DEFAULT_BID_CONFIG });
   const [typeFilter, setTypeFilter] = useState<'all' | 'FTE' | 'PT'>('all');
+  const [bidSortKey, setBidSortKey] = useState<BidSortColumn>('bid_rank');
+  const [bidSortDir, setBidSortDir] = useState<'asc' | 'desc'>('asc');
   const [expandedBids, setExpandedBids] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
@@ -270,11 +450,56 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
     exportBidsToExcel(bidResult, depots);
   }
 
+  function toggleBidSort(key: BidSortColumn) {
+    if (bidSortKey === key) {
+      setBidSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setBidSortKey(key);
+      setBidSortDir('asc');
+    }
+  }
+
   const filteredPackages = useMemo(() => {
     if (!bidResult) return [];
-    if (typeFilter === 'all') return bidResult.packages;
-    return bidResult.packages.filter((p) => p.type === typeFilter);
-  }, [bidResult, typeFilter]);
+    const filtered = typeFilter === 'all' ? bidResult.packages : bidResult.packages.filter((p) => p.type === typeFilter);
+    const dir = bidSortDir === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      let cmp: number;
+      switch (bidSortKey) {
+        case 'bid_rank':
+          cmp = a.bid_rank - b.bid_rank;
+          break;
+        case 'type':
+          cmp = a.type.localeCompare(b.type);
+          break;
+        case 'routes': {
+          const aNames = [...new Set(a.daily_blocks.map((bl) => bl.new_route_name))].join(', ');
+          const bNames = [...new Set(b.daily_blocks.map((bl) => bl.new_route_name))].join(', ');
+          cmp = aNames.localeCompare(bNames);
+          break;
+        }
+        case 'weekly_pay_hours':
+          cmp = a.weekly_pay_hours - b.weekly_pay_hours;
+          break;
+        case 'consecutive_days_off':
+          cmp = a.consecutive_days_off - b.consecutive_days_off;
+          break;
+        case 'consistency_score':
+          cmp = a.consistency_score - b.consistency_score;
+          break;
+        case 'depot': {
+          const aDepot = a.depot ? (depotNameMap.get(a.depot) ?? a.depot) : 'Mixed';
+          const bDepot = b.depot ? (depotNameMap.get(b.depot) ?? b.depot) : 'Mixed';
+          cmp = aDepot.localeCompare(bDepot);
+          break;
+        }
+        default:
+          cmp = 0;
+      }
+      if (cmp !== 0) return cmp * dir;
+      return a.bid_rank - b.bid_rank;
+    });
+  }, [bidResult, typeFilter, bidSortKey, bidSortDir, depotNameMap]);
 
   // ── Drag and drop ─────────────────────────────────────────────────
 
@@ -587,21 +812,30 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
 
       {/* ── Bid table with DnD ───────────────────────────────────── */}
       {bidResult && (
+        <div className="flex items-stretch">
+          <RouteReferencePanel
+            newRoutes={newRoutes}
+            depotNameMap={depotNameMap}
+            highlightFilter={highlightFilter}
+            onHighlightFilterChange={onHighlightFilterChange}
+          />
+          <div className="w-px bg-cc-border shrink-0" />
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="overflow-x-auto">
+          <div className="flex-1 min-w-0 overflow-x-auto pl-3">
+            <div className="text-[10px] font-semibold text-cc-text-muted uppercase tracking-wide mb-1.5">Bid Packages</div>
             <table className="w-full caption-bottom text-sm">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-6" />
-                  <TableHead className="min-w-[50px]">Rank</TableHead>
-                  <TableHead className="min-w-[50px]">Type</TableHead>
-                  <TableHead className="min-w-[150px]">Routes</TableHead>
+                  <BidSortableHead column="bid_rank" label="Rank" className="min-w-[50px]" sortKey={bidSortKey} sortDir={bidSortDir} onSort={toggleBidSort} />
+                  <BidSortableHead column="type" label="Type" className="min-w-[50px]" sortKey={bidSortKey} sortDir={bidSortDir} onSort={toggleBidSort} />
+                  <BidSortableHead column="routes" label="Routes" className="min-w-[150px]" sortKey={bidSortKey} sortDir={bidSortDir} onSort={toggleBidSort} />
                   <TableHead className="min-w-[160px]">Days On</TableHead>
                   <TableHead className="min-w-[100px]">Days Off</TableHead>
-                  <TableHead className="min-w-[90px]">Weekly Hrs</TableHead>
-                  <TableHead className="min-w-[80px]">Consec. Off</TableHead>
-                  <TableHead className="min-w-[90px]">Consistency</TableHead>
-                  <TableHead className="min-w-[80px]">Depot</TableHead>
+                  <BidSortableHead column="weekly_pay_hours" label="Weekly Hrs" className="min-w-[90px]" sortKey={bidSortKey} sortDir={bidSortDir} onSort={toggleBidSort} />
+                  <BidSortableHead column="consecutive_days_off" label="Consec. Off" className="min-w-[80px]" sortKey={bidSortKey} sortDir={bidSortDir} onSort={toggleBidSort} />
+                  <BidSortableHead column="consistency_score" label="Consistency" className="min-w-[90px]" sortKey={bidSortKey} sortDir={bidSortDir} onSort={toggleBidSort} />
+                  <BidSortableHead column="depot" label="Depot" className="min-w-[80px]" sortKey={bidSortKey} sortDir={bidSortDir} onSort={toggleBidSort} />
                 </TableRow>
               </TableHeader>
               {filteredPackages.length === 0 && (
@@ -619,9 +853,13 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
                 const isExpanded = expandedBids.has(pkg.bid_id);
                 const routeNames = [...new Set(pkg.daily_blocks.map((b) => b.new_route_name))].join(', ');
                 const collapsed = isExpanded ? collapseRoutes(pkg.daily_blocks) : [];
+                const isHighlighted = highlightFilter != null && pkg.daily_blocks.some(
+                  (b) => b.new_route_name === highlightFilter.routeName && highlightFilter.days.includes(b.day),
+                );
+                const isDimmed = highlightFilter != null && !isHighlighted;
                 return (
                   <DroppablePackageBody key={pkg.bid_id} packageId={pkg.bid_id}>
-                    <TableRow className="cursor-pointer" onClick={() => toggleExpanded(pkg.bid_id)}>
+                    <TableRow className={`cursor-pointer transition-opacity ${isHighlighted ? 'ring-2 ring-cc-accent/30 ring-inset' : ''} ${isDimmed ? 'opacity-40' : ''}`} onClick={() => toggleExpanded(pkg.bid_id)}>
                       <TableCell className="w-6" />
                       <TableCell className="text-xs font-medium">
                         <span className="inline-flex items-center gap-1">
@@ -774,6 +1012,7 @@ export default function ShiftBidsPanel({ newRoutes, depots, readonlyView, bidRes
             )}
           </DragOverlay>
         </DndContext>
+        </div>
       )}
 
       {/* ── Empty state ──────────────────────────────────────────── */}

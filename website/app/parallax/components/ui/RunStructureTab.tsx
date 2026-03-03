@@ -86,6 +86,7 @@ export default function RunStructureTab({
   const [newRouteDayFilter, setNewRouteDayFilter] = useState<ServiceDay | 'all'>('all');
   const [depotFilter, setDepotFilter] = useState<string>('all');
   const [copyDaysSelection, setCopyDaysSelection] = useState<ServiceDay[]>([...ALL_SERVICE_DAYS]);
+  const [highlightFilter, setHighlightFilter] = useState<{ routeName: string; days: ServiceDay[] } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ownPersistRef = useRef(false);
 
@@ -649,7 +650,7 @@ export default function RunStructureTab({
       </SectionCard>
 
       <section className="border border-cc-border rounded-[10px] bg-cc-surface-1 p-4 mb-4">
-      <Tabs value={subTab} onValueChange={(v) => setSubTab(v as 'imported' | 'bids' | 'runeditor' | 'help')}>
+      <Tabs value={subTab} onValueChange={(v) => { setSubTab(v as 'imported' | 'bids' | 'runeditor' | 'help'); if (v !== 'bids') setHighlightFilter(null); }}>
         <div className="flex items-center gap-2 mb-3">
           <TabsList>
             <TabsTrigger value="runeditor">Route Editor</TabsTrigger>
@@ -697,6 +698,8 @@ export default function RunStructureTab({
             pushBidUndoState={pushBidState}
             clearBidHistory={clearBidHistory}
             showToast={showToast}
+            highlightFilter={highlightFilter}
+            onHighlightFilterChange={setHighlightFilter}
           />
         </TabsContent>
 
