@@ -159,6 +159,8 @@ function computeLegendLabels(blocks: TimeBlock[]): string[] {
 
 export default function MapTab({ metrics, trips, selectedDays, specificDate }: MapTabProps) {
   const [mapBlockIdx, setMapBlockIdx] = useState(() => Math.floor(metrics.blocks.length / 2));
+  const [mapHeight, setMapHeight] = useState(500);
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapLoadedRef = useRef(false);
@@ -219,6 +221,59 @@ export default function MapTab({ metrics, trips, selectedDays, specificDate }: M
   useEffect(() => {
     setMapBlockIdx(Math.floor(metrics.blocks.length / 2));
   }, [metrics.blocks]);
+
+  /* ---- Fill remaining viewport height ---- */
+  useEffect(() => {
+    function findMain(): HTMLElement | null {
+      let el: HTMLElement | null = mapWrapperRef.current;
+      while (el && el.tagName !== 'MAIN') el = el.parentElement;
+      return el;
+    }
+
+    function updateHeight() {
+      if (!mapWrapperRef.current) return;
+      const rect = mapWrapperRef.current.getBoundingClientRect();
+      // If the element is hidden (display:none tab), rect is all zeros — skip
+      if (rect.top === 0 && rect.height === 0) return;
+
+      const mainEl = findMain();
+      const bottom = mainEl
+        ? mainEl.getBoundingClientRect().bottom
+        : window.innerHeight;
+
+      // Compute space needed below the map: SectionCard padding + border +
+      // SectionCard margin-bottom + main's padding-bottom
+      let belowMap = 0;
+      const section = mapWrapperRef.current.closest('section');
+      if (section) {
+        const cs = getComputedStyle(section);
+        belowMap += parseFloat(cs.paddingBottom) || 0;
+        belowMap += parseFloat(cs.borderBottomWidth) || 0;
+        belowMap += parseFloat(cs.marginBottom) || 0;
+      }
+      if (mainEl) {
+        belowMap += parseFloat(getComputedStyle(mainEl).paddingBottom) || 0;
+      }
+
+      const available = bottom - rect.top - belowMap;
+      setMapHeight(Math.max(300, available));
+    }
+
+    updateHeight();
+    // Re-measure after a frame to catch post-layout settling
+    requestAnimationFrame(updateHeight);
+    window.addEventListener('resize', updateHeight);
+    // Re-measure when layout shifts (filter bar expand/collapse, content changes)
+    const observer = new ResizeObserver(updateHeight);
+    if (mapWrapperRef.current) observer.observe(mapWrapperRef.current);
+    if (mapWrapperRef.current?.parentElement) {
+      observer.observe(mapWrapperRef.current.parentElement);
+    }
+    return () => {
+      window.removeEventListener('resize', updateHeight);
+      observer.disconnect();
+    };
+  }, []);
 
   /* ---- Map initialization ---- */
   useEffect(() => {
@@ -361,6 +416,9 @@ export default function MapTab({ metrics, trips, selectedDays, specificDate }: M
       mapLoadedRef.current = true;
       mapRef.current = map;
 
+      // Ensure map fills its container now that it's loaded
+      requestAnimationFrame(() => map.resize());
+
       // Push initial heatmap data now that the map is ready
       if (geoTripsRef.current.length > 0) {
         const source = map.getSource('trips') as mapboxgl.GeoJSONSource | undefined;
@@ -396,6 +454,13 @@ export default function MapTab({ metrics, trips, selectedDays, specificDate }: M
 
     source.setData(buildGeoJSON(geoTrips, mapBlockIdx));
   }, [geoTrips, mapBlockIdx]);
+
+  /* ---- Notify mapbox when container height changes ---- */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoadedRef.current) return;
+    map.resize();
+  }, [mapHeight]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -469,16 +534,18 @@ export default function MapTab({ metrics, trips, selectedDays, specificDate }: M
         />
 
         {/* Mapbox map */}
-        <div
-          ref={mapContainerRef}
-          style={{
-            width: '100%',
-            height: 500,
-            borderRadius: 8,
-            marginTop: 12,
-            overflow: 'hidden',
-          }}
-        />
+        <div ref={mapWrapperRef}>
+          <div
+            ref={mapContainerRef}
+            style={{
+              width: '100%',
+              height: mapHeight,
+              borderRadius: 8,
+              marginTop: 12,
+              overflow: 'hidden',
+            }}
+          />
+        </div>
 
         {geoTrips.length === 0 && (
           <p className="text-cc-text-muted text-center mt-3">

@@ -907,10 +907,10 @@ export function computeClearcutMetrics(
     breaksByBlock[i] = Math.round((breaksByBlock[i] / dayCount) * 10) / 10;
     const trips = blockTripCounts[i] / dayCount;
     pickupOtpByBlock[i] =
-      pickupEligibleCounts[i] > 0 ? (pickupOnTimeCounts[i] / pickupEligibleCounts[i]) * 100 : 0;
+      pickupEligibleCounts[i] > 0 ? (pickupOnTimeCounts[i] / pickupEligibleCounts[i]) * 100 : 100;
     dropoffOtpByBlock[i] =
-      dropoffEligibleCounts[i] > 0 ? (dropoffOnTimeCounts[i] / dropoffEligibleCounts[i]) * 100 : 0;
-    tripOtpByBlock[i] = tripEligibleCounts[i] > 0 ? (tripOnTimeCounts[i] / tripEligibleCounts[i]) * 100 : 0;
+      dropoffEligibleCounts[i] > 0 ? (dropoffOnTimeCounts[i] / dropoffEligibleCounts[i]) * 100 : 100;
+    tripOtpByBlock[i] = tripEligibleCounts[i] > 0 ? (tripOnTimeCounts[i] / tripEligibleCounts[i]) * 100 : 100;
     otpByBlock[i] = tripOtpByBlock[i];
     const vehicleHours = (vehiclesByBlock[i] * blockSizeMinutes) / 60;
     productivityByBlock[i] = vehicleHours > 0
