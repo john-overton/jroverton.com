@@ -402,16 +402,31 @@ export default function ImportTab({
   function downloadSampleCsv(kind: 'trips' | 'routes' | 'new_routes') {
     const tripSample = [
       'trip_id,trip_date,scheduled_pickup_time,scheduled_appointment_time,pickup_arrive_time,pickup_leave_time,dropoff_arrive_time,dropoff_leave_time,route_id,pickup_address,pickup_lat,pickup_lon,dropoff_address,dropoff_lat,dropoff_lon,status,passenger_type,passenger_count,pick_odometer,drop_odometer',
-      'TRIP-001,2026-02-01,2026-02-01 08:00:00,2026-02-01 08:30:00,2026-02-01 07:58:00,2026-02-01 08:02:00,2026-02-01 08:27:00,2026-02-01 08:31:00,ROUTE-001,123 Main St,,,456 Oak St,,,completed,ambulatory,1,1000,1010',
+      'TRIP-001,2026-02-01,2026-02-01 08:00:00,2026-02-01 08:30:00,2026-02-01 07:58:00,2026-02-01 08:02:00,2026-02-01 08:27:00,2026-02-01 08:31:00,ROUTE-001,123 Main St,40.7128,-74.0060,456 Oak Ave,40.7580,-73.9855,completed,ambulatory,1,1000,1010',
+      'TRIP-002,2026-02-01,2026-02-01 09:15:00,2026-02-01 09:45:00,,,,,ROUTE-001,789 Elm Blvd,40.7484,-73.9856,321 Pine St,40.7614,-73.9776,scheduled,wheelchair,1,,',
+      '',
+      '# DATA TYPES: TEXT,DATE,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,TEXT,TEXT,DECIMAL,DECIMAL,TEXT,DECIMAL,DECIMAL,TEXT,ENUM,INTEGER,DECIMAL,DECIMAL',
+      '# REQUIRED: yes,no,yes,no,no,no,no,no,yes,no,no,no,no,no,no,yes,no (default: ambulatory),no,no,no',
+      '# ENUM VALUES for passenger_type: ambulatory | wheelchair | extra_large',
+      '# DATETIME FORMAT: YYYY-MM-DD HH:MM:SS  |  DATE FORMAT: YYYY-MM-DD',
     ].join('\n');
     const routeSample = [
       'route_id,route_date,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1_start,break1_end,break2_start,break2_end,depot_address,depot_lat,depot_lon,distance_to_first_pick,distance_from_last_drop',
-      'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 11:30:00,,, 100 Depot Way,40.7128,-74.0060,3.2,4.5',
+      'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 11:30:00,,,100 Depot Way,40.7128,-74.0060,3.2,4.5',
+      'ROUTE-002,2026-02-01,South Loop,2026-02-01 06:00:00,2026-02-01 14:00:00,,,,,,,200 Base Rd,40.7484,-73.9856,,',
+      '',
+      '# DATA TYPES: TEXT,DATE,TEXT,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,TEXT,DECIMAL,DECIMAL,DECIMAL,DECIMAL',
+      '# REQUIRED: yes,no,no,yes,yes,no,no,no,no,no,no,no,no,no,no,no',
+      '# DATETIME FORMAT: YYYY-MM-DD HH:MM:SS  |  DATE FORMAT: YYYY-MM-DD',
     ].join('\n');
     const newRouteSample = [
       'new_route_name,start_time,end_time,service_days,depot_address,route_area,split_number,break_1_start,break_1_end,break_2_start,break_2_end',
       'North Loop,06:00,14:00,"M,T,W,Th,F",100 Depot Way,,0,10:00,10:30,,',
       'South Loop,14:00,22:00,"M,T,W,Th,F",100 Depot Way,,0,18:00,18:30,,',
+      '',
+      '# DATA TYPES: TEXT,TIME (HH:MM),TIME (HH:MM),TEXT (comma-separated),TEXT,TEXT,INTEGER,TIME (HH:MM),TIME (HH:MM),TIME (HH:MM),TIME (HH:MM)',
+      '# REQUIRED: yes,yes,yes,no (default: M T W Th F),no,no,no (default: 0),no,no,no,no',
+      '# SERVICE DAYS VALUES: M | T | W | Th | F | Sa | Su',
     ].join('\n');
 
     const content = kind === 'trips' ? tripSample : kind === 'routes' ? routeSample : newRouteSample;

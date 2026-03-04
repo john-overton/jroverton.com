@@ -63,6 +63,7 @@ export default function ClearcutLandingClient() {
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const tokenValid = TOKEN_REGEX.test(tokenInput.trim());
 
@@ -409,7 +410,7 @@ export default function ClearcutLandingClient() {
             Import your route and trip data, analyze demand patterns and performance characteristics, plan your route structure, and export optimized bids from real operational numbers.
           </p>
           <p style={{ fontSize: 12, color: '#4e4f52', marginBottom: 16 }}>
-            Suitable for most on-demand and pre-scheduled trip services.
+            Suitable for most on-demand and pre-scheduled trip services.  To get started, create a session and upload your route and trip data.
             </p>
 
           {/* Inline session form */}
@@ -425,13 +426,13 @@ export default function ClearcutLandingClient() {
                     textTransform: 'uppercase' as const,
                   }}
                 >
-                  Session Name
+                  New Session Name
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Title your session"
+                  placeholder="New session name"
                   required
                   style={{
                     padding: '12px 14px',
@@ -501,7 +502,7 @@ export default function ClearcutLandingClient() {
               </div>
               <button
                 type="submit"
-                disabled={isCreating || !name.trim()}
+                disabled={isCreating || !name.trim() || !agreedToTerms}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -516,10 +517,10 @@ export default function ClearcutLandingClient() {
                   fontWeight: 500,
                   textDecoration: 'none',
                   border: 'none',
-                  cursor: isCreating || !name.trim() ? 'not-allowed' : 'pointer',
+                  cursor: isCreating || !name.trim() || !agreedToTerms ? 'not-allowed' : 'pointer',
                   whiteSpace: 'nowrap' as const,
                   height: 46,
-                  opacity: isCreating || !name.trim() ? 0.7 : 1,
+                  opacity: isCreating || !name.trim() || !agreedToTerms ? 0.5 : 1,
                 }}
               >
                 {isCreating ? 'Creating...' : 'Go'}
@@ -531,7 +532,39 @@ export default function ClearcutLandingClient() {
                 )}
               </button>
             </div>
+
+            {/* Terms agreement checkbox */}
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+                fontSize: 12,
+                color: '#4e4f52',
+                cursor: 'pointer',
+                lineHeight: 1.5,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                style={{
+                  marginTop: 2,
+                  accentColor: '#2a6b5a',
+                  cursor: 'pointer',
+                }}
+              />
+              <span>
+                I agree to the{' '}
+                <a href="/parallax/terms" target="_blank" style={{ color: '#2a6b5a', textDecoration: 'none' }}>Terms of Service</a>
+                {' '}and{' '}
+                <a href="/parallax/privacy" target="_blank" style={{ color: '#2a6b5a', textDecoration: 'none' }}>Privacy Policy</a>
+              </span>
+            </label>
           </form>
+
+          <div style={{ height: 16 }} />
 
           {message && (
             <p style={{ color: '#DC2626', fontSize: 13, marginBottom: 12 }}>{message}</p>
