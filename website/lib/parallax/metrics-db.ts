@@ -112,17 +112,17 @@ export function getOverviewMetrics(days: number = 30): OverviewMetrics {
   };
 }
 
-export function getPageViewsByDay(days: number = 30): Array<{ date: string; count: number }> {
+export function getPageViewsByDay(days: number = 30): Array<{ date: string; views: number; visitors: number }> {
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   return getMetricsDb()
     .prepare(
-      `SELECT DATE(created_at) as date, COUNT(*) as count
+      `SELECT DATE(created_at) as date, COUNT(*) as views, COUNT(DISTINCT ip) as visitors
        FROM page_views
        WHERE created_at >= ?
        GROUP BY DATE(created_at)
        ORDER BY date`,
     )
-    .all(since) as Array<{ date: string; count: number }>;
+    .all(since) as Array<{ date: string; views: number; visitors: number }>;
 }
 
 export function getTopPages(days: number = 30, limit: number = 10): Array<{ page: string; count: number }> {

@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -40,7 +41,7 @@ interface OverviewData {
     sessionsCreated: number;
     honeypotBlocks: number;
   };
-  dailyViews: Array<{ date: string; count: number }>;
+  dailyViews: Array<{ date: string; views: number; visitors: number }>;
   topPages: Array<{ page: string; count: number }>;
   eventsByAction: Array<{ action: string; count: number }>;
   recentEvents: Array<{
@@ -222,8 +223,8 @@ function OverviewPanel({ data }: { data: OverviewData | null }) {
 
       {/* Daily activity chart */}
       {dailyViews.length > 0 && (
-        <SectionCard title="Daily Page Views">
-          <div style={{ width: '100%', height: 200 }}>
+        <SectionCard title="Daily Activity">
+          <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>
               <BarChart data={dailyViews}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" />
@@ -237,7 +238,9 @@ function OverviewPanel({ data }: { data: OverviewData | null }) {
                 />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--color-cc-text-muted)' }} allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="count" fill="var(--color-cc-accent)" radius={[4, 4, 0, 0]} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="views" name="Page Views" fill="var(--color-cc-accent)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="visitors" name="Unique Visitors" fill="var(--color-cc-success, #22c55e)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
