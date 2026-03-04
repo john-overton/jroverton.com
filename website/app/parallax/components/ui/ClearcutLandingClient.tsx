@@ -361,7 +361,6 @@ export default function ClearcutLandingClient() {
         {/* Left column: re-enable pointer events for the form */}
         <div
           style={{
-            maxWidth: 500,
             animation: 'fadeUp 0.5s ease-out',
             pointerEvents: 'auto',
             background: 'rgba(244, 243, 240, 0.35)',
@@ -374,7 +373,7 @@ export default function ClearcutLandingClient() {
               '0 0 10px 4px rgba(26,29,35,0.04) inset, ' +
               '0 4px 24px rgba(26,29,35,0.06), ' +
               '0 8px 48px rgba(26,29,35,0.04)',
-            padding: '36px 40px',
+            padding: '36px 40px 40px',
           }}
         >
           {/* Logo + wordmark */}
@@ -425,7 +424,7 @@ export default function ClearcutLandingClient() {
           {/* Inline session form */}
           <form onSubmit={onCreateSession}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 16 }}>
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 5, flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 5, flex: 1, minWidth: 0 }}>
                 <label
                   style={{
                     fontSize: 11,
@@ -452,6 +451,7 @@ export default function ClearcutLandingClient() {
                     color: '#1a1d23',
                     background: '#ffffff',
                     outline: 'none',
+                    width: '100%',
                   }}
                 />
               </div>
