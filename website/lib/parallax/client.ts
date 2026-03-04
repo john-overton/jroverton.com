@@ -145,6 +145,7 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
 export async function createSession(input?: {
   name?: string;
   password?: string;
+  _hp?: string;
 }): Promise<CreateSessionResponse> {
   return request<CreateSessionResponse>('/api/parallax/sessions', {
     method: 'POST',

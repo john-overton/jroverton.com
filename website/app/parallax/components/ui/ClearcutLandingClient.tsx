@@ -55,8 +55,9 @@ export default function ClearcutLandingClient() {
   const router = useRouter();
 
   // Form state
-  const [name, setName] = useState('Untitled Session');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [honeypot, setHoneypot] = useState('');
   const [tokenInput, setTokenInput] = useState('');
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -79,10 +80,15 @@ export default function ClearcutLandingClient() {
       const created = await createSession({
         name: name.trim() || 'Untitled Session',
         password: password.trim() || undefined,
+        _hp: honeypot || undefined,
       });
       router.push(`/parallax/s/${created.session.edit_token}`);
     } catch (error) {
       if (error instanceof ClearcutClientError) {
+        if (error.code === 'bot_detected' || error.code === 'ip_blocked') {
+          router.push('/');
+          return;
+        }
         setMessage(error.message);
       } else {
         setMessage('Failed to create a Parallax session.');
@@ -90,7 +96,7 @@ export default function ClearcutLandingClient() {
     } finally {
       setIsCreating(false);
     }
-  }, [name, password, router]);
+  }, [name, password, honeypot, router]);
 
   // Token return handler
   const onReturnToSession = useCallback(() => {
@@ -419,7 +425,8 @@ export default function ClearcutLandingClient() {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Untitled Session"
+                  placeholder="Title your session"
+                  required
                   style={{
                     padding: '12px 14px',
                     border: '1.5px solid rgba(26, 29, 35, 0.12)',
@@ -432,6 +439,30 @@ export default function ClearcutLandingClient() {
                   }}
                 />
               </div>
+              {/* Honeypot field — hidden from real users, bots will fill it */}
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  left: -9999,
+                  opacity: 0,
+                  height: 0,
+                  width: 0,
+                  overflow: 'hidden',
+                  pointerEvents: 'none',
+                }}
+              >
+                <label htmlFor="website">Website</label>
+                <input
+                  type="text"
+                  id="website"
+                  name="website"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 5, maxWidth: 160 }}>
                 <label
                   style={{
@@ -442,13 +473,13 @@ export default function ClearcutLandingClient() {
                     textTransform: 'uppercase' as const,
                   }}
                 >
-                  Password
+                  Password <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 10, color: '#8b8d94' }}>(optional)</span>
                 </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Optional"
+                  placeholder="Min 6 characters"
                   minLength={6}
                   style={{
                     padding: '12px 14px',
@@ -464,7 +495,7 @@ export default function ClearcutLandingClient() {
               </div>
               <button
                 type="submit"
-                disabled={isCreating}
+                disabled={isCreating || !name.trim()}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -479,10 +510,10 @@ export default function ClearcutLandingClient() {
                   fontWeight: 500,
                   textDecoration: 'none',
                   border: 'none',
-                  cursor: isCreating ? 'not-allowed' : 'pointer',
+                  cursor: isCreating || !name.trim() ? 'not-allowed' : 'pointer',
                   whiteSpace: 'nowrap' as const,
                   height: 46,
-                  opacity: isCreating ? 0.7 : 1,
+                  opacity: isCreating || !name.trim() ? 0.7 : 1,
                 }}
               >
                 {isCreating ? 'Creating...' : 'Go'}

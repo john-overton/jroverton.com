@@ -8,6 +8,9 @@ export const AUTH_ATTEMPT_WINDOW_MS = 30_000;
 export const AUTH_MAX_ATTEMPTS = 5;
 export const AUTH_LOCKOUT_MS = 5 * 60_000;
 
+export const HONEYPOT_MAX_TRIGGERS = 2;
+export const HONEYPOT_BLOCK_MS = 24 * 60 * 60_000; // 24 hours
+
 const defaultDataRoot = path.join(process.cwd(), 'data', 'parallax');
 
 export const clearcutConfig = {
