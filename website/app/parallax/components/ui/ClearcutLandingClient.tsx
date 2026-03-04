@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
 import { ClearcutClientError, createSession } from '@/lib/parallax/client';
+import { trackPageView } from '@/lib/parallax/tracking';
 import { hexToRgb } from './shared';
 import ParallaxMark from './ParallaxMark';
 
@@ -64,6 +65,11 @@ export default function ClearcutLandingClient() {
   const [isCreating, setIsCreating] = useState(false);
 
   const tokenValid = TOKEN_REGEX.test(tokenInput.trim());
+
+  // Track page view
+  useEffect(() => {
+    trackPageView('landing');
+  }, []);
 
   // Map refs
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -648,9 +654,9 @@ export default function ClearcutLandingClient() {
             padding: '10px 20px',
           }}
         >
-          <span style={{ fontSize: 13, color: '#4e4f52' }}>&copy; 2026 John Overton</span>
-          <a href="#" style={{ fontSize: 13, color: '#4e4f52', textDecoration: 'none' }}>Privacy</a>
-          <a href="#" style={{ fontSize: 13, color: '#4e4f52', textDecoration: 'none' }}>Terms</a>
+          <span style={{ fontSize: 13, color: '#4e4f52' }}>&copy; 2026 Parallax</span>
+          <a href="/parallax/privacy" style={{ fontSize: 13, color: '#4e4f52', textDecoration: 'none' }}>Privacy</a>
+          <a href="/parallax/terms" style={{ fontSize: 13, color: '#4e4f52', textDecoration: 'none' }}>Terms</a>
           <a href="mailto:john@jroverton.com" style={{ fontSize: 13, color: '#4e4f52', textDecoration: 'none' }}>Contact</a>
         </div>
       </div>

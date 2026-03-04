@@ -4,9 +4,11 @@ import { signSessionJwt } from '@/lib/parallax/auth';
 import { handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
+  getClientIp,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
 } from '@/lib/parallax/http';
+import { recordApiEvent } from '@/lib/parallax/metrics-db';
 import { cloneClearcutSession } from '@/lib/parallax/service';
 
 export const runtime = 'nodejs';
@@ -23,6 +25,19 @@ export async function POST(
 
     const cloned = await cloneClearcutSession(session);
     const jwt = signSessionJwt(cloned.edit_token, 'edit');
+
+    try {
+      recordApiEvent({
+        ip: getClientIp(request),
+        method: 'POST',
+        path: `/api/parallax/sessions/${token}/clone`,
+        action: 'session_clone',
+        sessionToken: token,
+        statusCode: 201,
+      });
+    } catch {
+      // Metrics recording should never break the main flow
+    }
 
     return successResponse(
       {

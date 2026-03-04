@@ -8,10 +8,12 @@ import {
 import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
+  getClientIp,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
   requireSessionByToken,
 } from '@/lib/parallax/http';
+import { recordApiEvent } from '@/lib/parallax/metrics-db';
 import {
   deleteClearcutSession,
   getSessionState,
@@ -48,6 +50,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const state = getSessionState(resolved.session, access);
+
+    try {
+      recordApiEvent({
+        ip: getClientIp(request),
+        method: 'GET',
+        path: `/api/parallax/sessions/${token}`,
+        action: 'session_view',
+        sessionToken: token,
+        statusCode: 200,
+      });
+    } catch {
+      // Metrics recording should never break the main flow
+    }
+
     return successResponse({
       ...state,
       ...(issuedJwt ? { jwt: issuedJwt } : {}),

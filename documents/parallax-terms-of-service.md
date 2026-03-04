@@ -9,7 +9,7 @@
 
 By accessing or using Parallax ("the Software," "the Service"), a transit and trip service planning tool, you ("User," "you") agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you must immediately discontinue use of the Software.
 
-These Terms constitute a legally binding agreement between you and Open Glades LLC ("Company," "we," "us," "our"), a Kansas limited liability company. Use of the Software constitutes acceptance of these Terms in their entirety.
+These Terms constitute a legally binding agreement between you and Parallax ("we," "us," "our"). Use of the Software constitutes acceptance of these Terms in their entirety.
 
 ---
 
@@ -31,18 +31,18 @@ The Software is not intended to serve as the sole basis for operational decision
 
 - The Software produces planning estimates and analytical outputs that may contain errors, inaccuracies, or omissions.
 - You bear sole responsibility for independently validating all outputs before applying them to live operations.
-- The Company is not responsible for any decisions you make, or actions you take, based on information or outputs provided by the Software.
-- The Company assumes no liability for operational disruptions, financial losses, service failures, regulatory penalties, labor disputes, or any other consequences arising from reliance on the Software's outputs.
+- Parallax is not responsible for any decisions you make, or actions you take, based on information or outputs provided by the Software.
+- Parallax assumes no liability for operational disruptions, financial losses, service failures, regulatory penalties, labor disputes, or any other consequences arising from reliance on the Software's outputs.
 
 ---
 
 ## 4. Waiver of Right to Litigation
 
-**BY USING THE SOFTWARE, YOU EXPRESSLY AND VOLUNTARILY WAIVE ANY AND ALL RIGHTS TO PURSUE LITIGATION — INCLUDING BUT NOT LIMITED TO INDIVIDUAL LAWSUITS, CLASS ACTIONS, AND COLLECTIVE ACTIONS — AGAINST THE COMPANY, ITS OWNERS, MEMBERS, OFFICERS, EMPLOYEES, CONTRACTORS, AND AFFILIATES ARISING OUT OF OR RELATED TO YOUR USE OF THE SOFTWARE.**
+**BY USING THE SOFTWARE, YOU EXPRESSLY AND VOLUNTARILY WAIVE ANY AND ALL RIGHTS TO PURSUE LITIGATION — INCLUDING BUT NOT LIMITED TO INDIVIDUAL LAWSUITS, CLASS ACTIONS, AND COLLECTIVE ACTIONS — AGAINST PARALLAX, ITS OWNERS, OPERATORS, OFFICERS, EMPLOYEES, CONTRACTORS, AND AFFILIATES ARISING OUT OF OR RELATED TO YOUR USE OF THE SOFTWARE.**
 
 This waiver applies to claims of any kind, whether based in contract, tort, statute, regulation, negligence, strict liability, or any other legal or equitable theory, including but not limited to claims for direct, indirect, incidental, consequential, special, exemplary, or punitive damages.
 
-If any dispute arises between you and the Company relating to the Software, you agree that such dispute shall be resolved exclusively through binding arbitration administered under the rules of the American Arbitration Association, conducted in the State of Kansas. Each party shall bear its own costs and attorney's fees.
+If any dispute arises between you and Parallax relating to the Software, you agree that such dispute shall be resolved exclusively through binding arbitration administered under the rules of the American Arbitration Association, conducted in the State of Kansas. Each party shall bear its own costs and attorney's fees.
 
 You acknowledge that by agreeing to this waiver, you are giving up your constitutional right to a trial by jury and your right to participate in a class or collective action.
 
@@ -50,17 +50,17 @@ You acknowledge that by agreeing to this waiver, you are giving up your constitu
 
 ## 5. Limitation of Liability
 
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COMPANY, ITS OWNERS, MEMBERS, OFFICERS, EMPLOYEES, AND CONTRACTORS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, NOR FOR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR BUSINESS OPPORTUNITY, REGARDLESS OF THE CAUSE OF ACTION OR THEORY OF LIABILITY.
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, PARALLAX, ITS OWNERS, OPERATORS, OFFICERS, EMPLOYEES, AND CONTRACTORS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, NOR FOR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR BUSINESS OPPORTUNITY, REGARDLESS OF THE CAUSE OF ACTION OR THEORY OF LIABILITY.
 
-IN NO EVENT SHALL THE COMPANY'S TOTAL AGGREGATE LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF OR RELATED TO THE SOFTWARE EXCEED THE AMOUNT YOU HAVE PAID TO THE COMPANY FOR USE OF THE SOFTWARE IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM, OR TEN DOLLARS ($10.00), WHICHEVER IS GREATER.
+IN NO EVENT SHALL PARALLAX'S TOTAL AGGREGATE LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF OR RELATED TO THE SOFTWARE EXCEED THE AMOUNT YOU HAVE PAID FOR USE OF THE SOFTWARE IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM, OR TEN DOLLARS ($10.00), WHICHEVER IS GREATER.
 
 ---
 
 ## 6. No Warranty
 
-THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY. THE COMPANY EXPRESSLY DISCLAIMS ALL WARRANTIES, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, RELIABILITY, TITLE, AND NON-INFRINGEMENT.
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY. PARALLAX EXPRESSLY DISCLAIMS ALL WARRANTIES, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, RELIABILITY, TITLE, AND NON-INFRINGEMENT.
 
-The Company does not warrant that the Software will be uninterrupted, error-free, secure, or free of harmful components, or that any defects will be corrected. No advice or information obtained through the Software shall create any warranty not expressly stated in these Terms.
+Parallax does not warrant that the Software will be uninterrupted, error-free, secure, or free of harmful components, or that any defects will be corrected. No advice or information obtained through the Software shall create any warranty not expressly stated in these Terms.
 
 ---
 
@@ -72,23 +72,23 @@ Users are responsible for all data imported into or entered within the Software.
 
 ### 7.2 Personally Identifiable Information (PII) and Protected Health Information (PHI)
 
-**The Software is not designed to collect, store, or process PII or PHI.** Users should take care to exclude PII and PHI from any data imported into the Software. If PII or PHI is inadvertently included in data you upload, you do so at your own risk. The Company assumes no responsibility for the security or handling of PII or PHI that users introduce into the Software.
+**The Software is not designed to collect, store, or process PII or PHI.** Users should take care to exclude PII and PHI from any data imported into the Software. If PII or PHI is inadvertently included in data you upload, you do so at your own risk. Parallax assumes no responsibility for the security or handling of PII or PHI that users introduce into the Software.
 
 ### 7.3 Session Data
 
-The Software uses token-based sessions to manage user workspaces. Session data — including imported trip and route data, settings, optimization parameters, run configurations, and import templates — is stored for the duration of the session and may be subject to periodic cleanup. The Company makes no guarantee regarding the persistence or long-term availability of session data.
+The Software uses token-based sessions to manage user workspaces. Session data — including imported trip and route data, settings, optimization parameters, run configurations, and import templates — is stored for the duration of the session and may be subject to periodic cleanup. Parallax makes no guarantee regarding the persistence or long-term availability of session data.
 
 ---
 
 ## 8. Third-Party Services
 
-The Software integrates with third-party services, including but not limited to Mapbox for mapping and geocoding functionality. Your use of such third-party services through the Software is subject to those providers' respective terms of service and privacy policies. The Company is not responsible for the availability, accuracy, or conduct of any third-party service.
+The Software integrates with third-party services, including but not limited to Mapbox for mapping and geocoding functionality. Your use of such third-party services through the Software is subject to those providers' respective terms of service and privacy policies. Parallax is not responsible for the availability, accuracy, or conduct of any third-party service.
 
 ---
 
 ## 9. Intellectual Property
 
-All rights, title, and interest in and to the Software — including its design, architecture, source code, visual elements, documentation, and all associated intellectual property — remain the exclusive property of Open Glades LLC. These Terms grant you no ownership interest in the Software and no license except the limited right to use the Software in accordance with these Terms.
+All rights, title, and interest in and to the Software — including its design, architecture, source code, visual elements, documentation, and all associated intellectual property — remain the exclusive property of Parallax and its operators. These Terms grant you no ownership interest in the Software and no license except the limited right to use the Software in accordance with these Terms.
 
 ---
 
@@ -100,21 +100,21 @@ While the Company does not impose specific restrictions on the types of transit 
 - Use the Software to engage in any activity that violates applicable local, state, federal, or international law.
 - Interfere with, disrupt, or place an unreasonable burden on the Software's infrastructure.
 - Attempt to gain unauthorized access to any portion of the Software or its underlying systems.
-- Resell, sublicense, or redistribute access to the Software without written consent from the Company.
+- Resell, sublicense, or redistribute access to the Software without prior written consent from Parallax.
 
 ---
 
 ## 11. Availability and Modification
 
-The Company reserves the right to modify, suspend, or discontinue the Software — in whole or in part — at any time, with or without notice. The Company shall not be liable to you or any third party for any modification, suspension, or discontinuation of the Software.
+Parallax reserves the right to modify, suspend, or discontinue the Software — in whole or in part — at any time, with or without notice. Parallax shall not be liable to you or any third party for any modification, suspension, or discontinuation of the Software.
 
-The Company reserves the right to update these Terms at any time. Continued use of the Software following the posting of revised Terms constitutes acceptance of those changes. It is your responsibility to review these Terms periodically.
+Parallax reserves the right to update these Terms at any time. Continued use of the Software following the posting of revised Terms constitutes acceptance of those changes. It is your responsibility to review these Terms periodically.
 
 ---
 
 ## 12. Indemnification
 
-You agree to indemnify, defend, and hold harmless the Company, its owners, members, officers, employees, contractors, and affiliates from and against any and all claims, damages, losses, liabilities, costs, and expenses (including reasonable attorney's fees) arising out of or related to your use of the Software, your violation of these Terms, or your violation of any applicable law or regulation.
+You agree to indemnify, defend, and hold harmless Parallax, its owners, operators, officers, employees, contractors, and affiliates from and against any and all claims, damages, losses, liabilities, costs, and expenses (including reasonable attorney's fees) arising out of or related to your use of the Software, your violation of these Terms, or your violation of any applicable law or regulation.
 
 ---
 
@@ -132,7 +132,7 @@ If any provision of these Terms is found to be invalid, illegal, or unenforceabl
 
 ## 15. Entire Agreement
 
-These Terms, together with any Privacy Policy published by the Company, constitute the entire agreement between you and the Company with respect to the Software and supersede all prior or contemporaneous communications, proposals, and agreements, whether oral or written.
+These Terms, together with any Privacy Policy published by Parallax, constitute the entire agreement between you and Parallax with respect to the Software and supersede all prior or contemporaneous communications, proposals, and agreements, whether oral or written.
 
 ---
 
@@ -140,9 +140,8 @@ These Terms, together with any Privacy Policy published by the Company, constitu
 
 For questions regarding these Terms, please contact:
 
-**Open Glades LLC**
-Email: [contact email]
-Website: [website URL]
+**Parallax**
+Email: john@jroverton.com
 
 ---
 

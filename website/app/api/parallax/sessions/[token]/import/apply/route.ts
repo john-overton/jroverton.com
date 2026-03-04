@@ -3,9 +3,11 @@ import type { NextRequest } from 'next/server';
 import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
+  getClientIp,
   requireAuthorizedSessionAccess,
   requireSessionByEditToken,
 } from '@/lib/parallax/http';
+import { recordApiEvent } from '@/lib/parallax/metrics-db';
 import { applyImportMapping } from '@/lib/parallax/import-mapper';
 import { updateSessionCounts } from '@/lib/parallax/registry-db';
 import { countRoutes, countTrips, listRoutes, listTrips, recalculateServiceWindow, replaceRoutes, replaceTrips } from '@/lib/parallax/session-db';
@@ -110,6 +112,19 @@ export async function POST(
       route_count: routeCount,
       elapsed_ms: Date.now() - startedAt,
     });
+
+    try {
+      recordApiEvent({
+        ip: getClientIp(request),
+        method: 'POST',
+        path: `/api/parallax/sessions/${token}/import/apply`,
+        action: 'import_apply',
+        sessionToken: token,
+        statusCode: 200,
+      });
+    } catch {
+      // Metrics recording should never break the main flow
+    }
 
     return successResponse({
       ...applied.result,

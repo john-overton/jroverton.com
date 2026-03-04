@@ -23,6 +23,7 @@ export const clearcutConfig = {
     (process.env.NODE_ENV === 'production'
       ? ''
       : 'parallax-dev-secret-change-me'),
+  adminPassword: process.env.PARALLAX_ADMIN_PASSWORD ?? null,
 };
 
 export function getRegistryDbPath(): string {
@@ -35,6 +36,10 @@ export function getSessionsDirPath(): string {
 
 export function getSessionDbPath(editToken: string): string {
   return path.join(getSessionsDirPath(), `${editToken}.db`);
+}
+
+export function getMetricsDbPath(): string {
+  return path.join(clearcutConfig.dataRoot, 'metrics.db');
 }
 
 export function getDemoLocationsDbPath(): string {

@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/parallax',
-        disallow: ['/parallax/s/', '/parallax/r/'],
+        disallow: ['/parallax/s/', '/parallax/r/', '/parallax/admin/'],
       },
     ],
   };

@@ -7,7 +7,7 @@
 
 ## 1. Introduction
 
-This Privacy Policy describes how Open Glades LLC ("Company," "we," "us," "our"), a Kansas limited liability company, collects, uses, stores, and protects information in connection with your use of Parallax ("the Software," "the Service"), a browser-based transit and trip service planning tool.
+This Privacy Policy describes how Parallax ("we," "us," "our") collects, uses, stores, and protects information in connection with your use of Parallax ("the Software," "the Service"), a browser-based transit and trip service planning tool.
 
 By using the Software, you acknowledge that you have read and understood this Privacy Policy. This Privacy Policy should be read in conjunction with our Terms of Service.
 
@@ -81,7 +81,7 @@ We do not sell, rent, or trade your data to third parties for their own marketin
 
 Parallax integrates with Mapbox to provide mapping, geocoding, and geographic visualization features. When you use these features, certain data — including addresses, geographic coordinates, and location-based queries derived from your imported trip and route data — may be transmitted to Mapbox for processing.
 
-Mapbox processes this data in accordance with its own privacy policy and terms of service, available at [https://www.mapbox.com/legal/privacy](https://www.mapbox.com/legal/privacy). The Company is not responsible for Mapbox's data handling practices.
+Mapbox processes this data in accordance with its own privacy policy and terms of service, available at [https://www.mapbox.com/legal/privacy](https://www.mapbox.com/legal/privacy). Parallax is not responsible for Mapbox's data handling practices.
 
 ### 4.2 Analytics Providers
 
@@ -97,7 +97,7 @@ The Software may incorporate additional third-party services in future releases,
 
 ### 5.1 Where Data Is Stored
 
-Session data and server logs are stored on self-hosted infrastructure located in the United States. All data processing occurs on servers under the Company's direct operational control.
+Session data and server logs are stored on self-hosted infrastructure located in the United States. All data processing occurs on servers under Parallax's direct operational control.
 
 ### 5.2 Security Measures
 
@@ -105,7 +105,7 @@ We implement reasonable technical and organizational measures to protect the dat
 
 ### 5.3 Data Retention
 
-Session data is retained for the duration of active use and may be automatically purged after a period of inactivity. Server logs and analytics data are retained for a reasonable period necessary to fulfill the purposes described in this Privacy Policy. We do not maintain long-term archives of user session data.
+Session data is retained for the duration of active use and may be automatically purged after a period of inactivity. Server logs and analytics data are retained for a reasonable period necessary to fulfill the purposes described in this Privacy Policy. Parallax does not maintain long-term archives of user session data.
 
 ---
 
@@ -149,9 +149,8 @@ We reserve the right to update this Privacy Policy at any time. Changes will be 
 
 For questions, concerns, or requests related to this Privacy Policy, please contact:
 
-**Open Glades LLC**
-Email: [contact email]
-Website: [website URL]
+**Parallax**
+Email: john@jroverton.com
 
 ---
 

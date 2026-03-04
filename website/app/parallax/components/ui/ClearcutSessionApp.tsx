@@ -14,6 +14,7 @@ import {
 } from '@/app/parallax/components/shadcn/select';
 import { ClearcutClientError } from '@/lib/parallax/client';
 import { extractNewDepotsFromRoutes } from '@/lib/parallax/depot-utils';
+import { trackPageView } from '@/lib/parallax/tracking';
 import { computeClearcutMetrics } from '@/lib/parallax/metrics';
 import type { BidResult, DepotRow, NewRouteRow } from '@/lib/parallax/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/parallax/use-clearcut-session';
@@ -107,6 +108,15 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
 
   const ready = session.loadState.status === 'ready' ? session.loadState : null;
   readyRef.current = ready;
+
+  // Track page view once the session loads
+  const trackedRef = useRef(false);
+  useEffect(() => {
+    if (ready && !trackedRef.current) {
+      trackedRef.current = true;
+      trackPageView(readonlyView ? 'session_readonly' : 'session_edit', token);
+    }
+  }, [ready, readonlyView, token]);
   const fallbackServiceStartMinutes = parseClockToMinutes(ready?.state.settings.service_day_start, 4 * 60);
   const fallbackServiceEndMinutes = parseClockToMinutes(ready?.state.settings.service_day_end, 21 * 60);
   const sliderBounds = useMemo(
