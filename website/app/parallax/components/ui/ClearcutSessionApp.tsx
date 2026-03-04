@@ -14,7 +14,7 @@ import {
 } from '@/app/parallax/components/shadcn/select';
 import { ClearcutClientError } from '@/lib/parallax/client';
 import { extractNewDepotsFromRoutes } from '@/lib/parallax/depot-utils';
-import { trackPageView } from '@/lib/parallax/tracking';
+import { checkMapboxStatus, trackPageView } from '@/lib/parallax/tracking';
 import { computeClearcutMetrics } from '@/lib/parallax/metrics';
 import type { BidResult, DepotRow, NewRouteRow } from '@/lib/parallax/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/parallax/use-clearcut-session';
@@ -70,6 +70,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const timeRangeTrackRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<TabKey>(mode === 'readonly' ? 'demand' : 'import');
   const [hasVisitedMap, setHasVisitedMap] = useState(false);
+  const [mapDisabled, setMapDisabled] = useState(false);
   const [status, setStatusRaw] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -686,7 +687,16 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           activeTab={tab}
           onTabChange={(v) => {
             setTab(v as TabKey);
-            if (v === 'map') setHasVisitedMap(true);
+            if (v === 'map' && !hasVisitedMap) {
+              checkMapboxStatus().then((status) => {
+                if (status && !status.allowed) {
+                  setMapDisabled(true);
+                } else {
+                  setMapDisabled(false);
+                }
+                setHasVisitedMap(true);
+              });
+            }
           }}
           hasData={hasData}
           hasTrips={hasTrips}
@@ -976,7 +986,15 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       )}
       {hasVisitedMap && (
         <div style={{ display: tab === 'map' ? undefined : 'none' }}>
-          <MapTab metrics={metrics} trips={filteredTrips} selectedDays={selectedDayIds} specificDate={dayMode === 'specific' ? specificDate : null} />
+          {mapDisabled ? (
+            <div className="border border-cc-border rounded-[10px] bg-cc-surface-1 p-6 text-center">
+              <p className="text-cc-text-muted text-sm">
+                Map disabled — monthly Mapbox load limit reached. Contact admin to reset.
+              </p>
+            </div>
+          ) : (
+            <MapTab metrics={metrics} trips={filteredTrips} selectedDays={selectedDayIds} specificDate={dayMode === 'specific' ? specificDate : null} sessionToken={token} />
+          )}
         </div>
       )}
       {tab === 'runstructure' && (

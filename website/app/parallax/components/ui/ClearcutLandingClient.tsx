@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
 import { ClearcutClientError, createSession } from '@/lib/parallax/client';
-import { trackPageView } from '@/lib/parallax/tracking';
+import { checkMapboxStatus, trackMapboxLoad, trackPageView } from '@/lib/parallax/tracking';
 import { hexToRgb } from './shared';
 import ParallaxMark from './ParallaxMark';
 
@@ -67,6 +67,14 @@ export default function ClearcutLandingClient() {
 
   const tokenValid = TOKEN_REGEX.test(tokenInput.trim());
 
+  // Mapbox load gating
+  const [mapAllowed, setMapAllowed] = useState(true);
+  useEffect(() => {
+    checkMapboxStatus().then((status) => {
+      if (status && !status.allowed) setMapAllowed(false);
+    });
+  }, []);
+
   // Track page view
   useEffect(() => {
     trackPageView('landing');
@@ -114,7 +122,7 @@ export default function ClearcutLandingClient() {
 
   // Map initialization
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current || !mapboxToken) return;
+    if (!mapContainerRef.current || mapRef.current || !mapboxToken || !mapAllowed) return;
 
     mapboxgl.accessToken = mapboxToken;
 
@@ -137,6 +145,7 @@ export default function ClearcutLandingClient() {
     });
 
     map.on('load', () => {
+      trackMapboxLoad();
       const canvas = map.getCanvas();
       canvas.style.cursor = 'default';
 
@@ -300,7 +309,7 @@ export default function ClearcutLandingClient() {
       map.remove();
       mapRef.current = null;
     };
-  }, [mapboxToken, mapStyle]);
+  }, [mapboxToken, mapStyle, mapAllowed]);
 
   return (
     <div

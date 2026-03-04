@@ -38,4 +38,22 @@ CREATE TABLE IF NOT EXISTS honeypot_blocks (
 
 CREATE INDEX IF NOT EXISTS idx_hb_ip ON honeypot_blocks(ip);
 CREATE INDEX IF NOT EXISTS idx_hb_created ON honeypot_blocks(created_at);
+
+CREATE TABLE IF NOT EXISTS mapbox_loads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_token TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_created ON mapbox_loads(created_at);
+
+CREATE TABLE IF NOT EXISTS admin_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+INSERT OR IGNORE INTO admin_settings (key, value) VALUES ('mapbox_billing_cycle_day', '1');
+INSERT OR IGNORE INTO admin_settings (key, value) VALUES ('mapbox_monthly_limit', '40000');
+INSERT OR IGNORE INTO admin_settings (key, value) VALUES ('mapbox_count_offset', '0');
 `;

@@ -8,6 +8,7 @@ import { Label } from '@/app/parallax/components/shadcn/label';
 import { Slider } from '@/app/parallax/components/shadcn/slider';
 import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 import type { ClearcutMetrics, TimeBlock } from '@/lib/parallax/metrics';
+import { trackMapboxLoad } from '@/lib/parallax/tracking';
 import type { TripRow } from '@/lib/parallax/types';
 
 import { HeatStrip, SectionCard, hexToRgb, parseDateTime } from './shared';
@@ -21,6 +22,7 @@ interface MapTabProps {
   trips: TripRow[];
   selectedDays: number[];
   specificDate?: string | null;
+  sessionToken?: string;
 }
 
 interface GeoTrip {
@@ -157,7 +159,7 @@ function computeLegendLabels(blocks: TimeBlock[]): string[] {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function MapTab({ metrics, trips, selectedDays, specificDate }: MapTabProps) {
+export default function MapTab({ metrics, trips, selectedDays, specificDate, sessionToken }: MapTabProps) {
   const [mapBlockIdx, setMapBlockIdx] = useState(() => Math.floor(metrics.blocks.length / 2));
   const [mapHeight, setMapHeight] = useState(500);
   const mapWrapperRef = useRef<HTMLDivElement>(null);
@@ -415,6 +417,9 @@ export default function MapTab({ metrics, trips, selectedDays, specificDate }: M
 
       mapLoadedRef.current = true;
       mapRef.current = map;
+
+      // Record this map load for billing tracking
+      trackMapboxLoad(sessionToken);
 
       // Ensure map fills its container now that it's loaded
       requestAnimationFrame(() => map.resize());

@@ -209,3 +209,101 @@ export function getRecentEvents(limit: number = 20): EventLogItem[] {
     .prepare('SELECT * FROM api_events ORDER BY created_at DESC LIMIT ?')
     .all(limit) as EventLogItem[];
 }
+
+/* ------------------------------------------------------------------ */
+/*  Admin settings                                                     */
+/* ------------------------------------------------------------------ */
+
+export function getAdminSetting(key: string): string | null {
+  const row = getMetricsDb()
+    .prepare('SELECT value FROM admin_settings WHERE key = ?')
+    .get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setAdminSetting(key: string, value: string): void {
+  getMetricsDb()
+    .prepare(
+      `INSERT INTO admin_settings (key, value, updated_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    )
+    .run(key, value);
+}
+
+export function getAllAdminSettings(): Record<string, string> {
+  const rows = getMetricsDb()
+    .prepare('SELECT key, value FROM admin_settings')
+    .all() as Array<{ key: string; value: string }>;
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    result[row.key] = row.value;
+  }
+  return result;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Mapbox load tracking                                               */
+/* ------------------------------------------------------------------ */
+
+export function recordMapboxLoad(sessionToken?: string | null): void {
+  getMetricsDb()
+    .prepare('INSERT INTO mapbox_loads (session_token) VALUES (?)')
+    .run(sessionToken ?? null);
+}
+
+/**
+ * Compute the start of the current Mapbox billing cycle.
+ * Given a billing cycle day N (1-28), returns the most recent date
+ * where day-of-month = N. If a manual reset timestamp exists and is
+ * more recent, that is used instead.
+ */
+function computeBillingCycleStart(): string {
+  const cycleDay = Math.min(28, Math.max(1, parseInt(getAdminSetting('mapbox_billing_cycle_day') ?? '1', 10) || 1));
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth(); // 0-indexed
+
+  let cycleStart: Date;
+  if (now.getUTCDate() >= cycleDay) {
+    cycleStart = new Date(Date.UTC(year, month, cycleDay));
+  } else {
+    // Use previous month's cycle day
+    cycleStart = new Date(Date.UTC(year, month - 1, cycleDay));
+  }
+
+  const resetAt = getAdminSetting('mapbox_counter_reset_at');
+  if (resetAt) {
+    const resetDate = new Date(resetAt);
+    if (resetDate > cycleStart) {
+      cycleStart = resetDate;
+    }
+  }
+
+  return cycleStart.toISOString();
+}
+
+export interface MapboxStatus {
+  count: number;
+  limit: number;
+  allowed: boolean;
+  cycleStart: string;
+}
+
+export function getMapboxStatus(): MapboxStatus {
+  const cycleStart = computeBillingCycleStart();
+  const limit = parseInt(getAdminSetting('mapbox_monthly_limit') ?? '40000', 10) || 40000;
+  const offset = parseInt(getAdminSetting('mapbox_count_offset') ?? '0', 10) || 0;
+
+  const row = getMetricsDb()
+    .prepare('SELECT COUNT(*) as count FROM mapbox_loads WHERE created_at >= ?')
+    .get(cycleStart) as { count: number };
+
+  const count = Math.max(0, row.count + offset);
+
+  return {
+    count,
+    limit,
+    allowed: count < limit,
+    cycleStart,
+  };
+}

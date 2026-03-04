@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -15,6 +15,7 @@ import {
 import { Badge } from '@/app/parallax/components/shadcn/badge';
 import { Button } from '@/app/parallax/components/shadcn/button';
 import { Input } from '@/app/parallax/components/shadcn/input';
+import { Label } from '@/app/parallax/components/shadcn/label';
 import {
   Table,
   TableBody,
@@ -75,6 +76,16 @@ interface HoneypotBlock {
   blocked_until: string;
   created_at: string;
   source: 'db' | 'memory';
+}
+
+interface SettingsData {
+  settings: Record<string, string>;
+  mapboxStatus: {
+    count: number;
+    limit: number;
+    allowed: boolean;
+    cycleStart: string;
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -448,6 +459,176 @@ function SecurityPanel({ blocks }: { blocks: HoneypotBlock[] | null }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Settings Tab                                                       */
+/* ------------------------------------------------------------------ */
+
+function SettingsPanel({ data, onRefresh }: { data: SettingsData | null; onRefresh: () => void }) {
+  const [billingDay, setBillingDay] = useState('');
+  const [monthlyLimit, setMonthlyLimit] = useState('');
+  const [currentCount, setCurrentCount] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (data && !initialized.current) {
+      setBillingDay(data.settings.mapbox_billing_cycle_day ?? '1');
+      setMonthlyLimit(data.settings.mapbox_monthly_limit ?? '40000');
+      setCurrentCount(String(data.mapboxStatus.count));
+      initialized.current = true;
+    }
+  }, [data]);
+
+  if (!data) {
+    return <p className="text-cc-text-muted text-sm">Loading...</p>;
+  }
+
+  const { mapboxStatus } = data;
+  const pct = mapboxStatus.limit > 0 ? Math.min(100, Math.round((mapboxStatus.count / mapboxStatus.limit) * 100)) : 100;
+
+  async function saveSettings() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const updates: Record<string, string> = {
+        mapbox_billing_cycle_day: billingDay,
+        mapbox_monthly_limit: monthlyLimit,
+      };
+
+      // If the user changed the current count, compute the new offset
+      const desiredCount = parseInt(currentCount, 10);
+      if (Number.isFinite(desiredCount) && desiredCount !== mapboxStatus.count) {
+        const currentOffset = parseInt(data!.settings.mapbox_count_offset ?? '0', 10) || 0;
+        // actual db count = mapboxStatus.count - currentOffset
+        const dbCount = mapboxStatus.count - currentOffset;
+        const newOffset = desiredCount - dbCount;
+        updates.mapbox_count_offset = String(newOffset);
+      }
+
+      const res = await fetch('/api/parallax/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        setMessage(d?.error?.message ?? 'Save failed.');
+        return;
+      }
+      setMessage('Settings saved.');
+      initialized.current = false;
+      onRefresh();
+    } catch {
+      setMessage('Connection failed.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetCounter() {
+    setResetting(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/parallax/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mapbox_counter_reset_at: new Date().toISOString(),
+          mapbox_count_offset: '0',
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        setMessage(d?.error?.message ?? 'Reset failed.');
+        return;
+      }
+      setMessage('Counter reset to 0.');
+      initialized.current = false;
+      onRefresh();
+    } catch {
+      setMessage('Connection failed.');
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  return (
+    <div>
+      <SectionCard title="Mapbox Usage">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <MetricCard label="Map Loads (cycle)" value={mapboxStatus.count.toLocaleString()} />
+          <MetricCard label="Monthly Limit" value={mapboxStatus.limit.toLocaleString()} />
+          <MetricCard label="Status" value={mapboxStatus.allowed ? 'Active' : 'Disabled'} />
+          <MetricCard label="Cycle Start" value={formatDate(mapboxStatus.cycleStart)} />
+        </div>
+
+        {/* Progress bar */}
+        <div className="mb-4">
+          <div className="flex justify-between text-xs text-cc-text-muted mb-1">
+            <span>{pct}% used</span>
+            <span>{mapboxStatus.count.toLocaleString()} / {mapboxStatus.limit.toLocaleString()}</span>
+          </div>
+          <div className="w-full h-2 bg-cc-surface-2 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${pct}%`,
+                backgroundColor: pct >= 90 ? 'var(--color-cc-danger, #ef4444)' : pct >= 70 ? 'var(--color-cc-warning, #f59e0b)' : 'var(--color-cc-success, #22c55e)',
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <Label className="mb-1.5">Current Count</Label>
+            <Input
+              type="number"
+              min={0}
+              value={currentCount}
+              onChange={(e) => setCurrentCount(e.target.value)}
+            />
+            <p className="text-xs text-cc-text-muted mt-1">Set to match your Mapbox dashboard count</p>
+          </div>
+          <div>
+            <Label className="mb-1.5">Monthly Load Limit</Label>
+            <Input
+              type="number"
+              min={0}
+              value={monthlyLimit}
+              onChange={(e) => setMonthlyLimit(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+          <div>
+            <Label className="mb-1.5">Billing Cycle Start Day (1-28)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={28}
+              value={billingDay}
+              onChange={(e) => setBillingDay(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 items-end">
+            <Button onClick={saveSettings} disabled={saving} size="sm">
+              {saving ? 'Saving...' : 'Save Settings'}
+            </Button>
+            <Button onClick={resetCounter} disabled={resetting} variant="outline" size="sm">
+              {resetting ? 'Resetting...' : 'Reset Counter'}
+            </Button>
+          </div>
+        </div>
+        {message && <p className="text-sm text-cc-text-secondary mt-2">{message}</p>}
+      </SectionCard>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -460,6 +641,7 @@ export default function AdminPanelClient() {
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
   const [sessions, setSessions] = useState<SessionItem[] | null>(null);
   const [honeypotBlocks, setHoneypotBlocks] = useState<HoneypotBlock[] | null>(null);
+  const [settingsData, setSettingsData] = useState<SettingsData | null>(null);
 
   // Check if already authenticated on mount
   useEffect(() => {
@@ -488,8 +670,10 @@ export default function AdminPanelClient() {
       adminFetch<{ blocks: HoneypotBlock[] }>('/api/parallax/admin/honeypot')
         .then((d) => setHoneypotBlocks(d.blocks))
         .catch(() => {});
+    } else if (activeTab === 'settings' && !settingsData) {
+      adminFetch<SettingsData>('/api/parallax/admin/settings').then(setSettingsData).catch(() => {});
     }
-  }, [authenticated, activeTab, overviewData, sessions, honeypotBlocks]);
+  }, [authenticated, activeTab, overviewData, sessions, honeypotBlocks, settingsData]);
 
   const onLoginSuccess = useCallback(() => {
     setAuthenticated(true);
@@ -536,6 +720,9 @@ export default function AdminPanelClient() {
                 adminFetch<{ blocks: HoneypotBlock[] }>('/api/parallax/admin/honeypot')
                   .then((d) => setHoneypotBlocks(d.blocks))
                   .catch(() => {});
+              } else if (activeTab === 'settings') {
+                setSettingsData(null);
+                adminFetch<SettingsData>('/api/parallax/admin/settings').then(setSettingsData).catch(() => {});
               }
             }}
           >
@@ -549,6 +736,7 @@ export default function AdminPanelClient() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="sessions">Sessions</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -561,6 +749,16 @@ export default function AdminPanelClient() {
 
           <TabsContent value="security">
             <SecurityPanel blocks={honeypotBlocks} />
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <SettingsPanel
+              data={settingsData}
+              onRefresh={() => {
+                setSettingsData(null);
+                adminFetch<SettingsData>('/api/parallax/admin/settings').then(setSettingsData).catch(() => {});
+              }}
+            />
           </TabsContent>
         </Tabs>
       </div>
