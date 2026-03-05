@@ -27,6 +27,7 @@ export async function POST(
       trips: payload.trips,
       routes: payload.routes,
       depots: payload.depots,
+      settings: { is_demo: 1 },
     });
 
     const state = getSessionState(updatedSession);

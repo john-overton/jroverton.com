@@ -50,6 +50,7 @@ export async function POST(
     }
 
     replaceNewRoutes(token, updatedNewRoutes);
+    saveSessionState(token, { settings: { is_demo: 0 } });
 
     const tripCount = countTrips(token);
     const routeCount = countRoutes(token);

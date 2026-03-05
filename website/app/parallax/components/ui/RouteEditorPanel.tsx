@@ -54,16 +54,6 @@ function breakDurationLabel(start: string | null, end: string | null): string | 
   return `${e - s}m`;
 }
 
-/** Clamp a break time string to fall within the new route's start/end window */
-function clampBreakTime(time: string, routeStart: string, routeEnd: string): string {
-  const t = parseClockToMinutes(time, -1);
-  if (t < 0) return time;
-  const s = parseClockToMinutes(routeStart, 0);
-  const e = parseClockToMinutes(routeEnd, 1440);
-  const clamped = Math.max(s, Math.min(e, t));
-  return formatMinutesToClock(clamped);
-}
-
 const SPLIT_SUFFIX_RE = /(?:[-_](?:am|pm|a|p|\d+)|(?:am|pm|a|p))$/i;
 
 function parseSplitName(name: string): { baseName: string; suffix: string } | null {
@@ -192,6 +182,7 @@ export default function RouteEditorPanel({
   onUpdateLocalNewRoutes,
 }: RouteEditorPanelProps) {
   const [draftNewRoute, setDraftNewRoute] = useState<NewRouteRow | null>(null);
+  const [draftBreakCount, setDraftBreakCount] = useState(0);
   const [sortKey, setSortKey] = useState<SortColumn>('new_route_name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [breaksExpanded, setBreaksExpanded] = useState(false);
@@ -324,14 +315,12 @@ export default function RouteEditorPanel({
       break_3_start: null,
       break_3_end: null,
     });
+    setDraftBreakCount(0);
   }
 
   function updateDraft(field: keyof NewRouteRow, value: string | number | null) {
     if (!draftNewRoute) return;
     const next = { ...draftNewRoute, [field]: value };
-    if (field.startsWith('break_') && typeof value === 'string' && value) {
-      next[field as keyof NewRouteRow] = clampBreakTime(value, next.start_time, next.end_time) as never;
-    }
     if (field === 'start_time' || field === 'end_time' || field.startsWith('break_')) {
       const svcHrs = computeServiceHours(next);
       next.platform_hours = String(svcHrs);
@@ -352,10 +341,52 @@ export default function RouteEditorPanel({
     if (!draftNewRoute) return;
     updateLocalNewRoutes([...localNewRoutes, draftNewRoute]);
     setDraftNewRoute(null);
+    setDraftBreakCount(0);
   }
 
   function cancelDraft() {
     setDraftNewRoute(null);
+    setDraftBreakCount(0);
+  }
+
+  function addDraftBreak() {
+    if (!draftNewRoute || draftBreakCount >= 2) return;
+    const nextBreak = draftBreakCount + 1;
+    const next = { ...draftNewRoute };
+    if (nextBreak === 1) {
+      next.break_1_start = next.start_time;
+      next.break_1_end = next.end_time;
+    } else {
+      next.break_2_start = next.start_time;
+      next.break_2_end = next.end_time;
+    }
+    const svcHrs = computeServiceHours(next);
+    next.platform_hours = String(svcHrs);
+    next.pay_hours = String(svcHrs);
+    setDraftNewRoute(next);
+    setDraftBreakCount(nextBreak);
+  }
+
+  function removeDraftBreak(breakNum: 1 | 2) {
+    if (!draftNewRoute) return;
+    const next = { ...draftNewRoute };
+    if (breakNum === 1 && draftBreakCount === 2) {
+      next.break_1_start = next.break_2_start;
+      next.break_1_end = next.break_2_end;
+      next.break_2_start = null;
+      next.break_2_end = null;
+    } else if (breakNum === 1) {
+      next.break_1_start = null;
+      next.break_1_end = null;
+    } else {
+      next.break_2_start = null;
+      next.break_2_end = null;
+    }
+    const svcHrs = computeServiceHours(next);
+    next.platform_hours = String(svcHrs);
+    next.pay_hours = String(svcHrs);
+    setDraftNewRoute(next);
+    setDraftBreakCount((prev) => prev - 1);
   }
 
   function addSplit(newRoute: NewRouteRow) {
@@ -425,9 +456,6 @@ export default function RouteEditorPanel({
       localNewRoutes.map((r) => {
         if (r.new_route_id !== newRouteId) return r;
         const next = { ...r, [field]: value };
-        if (field.startsWith('break_') && typeof value === 'string' && value) {
-          next[field as keyof NewRouteRow] = clampBreakTime(value, next.start_time, next.end_time) as never;
-        }
         if (field === 'start_time' || field === 'end_time' || field.startsWith('break_')) {
           const svcHrs = computeServiceHours(next);
           next.platform_hours = String(svcHrs);
@@ -553,14 +581,7 @@ export default function RouteEditorPanel({
                     <TableHead className="min-w-[90px]">Start</TableHead>
                     <TableHead className="min-w-[90px]">End</TableHead>
                     <TableHead className="min-w-[70px]">Service Hrs</TableHead>
-                    {breaksExpanded ? (
-                      <>
-                        <TableHead className="min-w-[140px]">Break 1</TableHead>
-                        <TableHead className="min-w-[140px]">Break 2</TableHead>
-                      </>
-                    ) : (
-                      <TableHead className="min-w-[80px]">Breaks</TableHead>
-                    )}
+                    <TableHead className="min-w-[160px]">Breaks</TableHead>
                     <TableHead className="min-w-[160px]">Days</TableHead>
                     <TableHead className="min-w-[80px]">Actions</TableHead>
                   </TableRow>
@@ -612,9 +633,9 @@ export default function RouteEditorPanel({
                     <TableCell>
                       <span className="text-xs">{draftNewRoute.platform_hours}</span>
                     </TableCell>
-                    {breaksExpanded ? (
-                      <>
-                        <TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {draftBreakCount >= 1 && (
                           <div className="flex gap-1 items-center">
                             <Input
                               type="time"
@@ -633,9 +654,19 @@ export default function RouteEditorPanel({
                               max={draftNewRoute.end_time}
                               onChange={(e) => updateDraft('break_1_end', e.target.value || null)}
                             />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={() => removeDraftBreak(1)}
+                              title="Remove break"
+                              type="button"
+                            >
+                              <X size={11} />
+                            </Button>
                           </div>
-                        </TableCell>
-                        <TableCell>
+                        )}
+                        {draftBreakCount >= 2 && (
                           <div className="flex gap-1 items-center">
                             <Input
                               type="time"
@@ -654,23 +685,31 @@ export default function RouteEditorPanel({
                               max={draftNewRoute.end_time}
                               onChange={(e) => updateDraft('break_2_end', e.target.value || null)}
                             />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={() => removeDraftBreak(2)}
+                              title="Remove break"
+                              type="button"
+                            >
+                              <X size={11} />
+                            </Button>
                           </div>
-                        </TableCell>
-                      </>
-                    ) : (
-                      <TableCell>
-                        <span className="text-xs text-cc-text-muted">
-                          {(() => {
-                            const b1 = breakDurationLabel(draftNewRoute.break_1_start, draftNewRoute.break_1_end);
-                            const b2 = breakDurationLabel(draftNewRoute.break_2_start, draftNewRoute.break_2_end);
-                            if (b1 && b2) return `${b1}, ${b2}`;
-                            if (b1) return b1;
-                            if (b2) return b2;
-                            return '\u2014';
-                          })()}
-                        </span>
-                      </TableCell>
-                    )}
+                        )}
+                        {draftBreakCount < 2 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs w-fit"
+                            onClick={addDraftBreak}
+                            type="button"
+                          >
+                            <Plus size={11} className="mr-1" /> Break
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-0.5">
                         {ALL_SERVICE_DAYS.map((day) => (

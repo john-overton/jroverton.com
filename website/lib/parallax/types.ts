@@ -193,6 +193,7 @@ export interface SettingsRow {
   day_type: string;
   time_range_start: string | null;
   time_range_end: string | null;
+  is_demo: number;
 }
 
 export interface OptimizationRow {

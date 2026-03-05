@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, CircleHelp, Pencil, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronRight, CircleHelp, GitBranch, Pencil, Play, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // import ImportMapperWizard from '@/app/parallax/components/ui/ImportMapperWizard';
@@ -16,6 +16,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/app/parallax/components/shadcn/dialog';
@@ -267,6 +268,9 @@ export default function ImportTab({
     newRoutes?: Array<{ row: number; reason: string }>;
   } | null>(null);
   const [showFlatImportLog, setShowFlatImportLog] = useState(false);
+  const [wizardChoice, setWizardChoice] = useState<'analyze' | 'refine' | null>(null);
+  const [showDemoReplaceDialog, setShowDemoReplaceDialog] = useState(false);
+  const pendingImportRef = useRef<{ tripFile: File | null; routeFile: File | null; newRouteFile: File | null } | null>(null);
   const [tripVisibleColumns, setTripVisibleColumns] = useState<Record<TripDataColumnKey, boolean>>({
     trip_id: true,
     trip_date: true,
@@ -382,6 +386,18 @@ export default function ImportTab({
     };
   }, []);
 
+  const hasData = state.trips.length > 0 || state.routes.length > 0 || state.new_routes.length > 0;
+  const showWizard = !readonlyView && !hasData && wizardChoice === null;
+  const showConditionalUpload = !readonlyView && !hasData && wizardChoice !== null;
+
+  function handleWizardChoice(choice: 'analyze' | 'refine' | 'demo') {
+    if (choice === 'demo') {
+      onLoadDemo();
+      return;
+    }
+    setWizardChoice(choice);
+  }
+
   const activeTripColumns = TRIP_DATA_COLUMNS.filter((column) => tripVisibleColumns[column.key]);
   const activeRouteColumns = ROUTE_DATA_COLUMNS.filter((column) => routeVisibleColumns[column.key]);
   const tripCount = state.trips.length;
@@ -441,345 +457,465 @@ export default function ImportTab({
     URL.revokeObjectURL(url);
   }
 
+  async function performImport(tripFile: File | null, routeFile: File | null, newRouteFile: File | null) {
+    if (readonlyView) return;
+    setStatus('Importing files...');
+    setError(null);
+    setFlatImportLog(null);
+    try {
+      const skippedMessages: string[] = [];
+      let routeSkipped: Array<{ row: number; reason: string }> = [];
+      let tripSkipped: Array<{ row: number; reason: string }> = [];
+      let newRouteSkipped: Array<{ row: number; reason: string }> = [];
+      if (routeFile) {
+        const routeResult = await session.uploadRoutes(routeFile);
+        if (routeResult?.skipped_rows?.length) {
+          skippedMessages.push(`${routeResult.skipped_rows.length} route row(s) skipped.`);
+          routeSkipped = routeResult.skipped_rows;
+        }
+      }
+      if (tripFile) {
+        const tripResult = await session.uploadTrips(tripFile);
+        if (tripResult?.skipped_rows?.length) {
+          skippedMessages.push(`${tripResult.skipped_rows.length} trip row(s) skipped.`);
+          tripSkipped = tripResult.skipped_rows;
+        }
+      }
+      if (newRouteFile) {
+        const newRouteResult = await session.uploadNewRoutes(newRouteFile);
+        if (newRouteResult?.skipped_rows?.length) {
+          skippedMessages.push(`${newRouteResult.skipped_rows.length} new route row(s) skipped.`);
+          newRouteSkipped = newRouteResult.skipped_rows;
+        }
+      }
+      if (routeSkipped.length > 0 || tripSkipped.length > 0 || newRouteSkipped.length > 0) {
+        setFlatImportLog({ routes: routeSkipped, trips: tripSkipped, newRoutes: newRouteSkipped });
+      }
+      const statusParts = ['Import complete.'];
+      if (skippedMessages.length > 0) {
+        statusParts.push(skippedMessages.join(' '));
+      }
+      setStatus(statusParts.join(' '));
+    } catch (uploadError) {
+      setStatus(null);
+      setError(uploadError instanceof Error ? uploadError.message : 'Import failed.');
+    }
+  }
+
+  async function handleImportWithDemoCheck(tripFile: File | null, routeFile: File | null, newRouteFile: File | null) {
+    if (state.settings.is_demo === 1) {
+      pendingImportRef.current = { tripFile, routeFile, newRouteFile };
+      setShowDemoReplaceDialog(true);
+      return;
+    }
+    await performImport(tripFile, routeFile, newRouteFile);
+  }
+
+  function handleDemoReplaceConfirm() {
+    setShowDemoReplaceDialog(false);
+    const pending = pendingImportRef.current;
+    if (pending) {
+      pendingImportRef.current = null;
+      void performImport(pending.tripFile, pending.routeFile, pending.newRouteFile);
+    }
+  }
+
   return (
     <>
-      <SectionCard title="Data Import">
-        <div className="text-[13px] text-cc-text-secondary mb-4 bg-cc-surface-2 border border-cc-border rounded-lg px-4 py-3 leading-relaxed">
-          Upload past route and trip data to analyze demand or build a new route structure based on existing routes (trip data is not required). If you already have a new route structure you want to modify or break into bids, you can upload that directly.
-        </div>
-        <FlatFileImport
-          readonlyView={readonlyView}
-          onDownloadSample={downloadSampleCsv}
-          onImport={async (tripFile, routeFile, newRouteFile) => {
-            if (readonlyView) return;
-            setStatus('Importing files...');
-            setError(null);
-            setFlatImportLog(null);
-            try {
-              const skippedMessages: string[] = [];
-              let routeSkipped: Array<{ row: number; reason: string }> = [];
-              let tripSkipped: Array<{ row: number; reason: string }> = [];
-              let newRouteSkipped: Array<{ row: number; reason: string }> = [];
-              if (routeFile) {
-                const routeResult = await session.uploadRoutes(routeFile);
-                if (routeResult?.skipped_rows?.length) {
-                  skippedMessages.push(`${routeResult.skipped_rows.length} route row(s) skipped.`);
-                  routeSkipped = routeResult.skipped_rows;
-                }
-              }
-              if (tripFile) {
-                const tripResult = await session.uploadTrips(tripFile);
-                if (tripResult?.skipped_rows?.length) {
-                  skippedMessages.push(`${tripResult.skipped_rows.length} trip row(s) skipped.`);
-                  tripSkipped = tripResult.skipped_rows;
-                }
-              }
-              if (newRouteFile) {
-                const newRouteResult = await session.uploadNewRoutes(newRouteFile);
-                if (newRouteResult?.skipped_rows?.length) {
-                  skippedMessages.push(`${newRouteResult.skipped_rows.length} new route row(s) skipped.`);
-                  newRouteSkipped = newRouteResult.skipped_rows;
-                }
-              }
-              if (routeSkipped.length > 0 || tripSkipped.length > 0 || newRouteSkipped.length > 0) {
-                setFlatImportLog({ routes: routeSkipped, trips: tripSkipped, newRoutes: newRouteSkipped });
-              }
-              const statusParts = ['Import complete.'];
-              if (skippedMessages.length > 0) {
-                statusParts.push(skippedMessages.join(' '));
-              }
-              setStatus(statusParts.join(' '));
-            } catch (uploadError) {
-              setStatus(null);
-              setError(uploadError instanceof Error ? uploadError.message : 'Import failed.');
-            }
-          }}
-        />
-        {!readonlyView && (
-          <Button variant="outline" className="mt-3" onClick={onLoadDemo} type="button">
-            Load Demo Dataset
-          </Button>
-        )}
-      </SectionCard>
-
-      <DepotSettings
-        readonlyView={readonlyView}
-        routes={state.routes}
-        depots={depots}
-        onDepotsChange={onDepotsChange}
-      />
-
-      <SectionCard title="System Settings">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <InfoLabel tip="Auto-derived from imported data with a 30-minute buffer before the earliest trip or shift start.">Derived Service Start</InfoLabel>
-            <div className="font-semibold">{metrics.derivedServiceWindow.startLabel}</div>
+      {/* ── Welcome Wizard (empty session, no data yet) ──────────── */}
+      {showWizard && (
+        <SectionCard title="Welcome to Parallax">
+          <div className="text-[13px] text-cc-text-secondary mb-6 leading-relaxed">
+            Get started by choosing how you would like to use Parallax:
           </div>
-          <div>
-            <InfoLabel tip="Auto-derived from imported data with a 30-minute buffer after the latest trip or shift end.">Derived Service End</InfoLabel>
-            <div className="font-semibold">{metrics.derivedServiceWindow.endLabel}</div>
-          </div>
-          <div>
-            <InfoLabel tip="Total hours between the derived service start and end times.">Service Hours</InfoLabel>
-            <div className="font-semibold">
-              {metrics.derivedServiceWindow.isTwentyFourHours
-                ? '24:00'
-                : metrics.derivedServiceWindow.durationLabel}
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-          <div>
-            <InfoLabel tip="The earliest actual or scheduled time found across all imported trips and routes.">Earliest Data Time</InfoLabel>
-            <div className="font-semibold">
-              {metrics.derivedServiceWindow.earliestDataTime ?? 'No trip data'}
-            </div>
-          </div>
-          <div>
-            <InfoLabel tip="The latest actual or scheduled time found across all imported trips and routes.">Latest Data Time</InfoLabel>
-            <div className="font-semibold">
-              {metrics.derivedServiceWindow.latestDataTime ?? 'No trip data'}
-            </div>
-          </div>
-        </div>
-        <hr className="my-3 border-cc-border" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div>
-            <SettingLabel tip="Minutes before the scheduled pickup time that still counts as on-time.">Pickup OTP: before</SettingLabel>
-            <Input
-              type="number"
-              min={0}
-              max={180}
-              step={1}
-              disabled={readonlyView}
-              value={localOtp.pickup_otp_window_before_min}
-              onChange={(event) =>
-                handleOtpChange('pickup_otp_window_before_min', event.target.value)
-              }
-            />
-          </div>
-          <div>
-            <SettingLabel tip="Minutes after the scheduled pickup time that still counts as on-time.">Pickup OTP: after</SettingLabel>
-            <Input
-              type="number"
-              min={0}
-              max={180}
-              step={1}
-              disabled={readonlyView}
-              value={localOtp.pickup_otp_window_after_min}
-              onChange={(event) =>
-                handleOtpChange('pickup_otp_window_after_min', event.target.value)
-              }
-            />
-          </div>
-          <div>
-            <SettingLabel tip="Minutes before the scheduled dropoff time that still counts as on-time.">Dropoff OTP: before</SettingLabel>
-            <Input
-              type="number"
-              min={0}
-              max={180}
-              step={1}
-              disabled={readonlyView}
-              value={localOtp.dropoff_otp_window_before_min}
-              onChange={(event) =>
-                handleOtpChange('dropoff_otp_window_before_min', event.target.value)
-              }
-            />
-          </div>
-          <div>
-            <SettingLabel tip="Minutes after the scheduled dropoff time that still counts as on-time.">Dropoff OTP: after</SettingLabel>
-            <Input
-              type="number"
-              min={0}
-              max={180}
-              step={1}
-              disabled={readonlyView}
-              value={localOtp.dropoff_otp_window_after_min}
-              onChange={(event) =>
-                handleOtpChange('dropoff_otp_window_after_min', event.target.value)
-              }
-            />
-          </div>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Data Views">
-        <Collapsible open={tripsOpen} onOpenChange={setTripsOpen} className="mb-3">
-          <CollapsibleTrigger className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full">
-            <ChevronRight
-              size={14}
-              className="transition-transform duration-150 data-[state=open]:rotate-90"
-              data-state={tripsOpen ? 'open' : 'closed'}
-            />
-            Trips ({state.trips.length})
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="overflow-x-auto mt-2">
-              <div className="mb-3">
-                <ColumnSelectorDropdown
-                  columns={TRIP_DATA_COLUMNS}
-                  visibleColumns={tripVisibleColumns}
-                  onToggle={(key, value) =>
-                    setTripVisibleColumns((prev) => ({ ...prev, [key]: value }))
-                  }
-                />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              type="button"
+              className="border border-cc-border rounded-[10px] p-5 text-left hover:border-cc-accent hover:shadow-md transition-all cursor-pointer bg-cc-surface-1 group"
+              onClick={() => handleWizardChoice('analyze')}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 size={18} className="text-cc-accent" />
+                <div className="font-semibold text-sm">Analyze Operational Data</div>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {activeTripColumns.map((column) => (
-                      <TableHead key={`trip-col-head-${column.key}`}>{column.label}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tripPageRows.map((trip) => (
-                    <TableRow key={`trip-view-${trip.trip_id}-${trip.route_id}`}>
-                      {activeTripColumns.map((column) => (
-                        <TableCell key={`trip-row-${trip.trip_id}-${column.key}`}>
-                          {column.getValue(trip) ?? '-'}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                  {state.trips.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={Math.max(activeTripColumns.length, 1)} className="text-cc-text-muted">
-                        No trips available.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {state.trips.length > 0 && activeTripColumns.length === 0 && (
-                    <TableRow>
-                      <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              {state.trips.length > 0 && (
-                <div className="flex items-center justify-between mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    disabled={currentTripPage <= 1}
-                    onClick={() => setTripPage((prev) => Math.max(1, prev - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <div className="text-[13px]">
-                    Page {currentTripPage} of {tripTotalPages}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    disabled={currentTripPage >= tripTotalPages}
-                    onClick={() => setTripPage((prev) => Math.min(tripTotalPages, prev + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
-        <Collapsible open={routesOpen} onOpenChange={setRoutesOpen}>
-          <CollapsibleTrigger className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full">
-            <ChevronRight
-              size={14}
-              className="transition-transform duration-150 data-[state=open]:rotate-90"
-              data-state={routesOpen ? 'open' : 'closed'}
-            />
-            Routes ({state.routes.length})
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="overflow-x-auto mt-2">
-              <div className="mb-3">
-                <ColumnSelectorDropdown
-                  columns={ROUTE_DATA_COLUMNS}
-                  visibleColumns={routeVisibleColumns}
-                  onToggle={(key, value) =>
-                    setRouteVisibleColumns((prev) => ({ ...prev, [key]: value }))
-                  }
-                />
+              <div className="text-[13px] text-cc-text-muted leading-relaxed">
+                Import route and trip data to analyze demand patterns and build optimized routes and bids.
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {activeRouteColumns.map((column) => (
-                      <TableHead key={`route-col-head-${column.key}`}>{column.label}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {routePageRows.map((route) => (
-                    <TableRow key={`route-view-${route.route_id}`}>
-                      {activeRouteColumns.map((column) => (
-                        <TableCell key={`route-row-${route.route_id}-${column.key}`}>
-                          {column.getValue(route) ?? '-'}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                  {state.routes.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={Math.max(activeRouteColumns.length, 1)} className="text-cc-text-muted">
-                        No routes available.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {state.routes.length > 0 && activeRouteColumns.length === 0 && (
-                    <TableRow>
-                      <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              {state.routes.length > 0 && (
-                <div className="flex items-center justify-between mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    disabled={currentRoutePage <= 1}
-                    onClick={() => setRoutePage((prev) => Math.max(1, prev - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <div className="text-[13px]">
-                    Page {currentRoutePage} of {routeTotalPages}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    disabled={currentRoutePage >= routeTotalPages}
-                    onClick={() => setRoutePage((prev) => Math.min(routeTotalPages, prev + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      </SectionCard>
-
-      {flatImportLog && (flatImportLog.trips.length > 0 || flatImportLog.routes.length > 0) && (
-        <p className="text-[13px]">
-          Some rows were skipped during flat file import.{' '}
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            onClick={() => setShowFlatImportLog(true)}
-          >
-            View skipped row log
-          </Button>
-        </p>
+            </button>
+            <button
+              type="button"
+              className="border border-cc-border rounded-[10px] p-5 text-left hover:border-cc-accent hover:shadow-md transition-all cursor-pointer bg-cc-surface-1 group"
+              onClick={() => handleWizardChoice('refine')}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <GitBranch size={18} className="text-cc-accent" />
+                <div className="font-semibold text-sm">Refine Route Structure</div>
+              </div>
+              <div className="text-[13px] text-cc-text-muted leading-relaxed">
+                You already have a route structure you want to refine and organize into shift bids.
+              </div>
+            </button>
+            <button
+              type="button"
+              className="border border-cc-border rounded-[10px] p-5 text-left hover:border-cc-accent hover:shadow-md transition-all cursor-pointer bg-cc-surface-1 group"
+              onClick={() => handleWizardChoice('demo')}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Play size={18} className="text-cc-accent" />
+                <div className="font-semibold text-sm">Try the Demo</div>
+              </div>
+              <div className="text-[13px] text-cc-text-muted leading-relaxed">
+                Load sample data to explore what Parallax can do before importing your own.
+              </div>
+            </button>
+          </div>
+        </SectionCard>
       )}
+
+      {/* ── Conditional Upload (wizard choice made, awaiting file) ── */}
+      {showConditionalUpload && (
+        <SectionCard title="Data Import">
+          <div className="text-[13px] text-cc-text-secondary mb-4 bg-cc-surface-2 border border-cc-border rounded-lg px-4 py-3 leading-relaxed">
+            {wizardChoice === 'analyze'
+              ? 'Upload your route and trip data to analyze demand patterns, on-time performance, and build optimized routes and bids.'
+              : 'Upload your existing route structure to refine schedules, adjust breaks, and organize routes into shift bids.'}
+          </div>
+          <FlatFileImport
+            readonlyView={readonlyView}
+            onDownloadSample={downloadSampleCsv}
+            onImport={performImport}
+            showOnly={wizardChoice === 'analyze' ? 'routes_and_trips' : 'new_routes'}
+          />
+          <Button variant="outline" className="mt-3" onClick={() => setWizardChoice(null)} type="button">
+            Back
+          </Button>
+        </SectionCard>
+      )}
+
+      {/* ── Full UI (data loaded or readonly) ────────────────────── */}
+      {(hasData || readonlyView) && (
+        <>
+          <SectionCard title="Data Import">
+            <div className="text-[13px] text-cc-text-secondary mb-4 bg-cc-surface-2 border border-cc-border rounded-lg px-4 py-3 leading-relaxed">
+              Upload route and trip data to analyze demand, or upload a new route structure to refine and create bids. You can also upload all three to combine historical analysis with a new route design.
+            </div>
+            {state.settings.is_demo === 1 && (
+              <div className="text-[13px] text-cc-accent mb-3 bg-cc-accent/5 border border-cc-accent/20 rounded-lg px-4 py-2.5 leading-relaxed">
+                This session is using demo data. Importing your own files will replace all demo data.
+              </div>
+            )}
+            <FlatFileImport
+              readonlyView={readonlyView}
+              onDownloadSample={downloadSampleCsv}
+              onImport={handleImportWithDemoCheck}
+            />
+            {!readonlyView && (
+              <Button variant="outline" className="mt-3" onClick={onLoadDemo} type="button">
+                Load Demo Dataset
+              </Button>
+            )}
+          </SectionCard>
+
+          <DepotSettings
+            readonlyView={readonlyView}
+            routes={state.routes}
+            depots={depots}
+            onDepotsChange={onDepotsChange}
+          />
+
+          <SectionCard title="System Settings">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <InfoLabel tip="Auto-derived from imported data with a 30-minute buffer before the earliest trip or shift start.">Derived Service Start</InfoLabel>
+                <div className="font-semibold">{metrics.derivedServiceWindow.startLabel}</div>
+              </div>
+              <div>
+                <InfoLabel tip="Auto-derived from imported data with a 30-minute buffer after the latest trip or shift end.">Derived Service End</InfoLabel>
+                <div className="font-semibold">{metrics.derivedServiceWindow.endLabel}</div>
+              </div>
+              <div>
+                <InfoLabel tip="Total hours between the derived service start and end times.">Service Hours</InfoLabel>
+                <div className="font-semibold">
+                  {metrics.derivedServiceWindow.isTwentyFourHours
+                    ? '24:00'
+                    : metrics.derivedServiceWindow.durationLabel}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              <div>
+                <InfoLabel tip="The earliest actual or scheduled time found across all imported trips and routes.">Earliest Data Time</InfoLabel>
+                <div className="font-semibold">
+                  {metrics.derivedServiceWindow.earliestDataTime ?? 'No trip data'}
+                </div>
+              </div>
+              <div>
+                <InfoLabel tip="The latest actual or scheduled time found across all imported trips and routes.">Latest Data Time</InfoLabel>
+                <div className="font-semibold">
+                  {metrics.derivedServiceWindow.latestDataTime ?? 'No trip data'}
+                </div>
+              </div>
+            </div>
+            <hr className="my-3 border-cc-border" />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <SettingLabel tip="Minutes before the scheduled pickup time that still counts as on-time.">Pickup OTP: before</SettingLabel>
+                <Input
+                  type="number"
+                  min={0}
+                  max={180}
+                  step={1}
+                  disabled={readonlyView}
+                  value={localOtp.pickup_otp_window_before_min}
+                  onChange={(event) =>
+                    handleOtpChange('pickup_otp_window_before_min', event.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <SettingLabel tip="Minutes after the scheduled pickup time that still counts as on-time.">Pickup OTP: after</SettingLabel>
+                <Input
+                  type="number"
+                  min={0}
+                  max={180}
+                  step={1}
+                  disabled={readonlyView}
+                  value={localOtp.pickup_otp_window_after_min}
+                  onChange={(event) =>
+                    handleOtpChange('pickup_otp_window_after_min', event.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <SettingLabel tip="Minutes before the scheduled dropoff time that still counts as on-time.">Dropoff OTP: before</SettingLabel>
+                <Input
+                  type="number"
+                  min={0}
+                  max={180}
+                  step={1}
+                  disabled={readonlyView}
+                  value={localOtp.dropoff_otp_window_before_min}
+                  onChange={(event) =>
+                    handleOtpChange('dropoff_otp_window_before_min', event.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <SettingLabel tip="Minutes after the scheduled dropoff time that still counts as on-time.">Dropoff OTP: after</SettingLabel>
+                <Input
+                  type="number"
+                  min={0}
+                  max={180}
+                  step={1}
+                  disabled={readonlyView}
+                  value={localOtp.dropoff_otp_window_after_min}
+                  onChange={(event) =>
+                    handleOtpChange('dropoff_otp_window_after_min', event.target.value)
+                  }
+                />
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Data Views">
+            <Collapsible open={tripsOpen} onOpenChange={setTripsOpen} className="mb-3">
+              <CollapsibleTrigger className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full">
+                <ChevronRight
+                  size={14}
+                  className="transition-transform duration-150 data-[state=open]:rotate-90"
+                  data-state={tripsOpen ? 'open' : 'closed'}
+                />
+                Trips ({state.trips.length})
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="overflow-x-auto mt-2">
+                  <div className="mb-3">
+                    <ColumnSelectorDropdown
+                      columns={TRIP_DATA_COLUMNS}
+                      visibleColumns={tripVisibleColumns}
+                      onToggle={(key, value) =>
+                        setTripVisibleColumns((prev) => ({ ...prev, [key]: value }))
+                      }
+                    />
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {activeTripColumns.map((column) => (
+                          <TableHead key={`trip-col-head-${column.key}`}>{column.label}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tripPageRows.map((trip) => (
+                        <TableRow key={`trip-view-${trip.trip_id}-${trip.route_id}`}>
+                          {activeTripColumns.map((column) => (
+                            <TableCell key={`trip-row-${trip.trip_id}-${column.key}`}>
+                              {column.getValue(trip) ?? '-'}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                      {state.trips.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={Math.max(activeTripColumns.length, 1)} className="text-cc-text-muted">
+                            No trips available.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {state.trips.length > 0 && activeTripColumns.length === 0 && (
+                        <TableRow>
+                          <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                  {state.trips.length > 0 && (
+                    <div className="flex items-center justify-between mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        disabled={currentTripPage <= 1}
+                        onClick={() => setTripPage((prev) => Math.max(1, prev - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <div className="text-[13px]">
+                        Page {currentTripPage} of {tripTotalPages}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        disabled={currentTripPage >= tripTotalPages}
+                        onClick={() => setTripPage((prev) => Math.min(tripTotalPages, prev + 1))}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <Collapsible open={routesOpen} onOpenChange={setRoutesOpen}>
+              <CollapsibleTrigger className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-sm font-semibold w-full">
+                <ChevronRight
+                  size={14}
+                  className="transition-transform duration-150 data-[state=open]:rotate-90"
+                  data-state={routesOpen ? 'open' : 'closed'}
+                />
+                Routes ({state.routes.length})
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="overflow-x-auto mt-2">
+                  <div className="mb-3">
+                    <ColumnSelectorDropdown
+                      columns={ROUTE_DATA_COLUMNS}
+                      visibleColumns={routeVisibleColumns}
+                      onToggle={(key, value) =>
+                        setRouteVisibleColumns((prev) => ({ ...prev, [key]: value }))
+                      }
+                    />
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {activeRouteColumns.map((column) => (
+                          <TableHead key={`route-col-head-${column.key}`}>{column.label}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {routePageRows.map((route) => (
+                        <TableRow key={`route-view-${route.route_id}`}>
+                          {activeRouteColumns.map((column) => (
+                            <TableCell key={`route-row-${route.route_id}-${column.key}`}>
+                              {column.getValue(route) ?? '-'}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                      {state.routes.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={Math.max(activeRouteColumns.length, 1)} className="text-cc-text-muted">
+                            No routes available.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {state.routes.length > 0 && activeRouteColumns.length === 0 && (
+                        <TableRow>
+                          <TableCell className="text-cc-text-muted">Select at least one column.</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                  {state.routes.length > 0 && (
+                    <div className="flex items-center justify-between mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        disabled={currentRoutePage <= 1}
+                        onClick={() => setRoutePage((prev) => Math.max(1, prev - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <div className="text-[13px]">
+                        Page {currentRoutePage} of {routeTotalPages}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        disabled={currentRoutePage >= routeTotalPages}
+                        onClick={() => setRoutePage((prev) => Math.min(routeTotalPages, prev + 1))}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </SectionCard>
+
+          {flatImportLog && (flatImportLog.trips.length > 0 || flatImportLog.routes.length > 0) && (
+            <p className="text-[13px]">
+              Some rows were skipped during flat file import.{' '}
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => setShowFlatImportLog(true)}
+              >
+                View skipped row log
+              </Button>
+            </p>
+          )}
+        </>
+      )}
+
+      {/* ── Demo Replace Confirmation Dialog ─────────────────────── */}
+      <Dialog open={showDemoReplaceDialog} onOpenChange={(open) => { if (!open) setShowDemoReplaceDialog(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Replace Demo Data?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-cc-text-secondary">
+            This session currently contains demo data. Importing your own data will permanently replace all demo trips, routes, and depots. This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDemoReplaceDialog(false)} type="button">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDemoReplaceConfirm} type="button">
+              Replace Demo Data
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {flatImportLog && (
         <FlatImportLogModal
@@ -796,11 +932,16 @@ function FlatFileImport({
   readonlyView,
   onDownloadSample,
   onImport,
+  showOnly,
 }: {
   readonlyView: boolean;
   onDownloadSample: (kind: 'trips' | 'routes' | 'new_routes') => void;
   onImport: (tripFile: File | null, routeFile: File | null, newRouteFile: File | null) => Promise<void>;
+  showOnly?: 'routes_and_trips' | 'new_routes';
 }) {
+  const showRoutes = !showOnly || showOnly === 'routes_and_trips';
+  const showTrips = !showOnly || showOnly === 'routes_and_trips';
+  const showNewRoutes = !showOnly || showOnly === 'new_routes';
   const [tripFile, setTripFile] = useState<File | null>(null);
   const [routeFile, setRouteFile] = useState<File | null>(null);
   const [newRouteFile, setNewRouteFile] = useState<File | null>(null);
@@ -863,11 +1004,17 @@ function FlatFileImport({
     setNewRouteFile(file);
   }
 
+  const hasAnyFile = (showRoutes && (tripFile || routeFile)) || (showNewRoutes && newRouteFile) || (!showOnly && (tripFile || routeFile || newRouteFile));
+
   async function handleImport() {
-    if (readonlyView || (!tripFile && !routeFile && !newRouteFile)) return;
+    if (readonlyView || !hasAnyFile) return;
     setImporting(true);
     try {
-      await onImport(tripFile, routeFile, newRouteFile);
+      await onImport(
+        showTrips ? tripFile : null,
+        showRoutes ? routeFile : null,
+        showNewRoutes ? newRouteFile : null,
+      );
     } finally {
       setImporting(false);
     }
@@ -875,8 +1022,8 @@ function FlatFileImport({
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="border border-cc-border rounded-[10px] overflow-hidden">
+      <div className={`grid grid-cols-1 gap-4 ${showOnly === 'new_routes' ? 'max-w-md' : showOnly === 'routes_and_trips' ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+        {showRoutes && <div className="border border-cc-border rounded-[10px] overflow-hidden">
           <div className="bg-cc-surface-2 px-4 py-2.5 flex items-center justify-between">
             <div className="font-semibold text-sm">Route File (CSV/XLSX)</div>
             <Button
@@ -925,8 +1072,8 @@ function FlatFileImport({
             </div>
             {routeError && <div className="text-cc-danger text-[13px] mt-1.5">{routeError}</div>}
           </div>
-        </div>
-        <div className="border border-cc-border rounded-[10px] overflow-hidden">
+        </div>}
+        {showTrips && <div className="border border-cc-border rounded-[10px] overflow-hidden">
           <div className="bg-cc-surface-2 px-4 py-2.5 flex items-center justify-between">
             <div className="font-semibold text-sm">Trip File (CSV/XLSX)</div>
             <Button
@@ -975,8 +1122,8 @@ function FlatFileImport({
             </div>
             {tripError && <div className="text-cc-danger text-[13px] mt-1.5">{tripError}</div>}
           </div>
-        </div>
-        <div className="border border-cc-border rounded-[10px] overflow-hidden">
+        </div>}
+        {showNewRoutes && <div className="border border-cc-border rounded-[10px] overflow-hidden">
           <div className="bg-cc-surface-2 px-4 py-2.5 flex items-center justify-between">
             <div className="font-semibold text-sm">New Route File (CSV/XLSX)</div>
             <Button
@@ -1025,19 +1172,23 @@ function FlatFileImport({
             </div>
             {newRouteError && <div className="text-cc-danger text-[13px] mt-1.5">{newRouteError}</div>}
           </div>
-        </div>
+        </div>}
       </div>
       <Button
         className="mt-3"
         type="button"
-        disabled={readonlyView || importing || (!tripFile && !routeFile && !newRouteFile)}
+        disabled={readonlyView || importing || !hasAnyFile}
         onClick={handleImport}
       >
         {importing ? 'Importing...' : 'Import Files'}
       </Button>
-      {!tripFile && !routeFile && !newRouteFile && (
+      {!hasAnyFile && (
         <div className="text-[13px] text-cc-text-muted mt-2">
-          Select at least one file to import. Routes are imported first so trips can be validated against them.
+          {showOnly === 'new_routes'
+            ? 'Select a file containing your route structure to import.'
+            : showOnly === 'routes_and_trips'
+              ? 'Select at least one file to import. Routes are imported first so trips can be validated against them.'
+              : 'Select at least one file to import. Routes are imported first so trips can be validated against them.'}
         </div>
       )}
     </div>

@@ -277,6 +277,16 @@ function ensureBidResultColumn(db: Database.Database): void {
   }
 }
 
+function ensureSettingsIsDemoColumn(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('settings')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('is_demo')) {
+    db.exec('ALTER TABLE settings ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;');
+  }
+}
+
 function normalizePassengerType(value: string | null | undefined): TripRow['passenger_type'] {
   if (value && PASSENGER_TYPES.has(value as TripRow['passenger_type'])) {
     return value as TripRow['passenger_type'];
@@ -304,6 +314,7 @@ function openSessionDb(editToken: string): Database.Database {
   ensureNewRoutesTable(db);
   ensureDepotsTable(db);
   ensureBidResultColumn(db);
+  ensureSettingsIsDemoColumn(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
   db.prepare('INSERT OR IGNORE INTO optimization (id) VALUES (1)').run();
   return db;
@@ -480,6 +491,7 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
           day_type: null,
           time_range_start: null,
           time_range_end: null,
+          is_demo: null,
           ...input.settings,
         };
         db.prepare(
@@ -496,7 +508,8 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
                service_day_end = COALESCE(@service_day_end, service_day_end),
                day_type = COALESCE(@day_type, day_type),
                time_range_start = COALESCE(@time_range_start, time_range_start),
-               time_range_end = COALESCE(@time_range_end, time_range_end)
+               time_range_end = COALESCE(@time_range_end, time_range_end),
+               is_demo = COALESCE(@is_demo, is_demo)
            WHERE id = 1`,
         ).run(settingsParams);
       }

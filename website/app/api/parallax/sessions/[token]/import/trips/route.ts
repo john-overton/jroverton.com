@@ -8,7 +8,7 @@ import {
 } from '@/lib/parallax/http';
 import { parseTripsFile } from '@/lib/parallax/import-validators';
 import { updateSessionCounts } from '@/lib/parallax/registry-db';
-import { countRoutes, countTrips, recalculateServiceWindow, replaceTrips } from '@/lib/parallax/session-db';
+import { countRoutes, countTrips, recalculateServiceWindow, replaceTrips, saveSessionState } from '@/lib/parallax/session-db';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +35,7 @@ export async function POST(
     const fileBuffer = await readUploadedFile(request);
     const { rows: trips, skipped } = parseTripsFile(fileBuffer);
     replaceTrips(token, trips);
+    saveSessionState(token, { settings: { is_demo: 0 } });
     recalculateServiceWindow(token);
 
     const tripCount = countTrips(token);
