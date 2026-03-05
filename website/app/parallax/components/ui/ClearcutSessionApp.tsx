@@ -69,6 +69,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const prevDataCountsRef = useRef<{ trips: number; routes: number } | null>(null);
   const timeRangeTrackRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<TabKey>(mode === 'readonly' ? 'demand' : 'import');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hasVisitedMap, setHasVisitedMap] = useState(false);
   const [mapDisabled, setMapDisabled] = useState(false);
   const [status, setStatusRaw] = useState<string | null>(null);
@@ -713,8 +714,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onCopyEditLink={() => copyToClipboard(`${origin}/parallax/s/${token}`, 'edit')}
           copiedLink={copiedLink}
           detectedOS={detectedOS}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         />
       }
+      sidebarCollapsed={sidebarCollapsed}
       filterBar={
         hasData && allTimeBlocks.length > 0 ? (
           <FilterBar

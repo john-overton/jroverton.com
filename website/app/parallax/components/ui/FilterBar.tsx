@@ -102,7 +102,7 @@ export default function FilterBar({
       onMouseLeave={onMouseLeaveContainer}
     >
       {/* Compact bar */}
-      <div className="flex items-center gap-2 px-4 py-2 text-sm shadow-[0_2px_4px_rgba(0,0,0,0.06)]">
+      <div className="flex items-center gap-2 px-4 py-2.25 text-sm shadow-[0_2px_4px_rgba(0,0,0,0.06)]">
         <Filter size={14} className="text-cc-text-muted shrink-0" />
         <span className="text-cc-text-secondary truncate">
           {intervalMinutes}m
