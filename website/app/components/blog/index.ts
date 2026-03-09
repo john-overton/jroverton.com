@@ -3,6 +3,7 @@
 import BuildingAstryk, { metadata as buildingAstrykMetadata } from './building-astryk';
 import TheMissingDependency, { metadata as theMissingDependencyMetadata } from './the-missing-dependency';
 import IteratingWithAi, { metadata as iteratingWithAiMetadata } from './iterating-with-ai';
+import TenMinutePrTookThreeHours, { metadata as tenMinutePrTookThreeHoursMetadata } from './10-minute-pr-took-3-hours';
 import { BlogPost } from './types';
 
 // Add all blog posts to this array
@@ -18,6 +19,10 @@ export const blogPosts: BlogPost[] = [
   {
     ...iteratingWithAiMetadata,
     component: IteratingWithAi,
+  },
+  {
+    ...tenMinutePrTookThreeHoursMetadata,
+    component: TenMinutePrTookThreeHours,
   },
 ];
 
