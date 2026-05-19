@@ -12,7 +12,7 @@ import type { ClearcutMetrics } from '@/lib/parallax/metrics';
 import { estimateFtePtCounts } from '@/lib/parallax/bid-algorithm';
 import type { CurrentRunCutRow } from '@/lib/parallax/run-structure';
 import { buildRunCutForDate, getAvailableDates } from '@/lib/parallax/run-structure';
-import type { BidResult, DepotRow, NewRouteRow, OptimizationRow, RouteRow, ServiceDay } from '@/lib/parallax/types';
+import type { BidResult, DepotRow, NewRouteRow, OptimizationRow, RouteRow, ServiceDay, VehicleTypeRow } from '@/lib/parallax/types';
 
 import HelpPanel from './HelpPanel';
 import ImportedRoutesPanel from './ImportedRoutesPanel';
@@ -60,6 +60,7 @@ interface RunStructureTabProps {
   ) => void;
   onNewRoutesChange: (newRoutes: NewRouteRow[]) => void;
   depots: DepotRow[];
+  vehicleTypes: VehicleTypeRow[];
   filteredRoutes: RouteRow[];
   savedBidResult: BidResult | null;
   onBidResultChange: (result: BidResult | null) => void;
@@ -76,6 +77,7 @@ export default function RunStructureTab({
   intervalMinutes,
   onNewRoutesChange,
   depots,
+  vehicleTypes,
   savedBidResult,
   onBidResultChange,
 }: RunStructureTabProps) {
@@ -506,6 +508,7 @@ export default function RunStructureTab({
         break_2_end: break2End,
         break_3_start: null,
         break_3_end: null,
+        vehicle_type_id: null,
       };
       const svcHrs = computeServiceHours(newRouteRow);
       newRouteRow.platform_hours = String(svcHrs);
@@ -604,6 +607,7 @@ export default function RunStructureTab({
       break_2_end: b2End,
       break_3_start: null,
       break_3_end: null,
+      vehicle_type_id: null,
     };
     const svcHrs = computeServiceHours(copiedNewRoute);
     copiedNewRoute.platform_hours = String(svcHrs);
@@ -740,6 +744,7 @@ export default function RunStructureTab({
             localNewRoutes={localNewRoutes}
             filteredNewRoutes={filteredNewRoutes}
             depots={depots}
+            vehicleTypes={vehicleTypes}
             readonlyView={readonlyView}
             newRouteDayFilter={newRouteDayFilter}
             onNewRouteDayFilterChange={setNewRouteDayFilter}

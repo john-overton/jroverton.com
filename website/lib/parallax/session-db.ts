@@ -14,6 +14,7 @@ import type {
   SessionStateUpdateInput,
   SettingsRow,
   TripRow,
+  VehicleTypeRow,
 } from './types';
 
 const PASSENGER_TYPES = new Set<TripRow['passenger_type']>([
@@ -83,6 +84,13 @@ const NEW_ROUTE_COLUMNS = [
   'break_2_end',
   'break_3_start',
   'break_3_end',
+  'vehicle_type_id',
+] as const;
+
+const VEHICLE_TYPE_COLUMNS = [
+  'vehicle_type_id',
+  'vehicle_type_name',
+  'supported_modes',
 ] as const;
 
 const DEPOT_COLUMNS = [
@@ -269,6 +277,31 @@ function ensureDepotsTable(db: Database.Database): void {
   }
 }
 
+function ensureVehicleTypesTable(db: Database.Database): void {
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='vehicle_types'")
+    .all() as Array<{ name: string }>;
+  if (tables.length === 0) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS vehicle_types (
+        vehicle_type_id TEXT NOT NULL PRIMARY KEY,
+        vehicle_type_name TEXT NOT NULL,
+        supported_modes TEXT NOT NULL DEFAULT '["ambulatory","wheelchair","extra_large"]'
+      );
+    `);
+  }
+}
+
+function ensureNewRouteVehicleTypeColumn(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('new_routes')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('vehicle_type_id')) {
+    db.exec('ALTER TABLE new_routes ADD COLUMN vehicle_type_id TEXT;');
+  }
+}
+
 function ensureBidResultColumn(db: Database.Database): void {
   const columns = db
     .prepare("SELECT name FROM pragma_table_info('optimization')")
@@ -335,6 +368,8 @@ function openSessionDb(editToken: string): Database.Database {
   ensureRouteColumns(db);
   ensureNewRoutesTable(db);
   ensureDepotsTable(db);
+  ensureVehicleTypesTable(db);
+  ensureNewRouteVehicleTypeColumn(db);
   ensureBidResultColumn(db);
   ensureSettingsIsDemoColumn(db);
   ensureTripZoneColumn(db);
@@ -430,6 +465,12 @@ export function listNewRoutes(editToken: string): NewRouteRow[] {
 export function listDepots(editToken: string): DepotRow[] {
   return withSessionDb(editToken, (db) => {
     return db.prepare('SELECT * FROM depots ORDER BY depot_name').all() as DepotRow[];
+  });
+}
+
+export function listVehicleTypes(editToken: string): VehicleTypeRow[] {
+  return withSessionDb(editToken, (db) => {
+    return db.prepare('SELECT * FROM vehicle_types ORDER BY vehicle_type_name').all() as VehicleTypeRow[];
   });
 }
 
@@ -602,6 +643,17 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
         db.prepare('DELETE FROM depots').run();
         for (const row of input.depots) {
           insertDepot.run(...DEPOT_COLUMNS.map((column) => row[column as keyof DepotRow]));
+        }
+      }
+
+      if (input.vehicle_types) {
+        const insertVehicleType = db.prepare(
+          `INSERT INTO vehicle_types (${VEHICLE_TYPE_COLUMNS.join(',')})
+           VALUES (${VEHICLE_TYPE_COLUMNS.map(() => '?').join(',')})`,
+        );
+        db.prepare('DELETE FROM vehicle_types').run();
+        for (const row of input.vehicle_types) {
+          insertVehicleType.run(...VEHICLE_TYPE_COLUMNS.map((column) => row[column as keyof VehicleTypeRow]));
         }
       }
     });

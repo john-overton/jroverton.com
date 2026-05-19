@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { matchDepotsForNewRoutes } from '@/lib/parallax/depot-utils';
+import { matchDepotsForNewRoutes, matchVehicleTypesForNewRoutes } from '@/lib/parallax/depot-utils';
 import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
@@ -9,7 +9,8 @@ import {
 } from '@/lib/parallax/http';
 import { parseNewRoutesFile } from '@/lib/parallax/import-validators';
 import { updateSessionCounts } from '@/lib/parallax/registry-db';
-import { countRoutes, countTrips, listDepots, replaceNewRoutes, saveSessionState } from '@/lib/parallax/session-db';
+import type { SessionStateUpdateInput } from '@/lib/parallax/types';
+import { countRoutes, countTrips, listDepots, listVehicleTypes, replaceNewRoutes, saveSessionState } from '@/lib/parallax/session-db';
 
 export const runtime = 'nodejs';
 
@@ -34,19 +35,35 @@ export async function POST(
     requireAuthorizedSessionAccess(request, session, 'edit');
 
     const fileBuffer = await readUploadedFile(request);
-    const { rows: newRoutes, skipped, depotAddresses } = parseNewRoutesFile(fileBuffer);
+    const { rows: newRoutes, skipped, depotAddresses, vehicleTypeMap, routeVehicleTypeNames } = parseNewRoutesFile(fileBuffer);
 
     // Match depot addresses to existing depots or create new ones
     const existingDepots = listDepots(token);
-    const { updatedNewRoutes, newDepots } = matchDepotsForNewRoutes(
+    const { updatedNewRoutes: depotMatchedRoutes, newDepots } = matchDepotsForNewRoutes(
       newRoutes,
       existingDepots,
       depotAddresses,
     );
 
-    // Save new depots if any were created
+    // Match vehicle types from CSV to existing or create new ones
+    const existingVehicleTypes = listVehicleTypes(token);
+    const { updatedNewRoutes, newVehicleTypes } = matchVehicleTypesForNewRoutes(
+      depotMatchedRoutes,
+      existingVehicleTypes,
+      vehicleTypeMap,
+      routeVehicleTypeNames,
+    );
+
+    // Save new depots and vehicle types if any were created
+    const stateUpdates: SessionStateUpdateInput = {};
     if (newDepots.length > 0) {
-      saveSessionState(token, { depots: [...existingDepots, ...newDepots] });
+      stateUpdates.depots = [...existingDepots, ...newDepots];
+    }
+    if (newVehicleTypes.length > 0) {
+      stateUpdates.vehicle_types = [...existingVehicleTypes, ...newVehicleTypes];
+    }
+    if (Object.keys(stateUpdates).length > 0) {
+      saveSessionState(token, stateUpdates);
     }
 
     replaceNewRoutes(token, updatedNewRoutes);

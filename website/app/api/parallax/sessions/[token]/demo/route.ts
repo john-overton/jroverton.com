@@ -27,6 +27,7 @@ export async function POST(
       trips: payload.trips,
       routes: payload.routes,
       depots: payload.depots,
+      vehicle_types: payload.vehicleTypes,
       settings: { is_demo: 1 },
     });
 

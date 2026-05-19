@@ -1,7 +1,7 @@
 'use client';
 
 import { BarChart3, ChevronDown, ChevronRight, CircleHelp, GitBranch, Pencil, Play, Plus, Save, Trash2, Wand2, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // import ImportMapperWizard from '@/app/parallax/components/ui/ImportMapperWizard';
 import { Button } from '@/app/parallax/components/shadcn/button';
@@ -43,6 +43,7 @@ import type {
   RouteRow,
   SessionState,
   TripRow,
+  VehicleTypeRow,
 } from '@/lib/parallax/types';
 
 import { SectionCard } from './shared';
@@ -244,6 +245,8 @@ interface ImportTabProps {
   ) => void;
   depots: DepotRow[];
   onDepotsChange: (depots: DepotRow[]) => void;
+  vehicleTypes: VehicleTypeRow[];
+  onVehicleTypesChange: (vehicleTypes: VehicleTypeRow[]) => void;
 }
 
 export default function ImportTab({
@@ -257,6 +260,8 @@ export default function ImportTab({
   onOtpWindowChange,
   depots,
   onDepotsChange,
+  vehicleTypes,
+  onVehicleTypesChange,
 }: ImportTabProps) {
   const [tripsOpen, setTripsOpen] = useState(false);
   const [routesOpen, setRoutesOpen] = useState(false);
@@ -386,6 +391,17 @@ export default function ImportTab({
     };
   }, []);
 
+  const passengerModes = useMemo(() => {
+    const modes = new Set<string>();
+    for (const t of state.trips) { if (t.passenger_type) modes.add(t.passenger_type); }
+    for (const vt of vehicleTypes) {
+      const parsed: string[] = JSON.parse(vt.supported_modes);
+      for (const m of parsed) modes.add(m);
+    }
+    if (modes.size === 0) return ['ambulatory', 'wheelchair', 'extra_large'];
+    return [...modes].sort();
+  }, [state.trips, vehicleTypes]);
+
   const hasData = state.trips.length > 0 || state.routes.length > 0 || state.new_routes.length > 0;
   const showWizard = !readonlyView && !hasData && wizardChoice === null;
   const showConditionalUpload = !readonlyView && !hasData && wizardChoice !== null;
@@ -436,13 +452,14 @@ export default function ImportTab({
       '# DATETIME FORMAT: YYYY-MM-DD HH:MM:SS  |  DATE FORMAT: YYYY-MM-DD',
     ].join('\n');
     const newRouteSample = [
-      'new_route_name,start_time,end_time,service_days,depot_address,route_area,split_number,break_1_start,break_1_end,break_2_start,break_2_end',
-      'North Loop,06:00,14:00,"M,T,W,Th,F",100 Depot Way,,0,10:00,10:30,,',
-      'South Loop,14:00,22:00,"M,T,W,Th,F",100 Depot Way,,0,18:00,18:30,,',
+      'new_route_name,start_time,end_time,service_days,depot_address,route_area,split_number,break_1_start,break_1_end,break_2_start,break_2_end,vehicle_type,vehicle_person_types',
+      'North Loop,06:00,14:00,"M,T,W,Th,F",100 Depot Way,,0,10:00,10:30,,,Sedan,ambulatory;wheelchair',
+      'South Loop,14:00,22:00,"M,T,W,Th,F",100 Depot Way,,0,18:00,18:30,,,Cutaway,ambulatory;wheelchair;extra_large',
       '',
-      '# DATA TYPES: TEXT,TIME (HH:MM),TIME (HH:MM),TEXT (comma-separated),TEXT,TEXT,INTEGER,TIME (HH:MM),TIME (HH:MM),TIME (HH:MM),TIME (HH:MM)',
-      '# REQUIRED: yes,yes,yes,no (default: M T W Th F),no,no,no (default: 0),no,no,no,no',
+      '# DATA TYPES: TEXT,TIME (HH:MM),TIME (HH:MM),TEXT (comma-separated),TEXT,TEXT,INTEGER,TIME (HH:MM),TIME (HH:MM),TIME (HH:MM),TIME (HH:MM),TEXT,TEXT (semicolon-separated)',
+      '# REQUIRED: yes,yes,yes,no (default: M T W Th F),no,no,no (default: 0),no,no,no,no,no,no',
       '# SERVICE DAYS VALUES: M | T | W | Th | F | Sa | Su',
+      '# VEHICLE_PERSON_TYPES VALUES: ambulatory | wheelchair | extra_large (semicolon-separated)',
     ].join('\n');
 
     const content = kind === 'trips' ? tripSample : kind === 'routes' ? routeSample : newRouteSample;
@@ -621,6 +638,13 @@ export default function ImportTab({
             routes={state.routes}
             depots={depots}
             onDepotsChange={onDepotsChange}
+          />
+
+          <VehicleTypeSettings
+            readonlyView={readonlyView}
+            vehicleTypes={vehicleTypes}
+            onVehicleTypesChange={onVehicleTypesChange}
+            passengerModes={passengerModes}
           />
 
           <SectionCard title="System Settings">
@@ -1412,6 +1436,172 @@ function DepotSettings({
                 )}
               </TableRow>
             ))}
+          </TableBody>
+        </Table>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── Vehicle Type Settings component ────────────────────────────────
+
+function formatModeLabel(mode: string): string {
+  return mode.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function VehicleTypeSettings({
+  readonlyView,
+  vehicleTypes,
+  onVehicleTypesChange,
+  passengerModes,
+}: {
+  readonlyView: boolean;
+  vehicleTypes: VehicleTypeRow[];
+  onVehicleTypesChange: (vehicleTypes: VehicleTypeRow[]) => void;
+  passengerModes: string[];
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<VehicleTypeRow[]>(vehicleTypes);
+
+  useEffect(() => {
+    if (!editing) setDraft(vehicleTypes);
+  }, [vehicleTypes, editing]);
+
+  function addVehicleType() {
+    const base = editing ? draft : vehicleTypes;
+    const newVt: VehicleTypeRow = {
+      vehicle_type_id: crypto.randomUUID(),
+      vehicle_type_name: `Vehicle Type ${base.length + 1}`,
+      supported_modes: JSON.stringify([...passengerModes]),
+    };
+    const updated = [...base, newVt];
+    setDraft(updated);
+    if (!editing) setEditing(true);
+  }
+
+  function updateName(vtId: string, name: string) {
+    setDraft((prev) => prev.map((vt) => (vt.vehicle_type_id === vtId ? { ...vt, vehicle_type_name: name } : vt)));
+  }
+
+  function toggleMode(vtId: string, mode: string) {
+    setDraft((prev) => prev.map((vt) => {
+      if (vt.vehicle_type_id !== vtId) return vt;
+      const modes: string[] = JSON.parse(vt.supported_modes);
+      const next = modes.includes(mode) ? modes.filter((m) => m !== mode) : [...modes, mode];
+      return { ...vt, supported_modes: JSON.stringify(next) };
+    }));
+  }
+
+  function deleteVehicleType(vtId: string) {
+    setDraft((prev) => prev.filter((vt) => vt.vehicle_type_id !== vtId));
+  }
+
+  function handleSave() {
+    onVehicleTypesChange(draft);
+    setEditing(false);
+  }
+
+  function handleCancel() {
+    setDraft(vehicleTypes);
+    setEditing(false);
+  }
+
+  const displayTypes = editing ? draft : vehicleTypes;
+
+  return (
+    <SectionCard title="Vehicle Types">
+      <div className="flex flex-col gap-2 mb-3">
+        {!readonlyView && (
+          <>
+            <div className="flex items-center gap-2">
+              {!editing && vehicleTypes.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => { setDraft(vehicleTypes); setEditing(true); }} type="button">
+                  <Pencil size={14} className="mr-1.5" /> Edit Vehicle Types
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={addVehicleType} type="button">
+                <Plus size={14} className="mr-1.5" /> Add Vehicle Type
+              </Button>
+            </div>
+            {editing && (
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={handleSave} type="button">
+                  <Save size={14} className="mr-1.5" /> Save
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCancel} type="button">
+                  <X size={14} className="mr-1.5" /> Cancel
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {displayTypes.length === 0 ? (
+        <div className="text-xs text-cc-text-muted py-3">
+          No vehicle types configured. Add a vehicle type to assign to routes.
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="min-w-[150px]">Name</TableHead>
+              <TableHead className="min-w-[200px]">Supported Modes</TableHead>
+              {editing && <TableHead className="min-w-[60px]">Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayTypes.map((vt) => {
+              const modes: string[] = JSON.parse(vt.supported_modes);
+              return (
+                <TableRow key={vt.vehicle_type_id}>
+                  <TableCell>
+                    {editing ? (
+                      <Input
+                        value={vt.vehicle_type_name}
+                        className="h-7 text-xs"
+                        onChange={(e) => updateName(vt.vehicle_type_id, e.target.value)}
+                      />
+                    ) : (
+                      <span className="text-xs">{vt.vehicle_type_name}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editing ? (
+                      <div className="flex gap-2 flex-wrap">
+                        {passengerModes.map((mode) => (
+                          <label key={mode} className="flex items-center gap-1 text-xs cursor-pointer">
+                            <Checkbox
+                              checked={modes.includes(mode)}
+                              onCheckedChange={() => toggleMode(vt.vehicle_type_id, mode)}
+                            />
+                            {formatModeLabel(mode)}
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-cc-text-muted">
+                        {modes.map((m) => formatModeLabel(m)).join(', ')}
+                      </span>
+                    )}
+                  </TableCell>
+                  {editing && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-cc-danger"
+                        onClick={() => deleteVehicleType(vt.vehicle_type_id)}
+                        title="Delete vehicle type"
+                        type="button"
+                      >
+                        <Trash2 size={13} />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       )}

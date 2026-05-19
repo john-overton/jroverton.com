@@ -16,7 +16,7 @@ import { ClearcutClientError } from '@/lib/parallax/client';
 import { extractNewDepotsFromRoutes } from '@/lib/parallax/depot-utils';
 import { checkMapboxStatus, trackPageView } from '@/lib/parallax/tracking';
 import { computeClearcutMetrics } from '@/lib/parallax/metrics';
-import type { BidResult, DepotRow, NewRouteRow } from '@/lib/parallax/types';
+import type { BidResult, DepotRow, NewRouteRow, VehicleTypeRow } from '@/lib/parallax/types';
 import { useClearcutSession, type ClearcutMode } from '@/lib/parallax/use-clearcut-session';
 import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
@@ -665,6 +665,15 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     });
   }
 
+  function onVehicleTypesChange(vehicleTypes: VehicleTypeRow[]) {
+    if (!ready || readonlyView) {
+      return;
+    }
+    session.saveState({ vehicle_types: vehicleTypes }).catch((saveError) => {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save vehicle types.');
+    });
+  }
+
   if (session.loadState.status === 'loading') {
     return (
       <main className="max-w-[1100px] mx-auto px-5 pt-16 pb-8">
@@ -1076,6 +1085,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onOtpWindowChange={onOtpWindowChange}
           depots={ready.state.depots}
           onDepotsChange={onDepotsChange}
+          vehicleTypes={ready.state.vehicle_types}
+          onVehicleTypesChange={onVehicleTypesChange}
         />
       )}
       {tab === 'demand' && <DemandTab metrics={metrics} intervalMinutes={intervalMinutes} />}
@@ -1120,6 +1131,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onOptimizationChange={onOptimizationChange}
           onNewRoutesChange={onNewRoutesChange}
           depots={ready.state.depots}
+          vehicleTypes={ready.state.vehicle_types}
           filteredRoutes={filteredRoutes}
           savedBidResult={ready.state.bid_result}
           onBidResultChange={onBidResultChange}

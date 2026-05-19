@@ -5,7 +5,7 @@ import {
   listCities,
   withDemoLocationsDb,
 } from './demo-locations-db';
-import type { DepotRow, RouteRow, TripRow } from './types';
+import type { DepotRow, RouteRow, TripRow, VehicleTypeRow } from './types';
 
 // ── Demo Data Generation Configuration ──────────────────────────────
 
@@ -269,6 +269,7 @@ export function buildDemoTripsAndRoutes(): {
   trips: TripRow[];
   routes: RouteRow[];
   depots: DepotRow[];
+  vehicleTypes: VehicleTypeRow[];
 } {
   if (!demoLocationsDbExists()) {
     throw new Error(
@@ -314,6 +315,25 @@ export function buildDemoTripsAndRoutes(): {
       depot_lat: String(d.lat),
       depot_lon: String(d.lon),
     }));
+
+    // Build vehicle types
+    const vehicleTypes: VehicleTypeRow[] = [
+      {
+        vehicle_type_id: 'VT-SEDAN',
+        vehicle_type_name: 'Sedan',
+        supported_modes: JSON.stringify(['ambulatory']),
+      },
+      {
+        vehicle_type_id: 'VT-PASSENGER-VAN',
+        vehicle_type_name: 'Passenger Van',
+        supported_modes: JSON.stringify(['ambulatory', 'wheelchair']),
+      },
+      {
+        vehicle_type_id: 'VT-CUTAWAY',
+        vehicle_type_name: 'Cutaway',
+        supported_modes: JSON.stringify(['ambulatory', 'wheelchair', 'extra_large']),
+      },
+    ];
 
     // Build zones based on geographic quadrants
     const allLats = [...locations.residential, ...locations.destinations].map((l) => l.lat);
@@ -819,6 +839,6 @@ export function buildDemoTripsAndRoutes(): {
       }
     }
 
-    return { trips, routes, depots };
+    return { trips, routes, depots, vehicleTypes };
   });
 }

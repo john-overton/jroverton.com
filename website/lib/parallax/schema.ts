@@ -106,6 +106,12 @@ CREATE TABLE IF NOT EXISTS optimization (
   bid_result_json TEXT
 );
 
+CREATE TABLE IF NOT EXISTS vehicle_types (
+  vehicle_type_id TEXT NOT NULL PRIMARY KEY,
+  vehicle_type_name TEXT NOT NULL,
+  supported_modes TEXT NOT NULL DEFAULT '["ambulatory","wheelchair","extra_large"]'
+);
+
 CREATE TABLE IF NOT EXISTS new_routes (
   new_route_id TEXT NOT NULL PRIMARY KEY,
   new_route_name TEXT NOT NULL,
@@ -122,7 +128,8 @@ CREATE TABLE IF NOT EXISTS new_routes (
   break_2_start TEXT,
   break_2_end TEXT,
   break_3_start TEXT,
-  break_3_end TEXT
+  break_3_end TEXT,
+  vehicle_type_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_new_routes_name ON new_routes(new_route_name);

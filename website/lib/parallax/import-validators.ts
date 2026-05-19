@@ -385,6 +385,8 @@ function parseServiceDaysCsv(value: string | null): string {
 
 export interface NewRouteParseResult extends ParseResult<NewRouteRow> {
   depotAddresses: Map<string, string>;
+  vehicleTypeMap: Map<string, string[]>;
+  routeVehicleTypeNames: Map<string, string>;
 }
 
 export function parseNewRoutesFile(fileBuffer: Buffer): NewRouteParseResult {
@@ -394,6 +396,8 @@ export function parseNewRoutesFile(fileBuffer: Buffer): NewRouteParseResult {
   const newRoutes: NewRouteRow[] = [];
   const skipped: Array<{ row: number; reason: string }> = [];
   const depotAddresses = new Map<string, string>();
+  const vehicleTypeMap = new Map<string, string[]>();
+  const routeVehicleTypeNames = new Map<string, string>();
 
   for (let index = 0; index < rows.length; index++) {
     const rowIndex = index + 2;
@@ -454,11 +458,24 @@ export function parseNewRoutesFile(fileBuffer: Buffer): NewRouteParseResult {
       depotAddresses.set(newRouteId, depotAddress);
     }
 
+    const vehicleTypeName = getCellValue(row, 'vehicle_type')?.trim();
+    if (vehicleTypeName) {
+      routeVehicleTypeNames.set(newRouteId, vehicleTypeName.toLowerCase());
+      if (!vehicleTypeMap.has(vehicleTypeName.toLowerCase())) {
+        const defaultModes = ['ambulatory', 'wheelchair', 'extra_large'];
+        const modesRaw = getCellValue(row, 'vehicle_person_types');
+        const modes = modesRaw
+          ? modesRaw.split(';').map((m) => m.trim().toLowerCase()).filter(Boolean)
+          : [...defaultModes];
+        vehicleTypeMap.set(vehicleTypeName.toLowerCase(), modes.length > 0 ? modes : [...defaultModes]);
+      }
+    }
+
     newRoutes.push({
       new_route_id: newRouteId,
       new_route_name: routeName,
       split_number: splitNumber,
-      depot: null, // resolved later via depot matching
+      depot: null,
       service_days: parseServiceDaysCsv(getCellValue(row, 'service_days')),
       route_area: getCellValue(row, 'route_area'),
       start_time: startTime,
@@ -471,8 +488,9 @@ export function parseNewRoutesFile(fileBuffer: Buffer): NewRouteParseResult {
       break_2_end: break2End,
       break_3_start: break3Start,
       break_3_end: break3End,
+      vehicle_type_id: null,
     });
   }
 
-  return { rows: newRoutes, skipped, depotAddresses };
+  return { rows: newRoutes, skipped, depotAddresses, vehicleTypeMap, routeVehicleTypeNames };
 }

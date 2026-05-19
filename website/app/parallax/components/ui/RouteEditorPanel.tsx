@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/app/parallax/components/shadcn/table';
 import { exportRoutesToExcel } from '@/lib/parallax/bid-export';
-import type { DepotRow, NewRouteRow, ServiceDay } from '@/lib/parallax/types';
+import type { DepotRow, NewRouteRow, ServiceDay, VehicleTypeRow } from '@/lib/parallax/types';
 
 import { ALL_SERVICE_DAYS, SERVICE_DAY_FULL_NAME, parseClockToMinutes, formatMinutesToClock, parseServiceDays } from './shared';
 
@@ -152,6 +152,7 @@ interface RouteEditorPanelProps {
   localNewRoutes: NewRouteRow[];
   filteredNewRoutes: NewRouteRow[];
   depots: DepotRow[];
+  vehicleTypes: VehicleTypeRow[];
   readonlyView: boolean;
   newRouteDayFilter: ServiceDay | 'all';
   onNewRouteDayFilterChange: (filter: ServiceDay | 'all') => void;
@@ -173,6 +174,7 @@ export default function RouteEditorPanel({
   localNewRoutes,
   filteredNewRoutes,
   depots,
+  vehicleTypes,
   readonlyView,
   newRouteDayFilter,
   onNewRouteDayFilterChange,
@@ -314,6 +316,7 @@ export default function RouteEditorPanel({
       break_2_end: null,
       break_3_start: null,
       break_3_end: null,
+      vehicle_type_id: null,
     });
     setDraftBreakCount(0);
   }
@@ -419,6 +422,7 @@ export default function RouteEditorPanel({
       break_2_end: null,
       break_3_start: null,
       break_3_end: null,
+      vehicle_type_id: newRoute.vehicle_type_id,
     };
     updateLocalNewRoutes([...nextNewRoutes, newSplit]);
   }
@@ -578,6 +582,7 @@ export default function RouteEditorPanel({
                   <TableRow>
                     <TableHead className="min-w-[120px]">Route Name</TableHead>
                     {depots.length > 0 && <TableHead className="min-w-[100px]">Depot</TableHead>}
+                    {vehicleTypes.length > 0 && <TableHead className="min-w-[100px]">Vehicle</TableHead>}
                     <TableHead className="min-w-[80px]">Zone</TableHead>
                     <TableHead className="min-w-[90px]">Start</TableHead>
                     <TableHead className="min-w-[90px]">End</TableHead>
@@ -610,6 +615,24 @@ export default function RouteEditorPanel({
                             <SelectItem value="none">{'\u2014'}</SelectItem>
                             {depots.map((d) => (
                               <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    )}
+                    {vehicleTypes.length > 0 && (
+                      <TableCell>
+                        <Select
+                          value={draftNewRoute.vehicle_type_id ?? 'none'}
+                          onValueChange={(v) => updateDraft('vehicle_type_id', v === 'none' ? null : v)}
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">{'\u2014'}</SelectItem>
+                            {vehicleTypes.map((vt) => (
+                              <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>{vt.vehicle_type_name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -774,6 +797,7 @@ export default function RouteEditorPanel({
             <TableRow>
               <SortableHead column="new_route_name" label="Route Name" className="min-w-[120px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               {depots.length > 0 && <TableHead className="min-w-[100px]">Depot</TableHead>}
+              {vehicleTypes.length > 0 && <TableHead className="min-w-[100px]">Vehicle</TableHead>}
               <TableHead className="min-w-[80px]">Zone</TableHead>
               <SortableHead column="split_number" label="Split" className="min-w-[50px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <SortableHead column="start_time" label="Start" className="min-w-[90px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -845,6 +869,25 @@ export default function RouteEditorPanel({
                           <SelectItem value="none">{'\u2014'}</SelectItem>
                           {depots.map((d) => (
                             <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  )}
+                  {vehicleTypes.length > 0 && (
+                    <TableCell>
+                      <Select
+                        value={newRoute.vehicle_type_id ?? 'none'}
+                        onValueChange={(v) => updateNewRoute(newRoute.new_route_id, 'vehicle_type_id', v === 'none' ? null : v)}
+                        disabled={disabled}
+                      >
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">{'\u2014'}</SelectItem>
+                          {vehicleTypes.map((vt) => (
+                            <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>{vt.vehicle_type_name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

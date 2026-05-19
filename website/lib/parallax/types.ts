@@ -98,6 +98,13 @@ export interface NewRouteRow {
   break_2_end: string | null;
   break_3_start: string | null;
   break_3_end: string | null;
+  vehicle_type_id: string | null;
+}
+
+export interface VehicleTypeRow {
+  vehicle_type_id: string;
+  vehicle_type_name: string;
+  supported_modes: string;
 }
 
 // ── Bid system types ─────────────────────────────────────────────────
@@ -229,6 +236,7 @@ export interface SessionState {
   routes: RouteRow[];
   new_routes: NewRouteRow[];
   depots: DepotRow[];
+  vehicle_types: VehicleTypeRow[];
   bid_result: BidResult | null;
 }
 
@@ -239,6 +247,7 @@ export interface SessionStateUpdateInput {
   routes?: RouteRow[];
   new_routes?: NewRouteRow[];
   depots?: DepotRow[];
+  vehicle_types?: VehicleTypeRow[];
 }
 
 export type ImportEventType =

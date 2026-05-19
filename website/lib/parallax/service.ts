@@ -17,6 +17,7 @@ import {
   getOptimization,
   getSettings,
   listDepots,
+  listVehicleTypes,
   listRoutes,
   listNewRoutes,
   listTrips,
@@ -93,6 +94,7 @@ export function getSessionState(record: SessionRecord, access: AccessLevel = 'ed
     routes: listRoutes(record.edit_token),
     new_routes: listNewRoutes(record.edit_token),
     depots: listDepots(record.edit_token),
+    vehicle_types: listVehicleTypes(record.edit_token),
     bid_result: bidResult,
   };
 }
