@@ -205,6 +205,7 @@ export default function ImportedRoutesPanel({
             <TableRow>
               <ImportedSortableHead column="routeName" label="Route" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
               {depots.length > 0 && <TableHead>Depot</TableHead>}
+              <TableHead>Zone</TableHead>
               <ImportedSortableHead column="shiftStart" label="Shift Start" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
               <ImportedSortableHead column="shiftEnd" label="Shift End" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
               <ImportedSortableHead column="durationHours" label="Duration" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
@@ -238,7 +239,7 @@ export default function ImportedRoutesPanel({
           <TableBody>
             {sortedRunCut.length === 0 && (
               <TableRow>
-                <TableCell colSpan={importedBreaksExpanded ? (readonlyView ? 6 : 7) : (readonlyView ? 5 : 6) + (depots.length > 0 ? 1 : 0)} className="text-cc-text-muted">
+                <TableCell colSpan={importedBreaksExpanded ? (readonlyView ? 7 : 8) : (readonlyView ? 6 : 7) + (depots.length > 0 ? 1 : 0)} className="text-cc-text-muted">
                   No routes for selected date
                 </TableCell>
               </TableRow>
@@ -251,6 +252,9 @@ export default function ImportedRoutesPanel({
                     {row.depotAddress ? (depotAddressToName.get(row.depotAddress) ?? row.depotAddress) : '\u2014'}
                   </TableCell>
                 )}
+                <TableCell className="text-xs text-cc-text-muted">
+                  {row.zone ?? '—'}
+                </TableCell>
                 <TableCell>{row.shiftStart}</TableCell>
                 <TableCell>{row.shiftEnd}</TableCell>
                 <TableCell>{row.durationHours} hrs</TableCell>

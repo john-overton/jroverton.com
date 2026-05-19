@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS trips (
   passenger_type TEXT NOT NULL DEFAULT 'ambulatory' CHECK (passenger_type IN ('ambulatory', 'wheelchair', 'extra_large')),
   passenger_count TEXT,
   pick_odometer TEXT,
-  drop_odometer TEXT
+  drop_odometer TEXT,
+  zone TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_trips_route ON trips(route_id);
@@ -73,7 +74,8 @@ CREATE TABLE IF NOT EXISTS routes (
   depot_lat TEXT,
   depot_lon TEXT,
   distance_to_first_pick TEXT,
-  distance_from_last_drop TEXT
+  distance_from_last_drop TEXT,
+  zone TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (

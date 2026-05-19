@@ -30,6 +30,29 @@ import type { NewRouteRow, RouteRow, ServiceDay, TripRow } from '@/lib/parallax/
 import type { YardTripRow } from '@/lib/parallax/metrics';
 import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
+export type BreakoutMode = 'total' | 'byStatus' | 'byPassengerType';
+
+const STATUS_COLORS: Record<string, string> = {
+  completed: '#059669',
+  'no-show': '#DC2626',
+  cancelled: '#D97706',
+  scheduled: '#6366F1',
+};
+
+const PASSENGER_TYPE_COLORS: Record<string, string> = {
+  ambulatory: '#2563EB',
+  wheelchair: '#D97706',
+  extra_large: '#7C3AED',
+};
+
+const FALLBACK_COLORS = ['#6366F1', '#EC4899', '#14B8A6', '#F59E0B', '#8B5CF6', '#EF4444'];
+
+function getCategoryColor(category: string, mode: BreakoutMode, index: number): string {
+  if (mode === 'byStatus') return STATUS_COLORS[category] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+  if (mode === 'byPassengerType') return PASSENGER_TYPE_COLORS[category] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+  return FALLBACK_COLORS[0];
+}
+
 export const DEMAND_BLOCK_MINUTES = 15;
 
 export const ALL_SERVICE_DAYS: ServiceDay[] = ['M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'];
@@ -264,6 +287,15 @@ export function HeatStrip({ values, blocks, onBlockClick, activeIndex, valueLabe
   );
 }
 
+const TOOLTIP_STYLE = {
+  borderRadius: 8,
+  background: 'var(--color-cc-surface-1)',
+  color: 'var(--color-cc-text)',
+  border: '1px solid var(--color-cc-border)',
+  padding: '8px 12px',
+  fontSize: 13,
+} as const;
+
 function ChartTooltip({ active, payload, label, nameMap, breakColors }: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string }>;
@@ -278,17 +310,12 @@ function ChartTooltip({ active, payload, label, nameMap, breakColors }: {
   const nrOnBreak = dataPoint.nrOnBreak ?? 0;
   const irOnBreak = dataPoint.irOnBreak ?? 0;
   const breakStyle = { color: 'var(--color-cc-text-muted)', lineHeight: 1.6 } as const;
+  const visible = payload.filter((e) => e.value !== 0);
+  if (visible.length === 0 && onBreak === 0 && crOnBreak === 0 && nrOnBreak === 0 && irOnBreak === 0) return null;
   return (
-    <div style={{
-      borderRadius: 8,
-      background: 'var(--color-cc-surface-1)',
-      color: 'var(--color-cc-text)',
-      border: '1px solid var(--color-cc-border)',
-      padding: '8px 12px',
-      fontSize: 13,
-    }}>
+    <div style={TOOLTIP_STYLE}>
       <div style={{ color: 'var(--color-cc-text)', marginBottom: 4, fontWeight: 500 }}>Time: {label}</div>
-      {payload.map((entry) => (
+      {visible.map((entry) => (
         <div key={entry.name} style={{ color: 'var(--color-cc-text-secondary)', lineHeight: 1.6 }}>
           <span style={{ color: entry.color }}>●</span>{' '}
           {nameMap[entry.name] ?? entry.name}: {entry.value}
@@ -318,6 +345,35 @@ function ChartTooltip({ active, payload, label, nameMap, breakColors }: {
   );
 }
 
+function PerformanceTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: readonly { name: string; value: number; color: string }[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const isOtp = (name: string) => name === 'pickupOtp' || name === 'dropoffOtp';
+  const visible = payload.filter((e) => isOtp(e.name) || e.value !== 0);
+  if (visible.length === 0) return null;
+  return (
+    <div style={TOOLTIP_STYLE}>
+      <div style={{ color: 'var(--color-cc-text)', marginBottom: 4, fontWeight: 500 }}>Time: {label}</div>
+      {visible.map((entry) => {
+        let displayName: string;
+        let displayValue: string;
+        if (entry.name === 'pickupOtp') { displayName = 'Pickup OTP'; displayValue = `${entry.value}%`; }
+        else if (entry.name === 'dropoffOtp') { displayName = 'Dropoff OTP'; displayValue = `${entry.value}%`; }
+        else if (entry.name.startsWith('prod_')) { displayName = entry.name.replace('prod_', ''); displayValue = String(entry.value); }
+        else { displayName = 'Productivity'; displayValue = String(entry.value); }
+        return (
+          <div key={entry.name} style={{ color: 'var(--color-cc-text-secondary)', lineHeight: 1.6 }}>
+            <span style={{ color: entry.color }}>●</span> {displayName}: {displayValue}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DemandCompositeChart({
   pickups,
   onBoard,
@@ -329,6 +385,11 @@ export function DemandCompositeChart({
   maxOnBreak,
   blocks,
   mode,
+  breakoutMode = 'total',
+  pickupsByCategory,
+  onBoardByCategory,
+  maxPickupsByCategory,
+  maxOnBoardByCategory,
 }: {
   pickups: number[];
   onBoard: number[];
@@ -340,12 +401,22 @@ export function DemandCompositeChart({
   maxOnBreak?: number[];
   blocks: Array<{ label: string }>;
   mode?: 'avg' | 'max';
+  breakoutMode?: BreakoutMode;
+  pickupsByCategory?: Record<string, number[]>;
+  onBoardByCategory?: Record<string, number[]>;
+  maxPickupsByCategory?: Record<string, number[]>;
+  maxOnBoardByCategory?: Record<string, number[]>;
 }) {
   const { chartColors } = useClearcutTheme();
   const activePickups = mode === 'max' && maxPickups ? maxPickups : pickups;
   const activeOnBoard = mode === 'max' && maxOnBoard ? maxOnBoard : onBoard;
   const activeVehicles = mode === 'max' && maxVehicles ? maxVehicles : vehicles;
   const activeOnBreak = mode === 'max' && maxOnBreak ? maxOnBreak : (onBreak ?? []);
+
+  const categoryKeys = useMemo(
+    () => (breakoutMode !== 'total' && pickupsByCategory ? Object.keys(pickupsByCategory).sort() : []),
+    [breakoutMode, pickupsByCategory],
+  );
 
   // Fix Y-axis to the max across both modes so the scale stays constant during transitions
   const yMax = useMemo(() => {
@@ -358,21 +429,40 @@ export function DemandCompositeChart({
 
   const data = useMemo(
     () =>
-      blocks.map((block, index) => ({
-        label: block.label,
-        pickups: Math.round((activePickups[index] ?? 0) * 10) / 10,
-        onBoard: Math.round((activeOnBoard[index] ?? 0) * 10) / 10,
-        vehicles: Math.round((activeVehicles[index] ?? 0) * 10) / 10,
-        onBreak: Math.round((activeOnBreak[index] ?? 0) * 10) / 10,
-      })),
-    [blocks, activeOnBoard, activePickups, activeVehicles, activeOnBreak],
+      blocks.map((block, index) => {
+        const point: Record<string, string | number> = {
+          label: block.label,
+          vehicles: Math.round((activeVehicles[index] ?? 0) * 10) / 10,
+          onBreak: Math.round((activeOnBreak[index] ?? 0) * 10) / 10,
+        };
+        if (breakoutMode === 'total' || categoryKeys.length === 0) {
+          point.pickups = Math.round((activePickups[index] ?? 0) * 10) / 10;
+          point.onBoard = Math.round((activeOnBoard[index] ?? 0) * 10) / 10;
+        } else {
+          for (const cat of categoryKeys) {
+            const pickSrc = mode === 'max' && maxPickupsByCategory?.[cat] ? maxPickupsByCategory[cat] : pickupsByCategory![cat];
+            const obSrc = mode === 'max' && maxOnBoardByCategory?.[cat] ? maxOnBoardByCategory[cat] : onBoardByCategory?.[cat];
+            point[`pick_${cat}`] = Math.round((pickSrc?.[index] ?? 0) * 10) / 10;
+            point[`ob_${cat}`] = Math.round((obSrc?.[index] ?? 0) * 10) / 10;
+          }
+        }
+        return point;
+      }),
+    [blocks, activeOnBoard, activePickups, activeVehicles, activeOnBreak, breakoutMode, pickupsByCategory, onBoardByCategory, maxPickupsByCategory, maxOnBoardByCategory, mode, categoryKeys],
   );
 
-  const nameMap = useMemo(() => ({
-    vehicles: 'Routes On Road',
-    onBoard: 'Active Trips',
-    pickups: 'Pickups',
-  }), []);
+  const nameMap = useMemo(() => {
+    const map: Record<string, string> = {
+      vehicles: 'Routes On Road',
+      onBoard: 'Active Trips',
+      pickups: 'Pickups',
+    };
+    for (const cat of categoryKeys) {
+      map[`pick_${cat}`] = `Pickups (${cat})`;
+      map[`ob_${cat}`] = `On Board (${cat})`;
+    }
+    return map;
+  }, [categoryKeys]);
 
   return (
     <div className="h-[230px]">
@@ -382,8 +472,33 @@ export function DemandCompositeChart({
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} width={38} domain={[0, yMax]} />
           <Tooltip content={<ChartTooltip nameMap={nameMap} breakColors={{ onBreak: chartColors[1] }} />} />
-          <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
-          <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
+          {breakoutMode === 'total' || categoryKeys.length === 0 ? (
+            <>
+              <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
+            </>
+          ) : (
+            <>
+              {categoryKeys.map((cat, i) => (
+                <Bar
+                  key={`ob_${cat}`}
+                  dataKey={`ob_${cat}`}
+                  stackId="onBoard"
+                  fill={`${getCategoryColor(cat, breakoutMode, i)}66`}
+                  radius={i === categoryKeys.length - 1 ? [3, 3, 0, 0] : undefined}
+                />
+              ))}
+              {categoryKeys.map((cat, i) => (
+                <Bar
+                  key={`pick_${cat}`}
+                  dataKey={`pick_${cat}`}
+                  stackId="pickups"
+                  fill={getCategoryColor(cat, breakoutMode, i)}
+                  radius={i === categoryKeys.length - 1 ? [3, 3, 0, 0] : undefined}
+                />
+              ))}
+            </>
+          )}
           <Line
             type="monotone"
             dataKey="vehicles"
@@ -404,22 +519,39 @@ export function PerformanceCompositeChart({
   pickupOtp,
   dropoffOtp,
   blocks,
+  breakoutMode = 'total',
+  productivityByCategory,
 }: {
   productivity: number[];
   pickupOtp: number[];
   dropoffOtp: number[];
   blocks: Array<{ label: string }>;
+  breakoutMode?: BreakoutMode;
+  productivityByCategory?: Record<string, number[]>;
 }) {
   const { chartColors } = useClearcutTheme();
+  const categoryKeys = useMemo(
+    () => (breakoutMode !== 'total' && productivityByCategory ? Object.keys(productivityByCategory).sort() : []),
+    [breakoutMode, productivityByCategory],
+  );
   const data = useMemo(
     () =>
-      blocks.map((block, index) => ({
-        label: block.label,
-        productivity: Math.round((productivity[index] ?? 0) * 100) / 100,
-        pickupOtp: Math.round((pickupOtp[index] ?? 0) * 10) / 10,
-        dropoffOtp: Math.round((dropoffOtp[index] ?? 0) * 10) / 10,
-      })),
-    [blocks, productivity, pickupOtp, dropoffOtp],
+      blocks.map((block, index) => {
+        const point: Record<string, string | number> = {
+          label: block.label,
+          pickupOtp: Math.round((pickupOtp[index] ?? 0) * 10) / 10,
+          dropoffOtp: Math.round((dropoffOtp[index] ?? 0) * 10) / 10,
+        };
+        if (breakoutMode === 'total' || categoryKeys.length === 0) {
+          point.productivity = Math.round((productivity[index] ?? 0) * 100) / 100;
+        } else {
+          for (const cat of categoryKeys) {
+            point[`prod_${cat}`] = Math.round((productivityByCategory![cat][index] ?? 0) * 100) / 100;
+          }
+        }
+        return point;
+      }),
+    [blocks, productivity, pickupOtp, dropoffOtp, breakoutMode, productivityByCategory, categoryKeys],
   );
 
   return (
@@ -430,26 +562,29 @@ export function PerformanceCompositeChart({
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis yAxisId="left" allowDecimals width={38} />
           <YAxis yAxisId="right" orientation="right" domain={[0, 100]} width={38} tickFormatter={(v) => `${v}%`} />
-          <Tooltip
-            formatter={(value: number | string | undefined, name: string | undefined) => {
-              const v = typeof value === 'number' ? value : Number(value ?? 0);
-              if (name === 'pickupOtp') return [`${v}%`, 'Pickup OTP'];
-              if (name === 'dropoffOtp') return [`${v}%`, 'Dropoff OTP'];
-              return [v, 'Productivity'];
-            }}
-            labelFormatter={(label) => `Time: ${label}`}
-            contentStyle={{ borderRadius: 8, background: 'var(--color-cc-surface-1)', color: 'var(--color-cc-text)', borderColor: 'var(--color-cc-border)' }}
-            labelStyle={{ color: 'var(--color-cc-text)' }}
-            itemStyle={{ color: 'var(--color-cc-text-secondary)' }}
-          />
+          <Tooltip content={<PerformanceTooltip />} />
           <Legend
             formatter={(value) => {
               if (value === 'pickupOtp') return 'Pickup OTP';
               if (value === 'dropoffOtp') return 'Dropoff OTP';
+              if (value.startsWith('prod_')) return value.replace('prod_', '');
               return 'Productivity';
             }}
           />
-          <Bar yAxisId="left" dataKey="productivity" fill={`${chartColors[0]}66`} radius={[3, 3, 0, 0]} />
+          {breakoutMode === 'total' || categoryKeys.length === 0 ? (
+            <Bar yAxisId="left" dataKey="productivity" fill={`${chartColors[0]}66`} radius={[3, 3, 0, 0]} />
+          ) : (
+            categoryKeys.map((cat, i) => (
+              <Bar
+                key={cat}
+                yAxisId="left"
+                dataKey={`prod_${cat}`}
+                stackId="productivity"
+                fill={getCategoryColor(cat, breakoutMode, i)}
+                radius={i === categoryKeys.length - 1 ? [3, 3, 0, 0] : undefined}
+              />
+            ))
+          )}
           <Line
             yAxisId="right"
             type="monotone"
@@ -585,6 +720,9 @@ export function RunStructureChart({
   importedDateVehicles,
   irOnBreak,
   importedDateLabel,
+  breakoutMode = 'total',
+  pickupsByCategory,
+  onBoardByCategory,
 }: {
   pickups: number[];
   onBoard: number[];
@@ -596,34 +734,59 @@ export function RunStructureChart({
   importedDateVehicles?: number[];
   irOnBreak?: number[];
   importedDateLabel?: string;
+  breakoutMode?: BreakoutMode;
+  pickupsByCategory?: Record<string, number[]>;
+  onBoardByCategory?: Record<string, number[]>;
 }) {
   const { chartColors } = useClearcutTheme();
   const showImportedDate = importedDateVehicles && importedDateVehicles.length > 0;
-
   const importedDateColor = chartColors[5];
-  const data = useMemo(
-    () =>
-      blocks.map((block, index) => ({
-        label: block.label,
-        pickups: Math.round((pickups[index] ?? 0) * 10) / 10,
-        onBoard: Math.round((onBoard[index] ?? 0) * 10) / 10,
-        currentVehicles: Math.round((currentVehicles[index] ?? 0) * 10) / 10,
-        runVehicles: Math.round((runVehicles[index] ?? 0) * 10) / 10,
-        crOnBreak: Math.round((crOnBreak?.[index] ?? 0) * 10) / 10,
-        nrOnBreak: Math.round((nrOnBreak?.[index] ?? 0) * 10) / 10,
-        importedDateVehicles: showImportedDate ? Math.round((importedDateVehicles[index] ?? 0) * 10) / 10 : undefined,
-        irOnBreak: showImportedDate ? Math.round((irOnBreak?.[index] ?? 0) * 10) / 10 : undefined,
-      })),
-    [blocks, onBoard, pickups, currentVehicles, runVehicles, crOnBreak, nrOnBreak, importedDateVehicles, irOnBreak, showImportedDate],
+
+  const categoryKeys = useMemo(
+    () => (breakoutMode !== 'total' && pickupsByCategory ? Object.keys(pickupsByCategory).sort() : []),
+    [breakoutMode, pickupsByCategory],
   );
 
-  const nameMap = useMemo(() => ({
-    currentVehicles: 'Current Routes',
-    runVehicles: 'New Routes',
-    onBoard: 'Active Trips',
-    pickups: 'Pickups',
-    importedDateVehicles: importedDateLabel ?? 'Selected Date',
-  }), [importedDateLabel]);
+  const data = useMemo(
+    () =>
+      blocks.map((block, index) => {
+        const point: Record<string, string | number | undefined> = {
+          label: block.label,
+          currentVehicles: Math.round((currentVehicles[index] ?? 0) * 10) / 10,
+          runVehicles: Math.round((runVehicles[index] ?? 0) * 10) / 10,
+          crOnBreak: Math.round((crOnBreak?.[index] ?? 0) * 10) / 10,
+          nrOnBreak: Math.round((nrOnBreak?.[index] ?? 0) * 10) / 10,
+          importedDateVehicles: showImportedDate ? Math.round((importedDateVehicles[index] ?? 0) * 10) / 10 : undefined,
+          irOnBreak: showImportedDate ? Math.round((irOnBreak?.[index] ?? 0) * 10) / 10 : undefined,
+        };
+        if (breakoutMode === 'total' || categoryKeys.length === 0) {
+          point.pickups = Math.round((pickups[index] ?? 0) * 10) / 10;
+          point.onBoard = Math.round((onBoard[index] ?? 0) * 10) / 10;
+        } else {
+          for (const cat of categoryKeys) {
+            point[`pick_${cat}`] = Math.round((pickupsByCategory![cat][index] ?? 0) * 10) / 10;
+            point[`ob_${cat}`] = Math.round((onBoardByCategory?.[cat]?.[index] ?? 0) * 10) / 10;
+          }
+        }
+        return point;
+      }),
+    [blocks, onBoard, pickups, currentVehicles, runVehicles, crOnBreak, nrOnBreak, importedDateVehicles, irOnBreak, showImportedDate, breakoutMode, pickupsByCategory, onBoardByCategory, categoryKeys],
+  );
+
+  const nameMap = useMemo(() => {
+    const map: Record<string, string> = {
+      currentVehicles: 'Current Routes',
+      runVehicles: 'New Routes',
+      onBoard: 'Active Trips',
+      pickups: 'Pickups',
+      importedDateVehicles: importedDateLabel ?? 'Selected Date',
+    };
+    for (const cat of categoryKeys) {
+      map[`pick_${cat}`] = `Pickups (${cat})`;
+      map[`ob_${cat}`] = `On Board (${cat})`;
+    }
+    return map;
+  }, [importedDateLabel, categoryKeys]);
 
   return (
     <div className="h-[260px]">
@@ -634,16 +797,35 @@ export function RunStructureChart({
           <YAxis allowDecimals={false} width={38} />
           <Tooltip content={<ChartTooltip nameMap={nameMap} breakColors={{ crOnBreak: chartColors[1], nrOnBreak: chartColors[3], irOnBreak: importedDateColor }} />} />
           <Legend
-            formatter={(value) => {
-              if (value === 'currentVehicles') return 'Current Routes';
-              if (value === 'runVehicles') return 'New Routes';
-              if (value === 'onBoard') return 'Active Trips';
-              if (value === 'importedDateVehicles') return importedDateLabel ?? 'Selected Date';
-              return 'Pickups';
-            }}
+            formatter={(value) => nameMap[value] ?? value}
           />
-          <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
-          <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
+          {breakoutMode === 'total' || categoryKeys.length === 0 ? (
+            <>
+              <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
+            </>
+          ) : (
+            <>
+              {categoryKeys.map((cat, i) => (
+                <Bar
+                  key={`ob_${cat}`}
+                  dataKey={`ob_${cat}`}
+                  stackId="onBoard"
+                  fill={`${getCategoryColor(cat, breakoutMode, i)}66`}
+                  radius={i === categoryKeys.length - 1 ? [3, 3, 0, 0] : undefined}
+                />
+              ))}
+              {categoryKeys.map((cat, i) => (
+                <Bar
+                  key={`pick_${cat}`}
+                  dataKey={`pick_${cat}`}
+                  stackId="pickups"
+                  fill={getCategoryColor(cat, breakoutMode, i)}
+                  radius={i === categoryKeys.length - 1 ? [3, 3, 0, 0] : undefined}
+                />
+              ))}
+            </>
+          )}
           <Line type="monotone" dataKey="currentVehicles" stroke={chartColors[1]} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
           <Line type="monotone" dataKey="runVehicles" stroke={chartColors[3]} strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4 }} />
           {showImportedDate && (

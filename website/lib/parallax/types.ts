@@ -56,6 +56,7 @@ export interface TripRow {
   passenger_count: string | null;
   pick_odometer: string | null;
   drop_odometer: string | null;
+  zone: string | null;
 }
 
 export interface RouteRow {
@@ -75,6 +76,7 @@ export interface RouteRow {
   depot_lon: string | null;
   distance_to_first_pick: string | null;
   distance_from_last_drop: string | null;
+  zone: string | null;
 }
 
 export type ServiceDay = 'M' | 'T' | 'W' | 'Th' | 'F' | 'Sa' | 'Su';

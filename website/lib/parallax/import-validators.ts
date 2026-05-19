@@ -271,6 +271,7 @@ export function parseTripsFile(fileBuffer: Buffer): ParseResult<TripRow> {
       passenger_count: getCellValue(row, 'passenger_count'),
       pick_odometer: getCellValue(row, 'pick_odometer'),
       drop_odometer: getCellValue(row, 'drop_odometer'),
+      zone: getCellValue(row, 'zone'),
     });
   }
 
@@ -332,6 +333,7 @@ export function parseRoutesFile(fileBuffer: Buffer): ParseResult<RouteRow> {
       depot_lon: getCellValue(row, 'depot_lon'),
       distance_to_first_pick: getCellValue(row, 'distance_to_first_pick'),
       distance_from_last_drop: getCellValue(row, 'distance_from_last_drop'),
+      zone: getCellValue(row, 'zone'),
     });
   }
 

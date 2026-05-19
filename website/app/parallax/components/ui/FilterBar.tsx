@@ -25,6 +25,9 @@ interface FilterBarProps {
   specificDate: string | null;
   timeStartLabel: string;
   timeEndLabel: string;
+  zoneSummary?: string;
+  statusSummary?: string;
+  passengerTypeSummary?: string;
   children: ReactNode;
 }
 
@@ -37,6 +40,9 @@ export default function FilterBar({
   specificDate,
   timeStartLabel,
   timeEndLabel,
+  zoneSummary,
+  statusSummary,
+  passengerTypeSummary,
   children,
 }: FilterBarProps) {
   const [expanded, setExpanded] = useState(false);
@@ -112,6 +118,24 @@ export default function FilterBar({
           {daysSummary}
           <span className="text-cc-text-muted mx-1.5">&middot;</span>
           {timeStartLabel} – {timeEndLabel}
+          {zoneSummary && (
+            <>
+              <span className="text-cc-text-muted mx-1.5">&middot;</span>
+              {zoneSummary}
+            </>
+          )}
+          {statusSummary && (
+            <>
+              <span className="text-cc-text-muted mx-1.5">&middot;</span>
+              {statusSummary}
+            </>
+          )}
+          {passengerTypeSummary && (
+            <>
+              <span className="text-cc-text-muted mx-1.5">&middot;</span>
+              {passengerTypeSummary}
+            </>
+          )}
         </span>
       </div>
 

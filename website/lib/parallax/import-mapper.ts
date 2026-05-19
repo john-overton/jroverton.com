@@ -435,6 +435,7 @@ function coerceTripDefaults(value: Partial<TripRow>): TripRow {
     passenger_count: value.passenger_count ?? null,
     pick_odometer: value.pick_odometer ?? null,
     drop_odometer: value.drop_odometer ?? null,
+    zone: value.zone ?? null,
   };
 }
 
@@ -457,6 +458,7 @@ function coerceRouteDefaults(value: Partial<RouteRow>): RouteRow {
     depot_lon: value.depot_lon ?? null,
     distance_to_first_pick: value.distance_to_first_pick ?? null,
     distance_from_last_drop: value.distance_from_last_drop ?? null,
+    zone: value.zone ?? null,
   };
 }
 

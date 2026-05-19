@@ -86,6 +86,16 @@ export interface ClearcutMetrics {
     earliestDataTime: string | null;
     latestDataTime: string | null;
   };
+  pickupsByBlockByStatus: Record<string, number[]>;
+  pickupsByBlockByPassengerType: Record<string, number[]>;
+  onBoardByBlockByStatus: Record<string, number[]>;
+  onBoardByBlockByPassengerType: Record<string, number[]>;
+  productivityByBlockByStatus: Record<string, number[]>;
+  productivityByBlockByPassengerType: Record<string, number[]>;
+  maxPickupsByBlockByStatus: Record<string, number[]>;
+  maxPickupsByBlockByPassengerType: Record<string, number[]>;
+  maxOnBoardByBlockByStatus: Record<string, number[]>;
+  maxOnBoardByBlockByPassengerType: Record<string, number[]>;
 }
 
 export interface PerRouteMetrics {
@@ -108,6 +118,9 @@ export interface ComputeMetricsOptions {
   timeRangeEnd?: string | null;
   blockSizeMinutes?: number;
   selectedRouteIds?: string[];
+  selectedZones?: string[];
+  selectedStatuses?: string[];
+  selectedPassengerTypes?: string[];
 }
 
 function parseMinutes(value: string | null | undefined, fallback: number): number {
@@ -274,6 +287,7 @@ function computeRideTimeStats(
 ): { avg: number | null; max: number | null } {
   const rideTimes: number[] = [];
   for (const trip of trips) {
+    if (trip.status !== 'completed') continue;
     const pickup = asDate(trip.pickup_leave_time ?? '') ?? asDate(trip.pickup_arrive_time ?? '');
     const dropoff = asDate(trip.dropoff_leave_time ?? '') ?? asDate(trip.dropoff_arrive_time ?? '');
     if (!pickup || !dropoff) continue;
@@ -546,7 +560,8 @@ export function computePerRouteMetrics(
           }
           // Collect trip interval for merged occupied time calculation
           // (handles shared rides — overlapping intervals are merged later)
-          if (pickupTime && dropoffTime) {
+          // Only completed trips count toward on-board / occupied time
+          if (pickupTime && dropoffTime && trip.status === 'completed') {
             inst.tripIntervals.push([pickupTime.getTime(), dropoffTime.getTime()]);
           }
         }
@@ -659,7 +674,9 @@ export function computeClearcutMetrics(
   });
 
   const pickupsByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const completedPickupsByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const pickupsPassengersByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  const completedPassengersByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const onBoardByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const vehiclesByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const breaksByBlock = Array.from({ length: blockCount }).fill(0) as number[];
@@ -681,9 +698,29 @@ export function computeClearcutMetrics(
   const activeVehiclesRawByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const occupiedVehiclesRawByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const pickupsByDayBlock = new Map<string, number[]>();
+  const completedPickupsByDayBlock = new Map<string, number[]>();
   const passengersByDayBlock = new Map<string, number[]>();
+  const completedPassengersByDayBlock = new Map<string, number[]>();
   const vehiclesByDayBlock = new Map<string, number[]>();
   const breaksByDayBlock = new Map<string, number[]>();
+
+  const pickupsByBlockByStatus: Record<string, number[]> = {};
+  const pickupsByBlockByPassengerType: Record<string, number[]> = {};
+  const completedPickupsByBlockByPassengerType: Record<string, number[]> = {};
+  const pickupsByDayBlockByStatus: Record<string, Map<string, number[]>> = {};
+  const pickupsByDayBlockByPassengerType: Record<string, Map<string, number[]>> = {};
+  const completedPickupsByDayBlockByStatus: Record<string, Map<string, number[]>> = {};
+  const completedPickupsByDayBlockByPassengerType: Record<string, Map<string, number[]>> = {};
+  function ensureCatBlock(record: Record<string, number[]>, cat: string): number[] {
+    if (!record[cat]) record[cat] = Array.from({ length: blockCount }).fill(0) as number[];
+    return record[cat];
+  }
+  function ensureCatDayBlock(record: Record<string, Map<string, number[]>>, cat: string, dayKey: string): number[] {
+    if (!record[cat]) record[cat] = new Map();
+    let arr = record[cat].get(dayKey);
+    if (!arr) { arr = Array.from({ length: blockCount }).fill(0) as number[]; record[cat].set(dayKey, arr); }
+    return arr;
+  }
 
   let totalPickupEligible = 0;
   let totalPickupOnTime = 0;
@@ -724,21 +761,54 @@ export function computeClearcutMetrics(
     if (options.selectedRouteIds?.length && !options.selectedRouteIds.includes(trip.route_id)) {
       continue;
     }
+    if (options.selectedZones?.length && (!trip.zone || !options.selectedZones.includes(trip.zone))) {
+      continue;
+    }
+
+    if (options.selectedStatuses?.length && !options.selectedStatuses.includes(trip.status)) {
+      continue;
+    }
+    if (options.selectedPassengerTypes?.length && !options.selectedPassengerTypes.includes(trip.passenger_type)) {
+      continue;
+    }
 
     const passengers = parsePassengerCount(trip.passenger_count);
     const tripDayKey = dateKey(pickupTimestamp);
-    const occupiedRouteBlocks = ensureDayBlockSets(occupiedRouteIdsByDayBlock, tripDayKey, blockCount);
-    // Occupied routes for deadhead: which blocks does this trip overlap (pickup to dropoff)
-    const onboardStart = pickupTimestamp;
-    const onboardEnd = tripDropoffTime(trip) ?? pickupTimestamp;
-    const onboardStartMinutes = dateToMinutes(onboardStart);
-    const onboardEndMinutes = Math.max(onboardStartMinutes, dateToMinutes(onboardEnd));
-    for (let blockIdx = 0; blockIdx < blocks.length; blockIdx += 1) {
-      const block = blocks[blockIdx];
-      if (onboardEndMinutes > block.startMinutes && onboardStartMinutes < block.endMinutes) {
-        if (trip.route_id) {
-          occupiedRouteBlocks[blockIdx].add(trip.route_id);
+
+    if (trip.status === 'completed') {
+      const occupiedRouteBlocks = ensureDayBlockSets(occupiedRouteIdsByDayBlock, tripDayKey, blockCount);
+      const onboardStart = pickupTimestamp;
+      const onboardEnd = tripDropoffTime(trip) ?? pickupTimestamp;
+      const onboardStartMinutes = dateToMinutes(onboardStart);
+      const onboardEndMinutes = Math.max(onboardStartMinutes, dateToMinutes(onboardEnd));
+      for (let blockIdx = 0; blockIdx < blocks.length; blockIdx += 1) {
+        const block = blocks[blockIdx];
+        if (onboardEndMinutes > block.startMinutes && onboardStartMinutes < block.endMinutes) {
+          if (trip.route_id) {
+            occupiedRouteBlocks[blockIdx].add(trip.route_id);
+          }
         }
+      }
+
+      const compIdx = pickBlockIndex(dateToMinutes(pickupTimestamp), blocks);
+      if (compIdx >= 0) {
+        completedPickupsByBlock[compIdx] += 1;
+        completedPassengersByBlock[compIdx] += passengers;
+        ensureCatBlock(completedPickupsByBlockByPassengerType, trip.passenger_type)[compIdx] += 1;
+        ensureCatDayBlock(completedPickupsByDayBlockByStatus, trip.status, tripDayKey)[compIdx] += 1;
+        ensureCatDayBlock(completedPickupsByDayBlockByPassengerType, trip.passenger_type, tripDayKey)[compIdx] += 1;
+        let dayCompleted = completedPickupsByDayBlock.get(tripDayKey);
+        if (!dayCompleted) {
+          dayCompleted = Array.from({ length: blockCount }).fill(0) as number[];
+          completedPickupsByDayBlock.set(tripDayKey, dayCompleted);
+        }
+        dayCompleted[compIdx] += 1;
+        let dayCompPax = completedPassengersByDayBlock.get(tripDayKey);
+        if (!dayCompPax) {
+          dayCompPax = Array.from({ length: blockCount }).fill(0) as number[];
+          completedPassengersByDayBlock.set(tripDayKey, dayCompPax);
+        }
+        dayCompPax[compIdx] += passengers;
       }
     }
 
@@ -750,6 +820,10 @@ export function computeClearcutMetrics(
     pickupsByBlock[idx] += 1;
     pickupsPassengersByBlock[idx] += passengers;
     blockTripCounts[idx] += 1;
+    ensureCatBlock(pickupsByBlockByStatus, trip.status)[idx] += 1;
+    ensureCatBlock(pickupsByBlockByPassengerType, trip.passenger_type)[idx] += 1;
+    ensureCatDayBlock(pickupsByDayBlockByStatus, trip.status, tripDayKey)[idx] += 1;
+    ensureCatDayBlock(pickupsByDayBlockByPassengerType, trip.passenger_type, tripDayKey)[idx] += 1;
 
     let dayPickups = pickupsByDayBlock.get(tripDayKey);
     if (!dayPickups) {
@@ -897,10 +971,12 @@ export function computeClearcutMetrics(
   for (let i = 0; i < blocks.length; i += 1) {
     pickupsByBlock[i] = Math.round((pickupsByBlock[i] / dayCount) * 10) / 10;
     pickupsPassengersByBlock[i] = Math.round((pickupsPassengersByBlock[i] / dayCount) * 10) / 10;
-    // On-board = rolling sum of pickups (passengers) from current + previous blocks based on avg ride time
+    completedPickupsByBlock[i] = Math.round((completedPickupsByBlock[i] / dayCount) * 10) / 10;
+    completedPassengersByBlock[i] = Math.round((completedPassengersByBlock[i] / dayCount) * 10) / 10;
+    // On-board = rolling sum of completed pickups from current + previous blocks based on avg ride time
     let onBoardSum = 0;
     for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
-      onBoardSum += pickupsByBlock[i - k];
+      onBoardSum += completedPickupsByBlock[i - k];
     }
     onBoardByBlock[i] = Math.round(onBoardSum * 10) / 10;
     vehiclesByBlock[i] = Math.round((vehiclesByBlock[i] / dayCount) * 10) / 10;
@@ -925,6 +1001,48 @@ export function computeClearcutMetrics(
         : 0;
   }
 
+  // Average and derive onBoard/productivity per category
+  const onBoardByBlockByStatus: Record<string, number[]> = {};
+  const onBoardByBlockByPassengerType: Record<string, number[]> = {};
+  const productivityByBlockByStatus: Record<string, number[]> = {};
+  const productivityByBlockByPassengerType: Record<string, number[]> = {};
+
+  for (const [cat, arr] of Object.entries(pickupsByBlockByStatus)) {
+    const ob = Array.from({ length: blockCount }).fill(0) as number[];
+    const prod = Array.from({ length: blockCount }).fill(0) as number[];
+    const isCompleted = cat === 'completed';
+    for (let i = 0; i < blockCount; i++) {
+      arr[i] = Math.round((arr[i] / dayCount) * 10) / 10;
+      if (isCompleted) {
+        let sum = 0;
+        for (let k = 0; k <= lookBackBlocks && i - k >= 0; k++) sum += arr[i - k];
+        ob[i] = Math.round(sum * 10) / 10;
+      }
+      const vh = (vehiclesByBlock[i] * blockSizeMinutes) / 60;
+      prod[i] = vh > 0 ? Math.round((arr[i] / vh) * 100) / 100 : 0;
+    }
+    onBoardByBlockByStatus[cat] = ob;
+    productivityByBlockByStatus[cat] = prod;
+  }
+  for (const [cat, arr] of Object.entries(pickupsByBlockByPassengerType)) {
+    const ob = Array.from({ length: blockCount }).fill(0) as number[];
+    const prod = Array.from({ length: blockCount }).fill(0) as number[];
+    const compArr = completedPickupsByBlockByPassengerType[cat];
+    for (let i = 0; i < blockCount; i++) {
+      arr[i] = Math.round((arr[i] / dayCount) * 10) / 10;
+      if (compArr) {
+        compArr[i] = Math.round((compArr[i] / dayCount) * 10) / 10;
+        let sum = 0;
+        for (let k = 0; k <= lookBackBlocks && i - k >= 0; k++) sum += compArr[i - k];
+        ob[i] = Math.round(sum * 10) / 10;
+      }
+      const vh = (vehiclesByBlock[i] * blockSizeMinutes) / 60;
+      prod[i] = vh > 0 ? Math.round((arr[i] / vh) * 100) / 100 : 0;
+    }
+    onBoardByBlockByPassengerType[cat] = ob;
+    productivityByBlockByPassengerType[cat] = prod;
+  }
+
   // Compute max-per-block across individual days
   const maxPickupsByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   const maxOnBoardByBlock = Array.from({ length: blockCount }).fill(0) as number[];
@@ -937,10 +1055,12 @@ export function computeClearcutMetrics(
         maxPickupsByBlock[i] = dayPickups[i];
       }
     }
+  }
+  for (const [, dayCompleted] of completedPickupsByDayBlock) {
     for (let i = 0; i < blockCount; i += 1) {
       let onBoardSum = 0;
       for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
-        onBoardSum += dayPickups[i - k];
+        onBoardSum += dayCompleted[i - k];
       }
       if (onBoardSum > maxOnBoardByBlock[i]) {
         maxOnBoardByBlock[i] = onBoardSum;
@@ -964,12 +1084,55 @@ export function computeClearcutMetrics(
     }
   }
 
-  // Passenger-based on-board for cards (separate from trip-count chart)
+  // Max-per-block per category across individual days
+  const maxPickupsByBlockByStatus: Record<string, number[]> = {};
+  const maxPickupsByBlockByPassengerType: Record<string, number[]> = {};
+  const maxOnBoardByBlockByStatus: Record<string, number[]> = {};
+  const maxOnBoardByBlockByPassengerType: Record<string, number[]> = {};
+
+  for (const [cat, dayMap] of Object.entries(pickupsByDayBlockByStatus)) {
+    const maxArr = Array.from({ length: blockCount }).fill(0) as number[];
+    for (const [, dayArr] of dayMap) {
+      for (let i = 0; i < blockCount; i++) { if (dayArr[i] > maxArr[i]) maxArr[i] = dayArr[i]; }
+    }
+    maxPickupsByBlockByStatus[cat] = maxArr;
+  }
+  for (const [cat, dayMap] of Object.entries(pickupsByDayBlockByPassengerType)) {
+    const maxArr = Array.from({ length: blockCount }).fill(0) as number[];
+    for (const [, dayArr] of dayMap) {
+      for (let i = 0; i < blockCount; i++) { if (dayArr[i] > maxArr[i]) maxArr[i] = dayArr[i]; }
+    }
+    maxPickupsByBlockByPassengerType[cat] = maxArr;
+  }
+  for (const [cat, dayMap] of Object.entries(completedPickupsByDayBlockByStatus)) {
+    const maxArr = Array.from({ length: blockCount }).fill(0) as number[];
+    for (const [, dayArr] of dayMap) {
+      for (let i = 0; i < blockCount; i++) {
+        let sum = 0;
+        for (let k = 0; k <= lookBackBlocks && i - k >= 0; k++) sum += dayArr[i - k];
+        if (sum > maxArr[i]) maxArr[i] = sum;
+      }
+    }
+    maxOnBoardByBlockByStatus[cat] = maxArr;
+  }
+  for (const [cat, dayMap] of Object.entries(completedPickupsByDayBlockByPassengerType)) {
+    const maxArr = Array.from({ length: blockCount }).fill(0) as number[];
+    for (const [, dayArr] of dayMap) {
+      for (let i = 0; i < blockCount; i++) {
+        let sum = 0;
+        for (let k = 0; k <= lookBackBlocks && i - k >= 0; k++) sum += dayArr[i - k];
+        if (sum > maxArr[i]) maxArr[i] = sum;
+      }
+    }
+    maxOnBoardByBlockByPassengerType[cat] = maxArr;
+  }
+
+  // Passenger-based on-board for cards — only completed trips
   const onBoardPassengersByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   for (let i = 0; i < blockCount; i += 1) {
     let sum = 0;
     for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
-      sum += pickupsPassengersByBlock[i - k];
+      sum += completedPassengersByBlock[i - k];
     }
     onBoardPassengersByBlock[i] = Math.round(sum * 10) / 10;
   }
@@ -977,7 +1140,7 @@ export function computeClearcutMetrics(
 
   let maxPeakOnBoardPassengers = 0;
   let maxOnBoardPeakDate: string | null = null;
-  for (const [dk, dayPassengers] of passengersByDayBlock) {
+  for (const [dk, dayPassengers] of completedPassengersByDayBlock) {
     for (let i = 0; i < blockCount; i += 1) {
       let sum = 0;
       for (let k = 0; k <= lookBackBlocks && i - k >= 0; k += 1) {
@@ -1264,5 +1427,15 @@ export function computeClearcutMetrics(
     yardStartTrips,
     yardEndTrips,
     derivedServiceWindow,
+    pickupsByBlockByStatus,
+    pickupsByBlockByPassengerType,
+    onBoardByBlockByStatus,
+    onBoardByBlockByPassengerType,
+    productivityByBlockByStatus,
+    productivityByBlockByPassengerType,
+    maxPickupsByBlockByStatus,
+    maxPickupsByBlockByPassengerType,
+    maxOnBoardByBlockByStatus,
+    maxOnBoardByBlockByPassengerType,
   };
 }

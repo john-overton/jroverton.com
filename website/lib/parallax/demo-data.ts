@@ -53,8 +53,10 @@ export const DEMO_CONFIG = {
   passengerTypeExtraLargePct: 0.10,
 
   // Trip status distribution (must sum to 1.0)
-  statusCompletedPct: 0.92,
+  statusCompletedPct: 0.82,
   statusNoShowPct: 0.08,
+  statusCancelledPct: 0.06,
+  statusLateCancelPct: 0.04,
 
   // Dwell times (minutes at pickup)
   dwellTimeAmbulatoryMin: 1,
@@ -313,6 +315,17 @@ export function buildDemoTripsAndRoutes(): {
       depot_lon: String(d.lon),
     }));
 
+    // Build zones based on geographic quadrants
+    const allLats = [...locations.residential, ...locations.destinations].map((l) => l.lat);
+    const allLons = [...locations.residential, ...locations.destinations].map((l) => l.lon);
+    const midLat = (Math.min(...allLats) + Math.max(...allLats)) / 2;
+    const midLon = (Math.min(...allLons) + Math.max(...allLons)) / 2;
+    function pickZone(lat: number, lon: number): string {
+      const ns = lat >= midLat ? 'North' : 'South';
+      const ew = lon >= midLon ? 'East' : 'West';
+      return rand() < 0.6 ? ns : ew;
+    }
+
     // Build address pools
     const pickupPool = buildPickupPool(locations.residential, locations.destinations);
     const dropoffPool = buildDropoffPool(locations.residential, locations.destinations);
@@ -435,6 +448,7 @@ export function buildDemoTripsAndRoutes(): {
           depot_lon: depotRow.depot_lon,
           distance_to_first_pick: null,
           distance_from_last_drop: null,
+          zone: pickZone(depot.lat, depot.lon),
         };
 
         routes.push(route);
@@ -507,7 +521,11 @@ export function buildDemoTripsAndRoutes(): {
 
           // Determine trip status
           const statusRoll = rand();
-          const status: string = statusRoll < C.statusCompletedPct ? 'completed' : 'no-show';
+          let status: string;
+          if (statusRoll < C.statusCompletedPct) status = 'completed';
+          else if (statusRoll < C.statusCompletedPct + C.statusNoShowPct) status = 'no-show';
+          else if (statusRoll < C.statusCompletedPct + C.statusNoShowPct + C.statusCancelledPct) status = 'cancelled';
+          else status = 'late-cancel';
 
           // Compute haversine distance and estimated ride time
           const straightDistance = haversineDistanceMiles(
@@ -586,8 +604,11 @@ export function buildDemoTripsAndRoutes(): {
           pickupArriveMinute = clamp(pickupArriveMinute, serviceStartMinutes, serviceEndMinutes - 5);
           pickupArriveTime = fmtDate(atDayMinutes(dayDate, pickupArriveMinute));
 
-          if (status === 'no-show') {
-            // No-show: only pickup_arrive is populated
+          if (status === 'cancelled') {
+            // Cancelled: no actual times at all
+            pickupArriveTime = null;
+          } else if (status === 'no-show' || status === 'late-cancel') {
+            // No-show / late-cancel: only pickup_arrive is populated
           } else {
             // Pickup leave = arrive + average dwell
             const pickupLeaveMinute = clamp(
@@ -670,6 +691,7 @@ export function buildDemoTripsAndRoutes(): {
             passenger_count: String(passengerCount),
             pick_odometer: String(Math.round(pickOdometer)),
             drop_odometer: String(Math.round(dropOdometer)),
+            zone: pickZone(pickup.lat, pickup.lon),
           });
           tripSequence += 1;
 
@@ -765,6 +787,7 @@ export function buildDemoTripsAndRoutes(): {
               passenger_count: '1',
               pick_odometer: String(Math.round(pickOdometerB)),
               drop_odometer: String(Math.round(dropOdometerB)),
+              zone: pickZone(pickupB.lat, pickupB.lon),
             });
             tripSequence += 1;
           }

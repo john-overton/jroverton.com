@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { ClearcutMetrics } from '@/lib/parallax/metrics';
 
-import { DemandCompositeChart, HeatStrip, MetricCard, SectionCard } from './shared';
+import { type BreakoutMode, DemandCompositeChart, HeatStrip, MetricCard, SectionCard } from './shared';
 
 interface DemandTabProps {
   metrics: ClearcutMetrics;
@@ -12,6 +12,7 @@ interface DemandTabProps {
 
 export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) {
   const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
+  const [breakoutMode, setBreakoutMode] = useState<BreakoutMode>('total');
 
   return (
     <>
@@ -43,15 +44,31 @@ export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) 
           <div className="text-xs text-cc-text-muted">
             Pickups and onboard demand are shown by {intervalMinutes}-minute block with vehicles on road as a line overlay.
           </div>
-          <div className="flex gap-1 text-xs shrink-0 ml-3">
-            <button
-              className={`px-2 py-0.5 rounded ${demandMode === 'max' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-              onClick={() => setDemandMode('max')}
-            >Max</button>
-            <button
-              className={`px-2 py-0.5 rounded ${demandMode === 'avg' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-              onClick={() => setDemandMode('avg')}
-            >Avg</button>
+          <div className="flex items-center gap-3 shrink-0 ml-3">
+            <div className="flex gap-1 text-xs">
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'total' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('total')}
+              >Total</button>
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'byStatus' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('byStatus')}
+              >By Status</button>
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'byPassengerType' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('byPassengerType')}
+              >By Mode</button>
+            </div>
+            <div className="flex gap-1 text-xs">
+              <button
+                className={`px-2 py-0.5 rounded ${demandMode === 'max' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setDemandMode('max')}
+              >Max</button>
+              <button
+                className={`px-2 py-0.5 rounded ${demandMode === 'avg' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setDemandMode('avg')}
+              >Avg</button>
+            </div>
           </div>
         </div>
         <DemandCompositeChart
@@ -65,6 +82,35 @@ export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) 
           maxOnBreak={metrics.maxVehiclesOnBreakByBlock}
           blocks={metrics.blocks}
           mode={demandMode}
+          breakoutMode={breakoutMode}
+          pickupsByCategory={
+            breakoutMode === 'byStatus'
+              ? metrics.pickupsByBlockByStatus
+              : breakoutMode === 'byPassengerType'
+              ? metrics.pickupsByBlockByPassengerType
+              : undefined
+          }
+          onBoardByCategory={
+            breakoutMode === 'byStatus'
+              ? metrics.onBoardByBlockByStatus
+              : breakoutMode === 'byPassengerType'
+              ? metrics.onBoardByBlockByPassengerType
+              : undefined
+          }
+          maxPickupsByCategory={
+            breakoutMode === 'byStatus'
+              ? metrics.maxPickupsByBlockByStatus
+              : breakoutMode === 'byPassengerType'
+              ? metrics.maxPickupsByBlockByPassengerType
+              : undefined
+          }
+          maxOnBoardByCategory={
+            breakoutMode === 'byStatus'
+              ? metrics.maxOnBoardByBlockByStatus
+              : breakoutMode === 'byPassengerType'
+              ? metrics.maxOnBoardByBlockByPassengerType
+              : undefined
+          }
         />
       </SectionCard>
       <SectionCard title="Deadhead Intensity (empty-time heatmap)">

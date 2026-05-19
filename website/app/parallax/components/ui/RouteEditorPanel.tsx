@@ -578,6 +578,7 @@ export default function RouteEditorPanel({
                   <TableRow>
                     <TableHead className="min-w-[120px]">Route Name</TableHead>
                     {depots.length > 0 && <TableHead className="min-w-[100px]">Depot</TableHead>}
+                    <TableHead className="min-w-[80px]">Zone</TableHead>
                     <TableHead className="min-w-[90px]">Start</TableHead>
                     <TableHead className="min-w-[90px]">End</TableHead>
                     <TableHead className="min-w-[70px]">Service Hrs</TableHead>
@@ -614,6 +615,14 @@ export default function RouteEditorPanel({
                         </Select>
                       </TableCell>
                     )}
+                    <TableCell>
+                      <Input
+                        value={draftNewRoute.route_area ?? ''}
+                        className="h-7 text-xs"
+                        placeholder="Zone"
+                        onChange={(e) => updateDraft('route_area', e.target.value || null)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Input
                         type="time"
@@ -765,6 +774,7 @@ export default function RouteEditorPanel({
             <TableRow>
               <SortableHead column="new_route_name" label="Route Name" className="min-w-[120px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               {depots.length > 0 && <TableHead className="min-w-[100px]">Depot</TableHead>}
+              <TableHead className="min-w-[80px]">Zone</TableHead>
               <SortableHead column="split_number" label="Split" className="min-w-[50px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <SortableHead column="start_time" label="Start" className="min-w-[90px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <SortableHead column="end_time" label="End" className="min-w-[90px]" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -800,7 +810,7 @@ export default function RouteEditorPanel({
           <TableBody>
             {sortedNewRoutes.length === 0 && (
               <TableRow>
-                <TableCell colSpan={breaksExpanded ? 9 : 8} className="text-cc-text-muted">
+                <TableCell colSpan={breaksExpanded ? 10 : 9} className="text-cc-text-muted">
                   {newRouteDayFilter !== 'all'
                     ? `No routes for ${newRouteDayFilter}. Add a route or copy from an imported day.`
                     : 'No routes defined. Add a route or copy from an imported day.'}
@@ -840,6 +850,15 @@ export default function RouteEditorPanel({
                       </Select>
                     </TableCell>
                   )}
+                  <TableCell>
+                    <Input
+                      value={newRoute.route_area ?? ''}
+                      disabled={disabled}
+                      className="h-7 text-xs"
+                      placeholder="Zone"
+                      onChange={(e) => updateNewRoute(newRoute.new_route_id, 'route_area', e.target.value || null)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-cc-text-muted">

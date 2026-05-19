@@ -43,6 +43,7 @@ const TRIP_COLUMNS = [
   'passenger_count',
   'pick_odometer',
   'drop_odometer',
+  'zone',
 ] as const;
 
 const ROUTE_COLUMNS = [
@@ -62,6 +63,7 @@ const ROUTE_COLUMNS = [
   'depot_lon',
   'distance_to_first_pick',
   'distance_from_last_drop',
+  'zone',
 ] as const;
 
 const NEW_ROUTE_COLUMNS = [
@@ -287,6 +289,26 @@ function ensureSettingsIsDemoColumn(db: Database.Database): void {
   }
 }
 
+function ensureTripZoneColumn(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('trips')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('zone')) {
+    db.exec('ALTER TABLE trips ADD COLUMN zone TEXT;');
+  }
+}
+
+function ensureRouteZoneColumn(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('routes')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('zone')) {
+    db.exec('ALTER TABLE routes ADD COLUMN zone TEXT;');
+  }
+}
+
 function normalizePassengerType(value: string | null | undefined): TripRow['passenger_type'] {
   if (value && PASSENGER_TYPES.has(value as TripRow['passenger_type'])) {
     return value as TripRow['passenger_type'];
@@ -315,6 +337,8 @@ function openSessionDb(editToken: string): Database.Database {
   ensureDepotsTable(db);
   ensureBidResultColumn(db);
   ensureSettingsIsDemoColumn(db);
+  ensureTripZoneColumn(db);
+  ensureRouteZoneColumn(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
   db.prepare('INSERT OR IGNORE INTO optimization (id) VALUES (1)').run();
   return db;

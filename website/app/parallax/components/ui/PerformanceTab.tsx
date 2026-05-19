@@ -24,7 +24,7 @@ import type { ClearcutMetrics, ComputeMetricsOptions, PerRouteMetrics } from '@/
 import { computeClearcutMetrics, computePerRouteMetrics } from '@/lib/parallax/metrics';
 import type { RouteRow, SessionState, TripRow } from '@/lib/parallax/types';
 
-import { MetricCard, PerformanceCompositeChart, SectionCard } from './shared';
+import { type BreakoutMode, MetricCard, PerformanceCompositeChart, SectionCard } from './shared';
 
 // ── Sortable column header ────────────────────────────────────────────
 
@@ -137,6 +137,7 @@ export default function PerformanceTab({
   }, [routes]);
 
   const [selectedRouteName, setSelectedRouteName] = useState('all');
+  const [breakoutMode, setBreakoutMode] = useState<BreakoutMode>('total');
 
   useEffect(() => {
     if (selectedRouteName !== 'all' && !uniqueRouteNames.includes(selectedRouteName)) {
@@ -255,27 +256,51 @@ export default function PerformanceTab({
           <div className="text-xs text-cc-text-muted">
             Productivity shown as bars (left axis). Pickup and dropoff OTP shown as lines (right axis, %).
           </div>
-          {uniqueRouteNames.length > 1 && (
-            <Select value={selectedRouteName} onValueChange={setSelectedRouteName}>
-              <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] ml-3 shrink-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Routes</SelectItem>
-                {uniqueRouteNames.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <div className="flex gap-1 text-xs">
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'total' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('total')}
+              >Total</button>
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'byStatus' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('byStatus')}
+              >By Status</button>
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'byPassengerType' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('byPassengerType')}
+              >By Mode</button>
+            </div>
+            {uniqueRouteNames.length > 1 && (
+              <Select value={selectedRouteName} onValueChange={setSelectedRouteName}>
+                <SelectTrigger className="h-7 text-xs w-auto min-w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Routes</SelectItem>
+                  {uniqueRouteNames.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
         <PerformanceCompositeChart
           productivity={displayMetrics.productivityByBlock}
           pickupOtp={displayMetrics.pickupOtpByBlock}
           dropoffOtp={displayMetrics.dropoffOtpByBlock}
           blocks={displayMetrics.blocks}
+          breakoutMode={breakoutMode}
+          productivityByCategory={
+            breakoutMode === 'byStatus'
+              ? displayMetrics.productivityByBlockByStatus
+              : breakoutMode === 'byPassengerType'
+              ? displayMetrics.productivityByBlockByPassengerType
+              : undefined
+          }
         />
       </SectionCard>
 

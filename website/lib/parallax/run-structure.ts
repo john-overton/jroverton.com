@@ -4,6 +4,7 @@ import type { RouteRow } from './types';
 export interface CurrentRunCutRow {
   routeName: string;
   depotAddress: string | null;
+  zone: string | null;
   shiftStart: string;
   shiftEnd: string;
   durationHours: number;
@@ -144,6 +145,7 @@ export function buildRunCutForDate(
     rows.push({
       routeName: name,
       depotAddress: route.depot_address ?? null,
+      zone: route.zone ?? null,
       shiftStart: formatMinutes(startMin),
       shiftEnd: formatMinutes(endMin),
       durationHours: Math.round(((endMin - startMin) / 60) * 10) / 10,
@@ -234,6 +236,7 @@ export function buildCurrentRunCut(
     rows.push({
       routeName,
       depotAddress: null,
+      zone: null,
       shiftStart: formatMinutes(roundedStart),
       shiftEnd: formatMinutes(roundedEnd),
       durationHours: Math.round(((roundedEnd - roundedStart) / 60) * 10) / 10,

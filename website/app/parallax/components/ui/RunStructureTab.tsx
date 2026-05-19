@@ -18,7 +18,7 @@ import HelpPanel from './HelpPanel';
 import ImportedRoutesPanel from './ImportedRoutesPanel';
 import RouteEditorPanel from './RouteEditorPanel';
 import ShiftBidsPanel from './ShiftBidsPanel';
-import { ALL_SERVICE_DAYS, SERVICE_DAY_TO_DOW, RunStructureChart, SectionCard, parseClockToMinutes, formatMinutesToClock, parseServiceDays } from './shared';
+import { type BreakoutMode, ALL_SERVICE_DAYS, SERVICE_DAY_TO_DOW, RunStructureChart, SectionCard, parseClockToMinutes, formatMinutesToClock, parseServiceDays } from './shared';
 
 function dateToMinutesOfDay(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
@@ -80,6 +80,7 @@ export default function RunStructureTab({
   onBidResultChange,
 }: RunStructureTabProps) {
   const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
+  const [breakoutMode, setBreakoutMode] = useState<BreakoutMode>('total');
   const [subTab, setSubTab] = useState<'imported' | 'bids' | 'runeditor' | 'help'>('runeditor');
   const [localNewRoutes, setLocalNewRoutes] = useState<NewRouteRow[]>(newRoutes);
   const [selectedRunCutDate, setSelectedRunCutDate] = useState<string | null>(null);
@@ -494,7 +495,7 @@ export default function RunStructureTab({
         split_number: 0,
         depot: (route.depot_address ? addressToDepotId.get(route.depot_address) : null) ?? null,
         service_days: serviceDaysJson,
-        route_area: null,
+        route_area: route.zone ?? null,
         start_time: formatMinutesToClock(startMin),
         end_time: formatMinutesToClock(endMin),
         platform_hours: '0',
@@ -592,7 +593,7 @@ export default function RunStructureTab({
       split_number: 0,
       depot: matchedDepotId,
       service_days: serviceDaysJson,
-      route_area: null,
+      route_area: matchedRoute?.zone ?? null,
       start_time: formatMinutesToClock(startMin),
       end_time: formatMinutesToClock(endMin),
       platform_hours: '0',
@@ -621,15 +622,31 @@ export default function RunStructureTab({
           <div className="text-xs text-cc-text-muted">
             Demand shown as bars. Current routes (solid line) and new routes (dashed line) as overlays.
           </div>
-          <div className="flex gap-1 text-xs shrink-0 ml-3">
-            <button
-              className={`px-2 py-0.5 rounded ${demandMode === 'max' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-              onClick={() => setDemandMode('max')}
-            >Max</button>
-            <button
-              className={`px-2 py-0.5 rounded ${demandMode === 'avg' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-              onClick={() => setDemandMode('avg')}
-            >Avg</button>
+          <div className="flex items-center gap-3 shrink-0 ml-3">
+            <div className="flex gap-1 text-xs">
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'total' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('total')}
+              >Total</button>
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'byStatus' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('byStatus')}
+              >By Status</button>
+              <button
+                className={`px-2 py-0.5 rounded ${breakoutMode === 'byPassengerType' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setBreakoutMode('byPassengerType')}
+              >By Mode</button>
+            </div>
+            <div className="flex gap-1 text-xs">
+              <button
+                className={`px-2 py-0.5 rounded ${demandMode === 'max' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setDemandMode('max')}
+              >Max</button>
+              <button
+                className={`px-2 py-0.5 rounded ${demandMode === 'avg' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setDemandMode('avg')}
+              >Avg</button>
+            </div>
           </div>
         </div>
         <RunStructureChart
@@ -646,6 +663,21 @@ export default function RunStructureTab({
             const d = new Date(selectedRunCutDate + 'T00:00:00');
             return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
           })() : undefined}
+          breakoutMode={breakoutMode}
+          pickupsByCategory={
+            breakoutMode === 'byStatus'
+              ? (demandMode === 'max' ? metrics.maxPickupsByBlockByStatus : metrics.pickupsByBlockByStatus)
+              : breakoutMode === 'byPassengerType'
+              ? (demandMode === 'max' ? metrics.maxPickupsByBlockByPassengerType : metrics.pickupsByBlockByPassengerType)
+              : undefined
+          }
+          onBoardByCategory={
+            breakoutMode === 'byStatus'
+              ? (demandMode === 'max' ? metrics.maxOnBoardByBlockByStatus : metrics.onBoardByBlockByStatus)
+              : breakoutMode === 'byPassengerType'
+              ? (demandMode === 'max' ? metrics.maxOnBoardByBlockByPassengerType : metrics.onBoardByBlockByPassengerType)
+              : undefined
+          }
         />
       </SectionCard>
 

@@ -97,6 +97,9 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [dayMode, setDayMode] = useState<'dow' | 'specific'>('dow');
   const [specificDate, setSpecificDate] = useState<string | null>(null);
   const [selectedDepot, setSelectedDepot] = useState<string>('all');
+  const [selectedZones, setSelectedZones] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedPassengerTypes, setSelectedPassengerTypes] = useState<string[]>([]);
   const [copiedLink, setCopiedLink] = useState<'readonly' | 'edit' | null>(null);
 
   const readonlyView = mode === 'readonly';
@@ -206,14 +209,19 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       selectedDays: dayMode === 'dow' ? selectedDayIds : undefined,
       specificDate: dayMode === 'specific' && specificDate ? specificDate : undefined,
       selectedRouteIds: depotFilteredRouteIds,
+      selectedZones: selectedZones.length > 0 ? selectedZones : undefined,
+      selectedStatuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
+      selectedPassengerTypes: selectedPassengerTypes.length > 0 ? selectedPassengerTypes : undefined,
     }),
-    [dayMode, selectedDayIds, specificDate, depotFilteredRouteIds],
+    [dayMode, selectedDayIds, specificDate, depotFilteredRouteIds, selectedZones, selectedStatuses, selectedPassengerTypes],
   );
   const filteredRoutes = useMemo(() => {
     if (!ready) return [];
     const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;
+    const zoneSet = selectedZones.length > 0 ? new Set(selectedZones) : null;
     return ready.state.routes.filter((route) => {
       if (depotRouteIdSet && !depotRouteIdSet.has(route.route_id)) return false;
+      if (zoneSet && (!route.zone || !zoneSet.has(route.zone))) return false;
       const t = parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time);
       if (!t) return false;
       if (metricsOptions.specificDate) {
@@ -227,13 +235,21 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
       return true;
     });
-  }, [ready, metricsOptions, depotFilteredRouteIds]);
+  }, [ready, metricsOptions, depotFilteredRouteIds, selectedZones]);
   const filteredTrips = useMemo(() => {
     if (!ready) return [];
     const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;
-    if (!depotRouteIdSet) return ready.state.trips;
-    return ready.state.trips.filter((trip) => depotRouteIdSet.has(trip.route_id));
-  }, [ready, depotFilteredRouteIds]);
+    const zoneSet = selectedZones.length > 0 ? new Set(selectedZones) : null;
+    const statusSet = selectedStatuses.length > 0 ? new Set(selectedStatuses) : null;
+    const ptSet = selectedPassengerTypes.length > 0 ? new Set(selectedPassengerTypes) : null;
+    return ready.state.trips.filter((trip) => {
+      if (depotRouteIdSet && !depotRouteIdSet.has(trip.route_id)) return false;
+      if (zoneSet && (!trip.zone || !zoneSet.has(trip.zone))) return false;
+      if (statusSet && !statusSet.has(trip.status)) return false;
+      if (ptSet && !ptSet.has(trip.passenger_type)) return false;
+      return true;
+    });
+  }, [ready, depotFilteredRouteIds, selectedZones, selectedStatuses, selectedPassengerTypes]);
   const metrics = useMemo(
     () =>
       ready
@@ -266,6 +282,29 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     const depot = ready?.state.depots.find((d) => d.depot_id === selectedDepot);
     return depot?.depot_name ?? selectedDepot;
   }, [selectedDepot, ready]);
+
+  const availableZones = useMemo(() => {
+    if (!ready) return [];
+    const zones = new Set<string>();
+    for (const t of ready.state.trips) { if (t.zone) zones.add(t.zone); }
+    for (const r of ready.state.routes) { if (r.zone) zones.add(r.zone); }
+    for (const nr of ready.state.new_routes) { if (nr.route_area) zones.add(nr.route_area); }
+    return [...zones].sort();
+  }, [ready]);
+
+  const availableStatuses = useMemo(() => {
+    if (!ready) return [];
+    const statuses = new Set<string>();
+    for (const t of ready.state.trips) { if (t.status) statuses.add(t.status); }
+    return [...statuses].sort();
+  }, [ready]);
+
+  const availablePassengerTypes = useMemo(() => {
+    if (!ready) return [];
+    const types = new Set<string>();
+    for (const t of ready.state.trips) { if (t.passenger_type) types.add(t.passenger_type); }
+    return [...types].sort();
+  }, [ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -730,52 +769,57 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             specificDate={specificDate}
             timeStartLabel={allTimeBlocks[timeStartIndex]?.label ?? '--'}
             timeEndLabel={allTimeBlocks[timeEndIndex]?.label ?? '--'}
+            zoneSummary={selectedZones.length > 0 ? selectedZones.join(', ') : undefined}
+            statusSummary={selectedStatuses.length > 0 ? selectedStatuses.join(', ') : undefined}
+            passengerTypeSummary={selectedPassengerTypes.length > 0 ? selectedPassengerTypes.join(', ') : undefined}
           >
-            {/* Filter controls grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1px_1fr_1px_1fr_1px_1fr] gap-4">
-              {/* Column 1: Interval */}
-              <div>
-                <div className="text-xs text-cc-text-muted mb-1">Interval</div>
-                <div className="flex gap-1 text-xs">
-                  {([15, 30, 60] as const).map((mins) => (
-                    <button
-                      key={mins}
-                      className={`px-2 py-0.5 rounded ${intervalMinutes === mins ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
-                      onClick={() => setIntervalMinutes(mins)}
-                    >{mins}m</button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="hidden lg:block bg-cc-border" />
-              {/* Column 2: Depot */}
-              <div>
-                <div className="text-xs text-cc-text-muted mb-1">Depot</div>
-                <Select value={selectedDepot} onValueChange={setSelectedDepot} disabled={routeLinkedDepots.length <= 1}>
-                  <SelectTrigger className="w-auto min-w-[140px] h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Depots</SelectItem>
-                    {routeLinkedDepots.map((d) => (
-                      <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+            {/* Filter controls — vertical stacked layout */}
+            <div className="space-y-3">
+              {/* Row 1: Interval + Depot */}
+              <div className="flex flex-wrap gap-6">
+                <div>
+                  <div className="text-sm font-medium text-cc-text mb-1.5">Interval</div>
+                  <div className="flex gap-1">
+                    {([15, 30, 60] as const).map((mins) => (
+                      <button
+                        key={mins}
+                        className={`px-2 py-0.5 text-xs rounded ${intervalMinutes === mins ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                        onClick={() => setIntervalMinutes(mins)}
+                      >{mins}m</button>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                </div>
+                {routeLinkedDepots.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium text-cc-text mb-1.5">Depot</div>
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        className={`px-2 py-0.5 text-xs rounded ${selectedDepot === 'all' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                        onClick={() => setSelectedDepot('all')}
+                      >All</button>
+                      {routeLinkedDepots.map((d) => (
+                        <button
+                          key={d.depot_id}
+                          className={`px-2 py-0.5 text-xs rounded ${selectedDepot === d.depot_id ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                          onClick={() => setSelectedDepot(selectedDepot === d.depot_id ? 'all' : d.depot_id)}
+                        >{d.depot_name}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="hidden lg:block bg-cc-border" />
-              {/* Column 3: Day Selection */}
-              <div>
-                <div className="flex items-center gap-1 mb-1.5">
-                  <div className="text-xs text-cc-text-muted mr-1">Days</div>
-                  <div className="flex gap-1 text-xs">
+              {/* Row 2: Days */}
+              <div className="border-t border-cc-border pt-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="text-sm font-medium text-cc-text">Days</div>
+                  <div className="flex gap-1">
                     <button
-                      className={`px-2 py-0.5 rounded ${dayMode === 'dow' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                      className={`px-2 py-0.5 text-xs rounded ${dayMode === 'dow' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
                       onClick={() => setDayMode('dow')}
                     >Day of Week</button>
                     <button
-                      className={`px-2 py-0.5 rounded ${dayMode === 'specific' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                      className={`px-2 py-0.5 text-xs rounded ${dayMode === 'specific' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
                       onClick={() => {
                         setDayMode('specific');
                         if (!specificDate && availableDates.length > 0) {
@@ -786,10 +830,10 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                   </div>
                 </div>
                 {dayMode === 'dow' ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-1 mb-1.5 text-xs">
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-1">
                       <button
-                        className={`px-2 py-0.5 rounded ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                        className={`px-2 py-0.5 text-xs rounded ${selectedWeekdayDays.length === WEEKDAY_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
                         onClick={() =>
                           setSelectedWeekdayDays((prev) =>
                             prev.length === WEEKDAY_DAY_IDS.length ? [] : [...WEEKDAY_DAY_IDS],
@@ -799,14 +843,14 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                       {WEEKDAY_DAY_IDS.map((day) => (
                         <button
                           key={`weekday-pill-${day}`}
-                          className={`px-2 py-0.5 rounded ${selectedWeekdayDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                          className={`px-2 py-0.5 text-xs rounded ${selectedWeekdayDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
                           onClick={() => toggleWeekday(day)}
                         >{DAY_LABELS[day]}</button>
                       ))}
                     </div>
-                    <div className="flex flex-wrap items-center gap-1 text-xs">
+                    <div className="flex flex-wrap items-center gap-1">
                       <button
-                        className={`px-2 py-0.5 rounded ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                        className={`px-2 py-0.5 text-xs rounded ${selectedWeekendDays.length === WEEKEND_DAY_IDS.length ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
                         onClick={() =>
                           setSelectedWeekendDays((prev) =>
                             prev.length === WEEKEND_DAY_IDS.length ? [] : [...WEEKEND_DAY_IDS],
@@ -816,12 +860,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                       {WEEKEND_DAY_IDS.map((day) => (
                         <button
                           key={`weekend-pill-${day}`}
-                          className={`px-2 py-0.5 rounded ${selectedWeekendDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                          className={`px-2 py-0.5 text-xs rounded ${selectedWeekendDays.includes(day) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
                           onClick={() => toggleWeekend(day)}
                         >{DAY_LABELS[day]}</button>
                       ))}
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <Select
                     value={specificDate ?? ''}
@@ -844,10 +888,72 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 )}
               </div>
 
-              <div className="hidden lg:block bg-cc-border" />
-              {/* Column 4: Time Range */}
-              <div>
-                <div className="text-xs text-cc-text-muted mb-1">Time Range</div>
+              {/* Row 3: Trip filters — Status, Passenger Type, Zone */}
+              {(availableStatuses.length > 0 || availablePassengerTypes.length > 0 || availableZones.length > 0) && (
+                <div className="border-t border-cc-border pt-3 flex flex-wrap gap-6">
+                  {availableStatuses.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-cc-text mb-1.5">Trip Status</div>
+                      <div className="flex flex-wrap gap-1">
+                        {availableStatuses.map((s) => (
+                          <button
+                            key={s}
+                            className={`px-2 py-0.5 text-xs rounded ${selectedStatuses.includes(s) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                            onClick={() => setSelectedStatuses((prev) =>
+                              prev.includes(s) ? prev.filter((v) => v !== s) : [...prev, s]
+                            )}
+                          >{s}</button>
+                        ))}
+                        {selectedStatuses.length > 0 && (
+                          <button className="px-2 py-0.5 text-xs rounded text-cc-text-muted underline" onClick={() => setSelectedStatuses([])}>Clear</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {availablePassengerTypes.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-cc-text mb-1.5">Passenger Type</div>
+                      <div className="flex flex-wrap gap-1">
+                        {availablePassengerTypes.map((pt) => (
+                          <button
+                            key={pt}
+                            className={`px-2 py-0.5 text-xs rounded ${selectedPassengerTypes.includes(pt) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                            onClick={() => setSelectedPassengerTypes((prev) =>
+                              prev.includes(pt) ? prev.filter((p) => p !== pt) : [...prev, pt]
+                            )}
+                          >{pt}</button>
+                        ))}
+                        {selectedPassengerTypes.length > 0 && (
+                          <button className="px-2 py-0.5 text-xs rounded text-cc-text-muted underline" onClick={() => setSelectedPassengerTypes([])}>Clear</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {availableZones.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-cc-text mb-1.5">Zone</div>
+                      <div className="flex flex-wrap gap-1">
+                        {availableZones.map((zone) => (
+                          <button
+                            key={zone}
+                            className={`px-2 py-0.5 text-xs rounded ${selectedZones.includes(zone) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                            onClick={() => setSelectedZones((prev) =>
+                              prev.includes(zone) ? prev.filter((z) => z !== zone) : [...prev, zone]
+                            )}
+                          >{zone}</button>
+                        ))}
+                        {selectedZones.length > 0 && (
+                          <button className="px-2 py-0.5 text-xs rounded text-cc-text-muted underline" onClick={() => setSelectedZones([])}>Clear</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Row 4: Time Range — always at bottom */}
+              <div className="border-t border-cc-border pt-3">
+                <div className="text-sm font-medium text-cc-text mb-2">Time Range</div>
                 <div
                   ref={timeRangeTrackRef}
                   style={{ position: 'relative', height: 30 }}
@@ -935,7 +1041,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                     }}
                   />
                 </div>
-                <div className="flex justify-between text-[11px] text-cc-text-muted mt-1">
+                <div className="flex justify-between text-xs text-cc-text-muted mt-1">
                   <span>Start: {allTimeBlocks[timeStartIndex]?.label ?? '--'}</span>
                   <span>End: {allTimeBlocks[timeEndIndex]?.label ?? '--'}</span>
                 </div>
