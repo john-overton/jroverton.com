@@ -525,7 +525,7 @@ export default function RouteEditorPanel({
           </div>
           {depots.length > 0 && (
             <Select value={depotFilter} onValueChange={onDepotFilterChange}>
-              <SelectTrigger size="sm" className="w-auto min-w-[100px]">
+              <SelectTrigger className="h-7 py-1 text-xs w-auto min-w-[100px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -611,7 +611,7 @@ export default function RouteEditorPanel({
                           value={draftNewRoute.depot ?? 'none'}
                           onValueChange={(v) => updateDraft('depot', v === 'none' ? null : v)}
                         >
-                          <SelectTrigger size="sm">
+                          <SelectTrigger className="h-7 py-1 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -629,7 +629,7 @@ export default function RouteEditorPanel({
                           value={draftNewRoute.vehicle_type_id ?? 'none'}
                           onValueChange={(v) => updateDraft('vehicle_type_id', v === 'none' ? null : v)}
                         >
-                          <SelectTrigger size="sm">
+                          <SelectTrigger className="h-7 py-1 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
