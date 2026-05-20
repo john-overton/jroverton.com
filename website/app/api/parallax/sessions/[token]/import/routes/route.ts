@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 
+import { matchVehicleTypesForRoutes } from '@/lib/parallax/depot-utils';
 import { ApiError, handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
@@ -8,7 +9,7 @@ import {
 } from '@/lib/parallax/http';
 import { parseRoutesFile } from '@/lib/parallax/import-validators';
 import { updateSessionCounts } from '@/lib/parallax/registry-db';
-import { countRoutes, countTrips, recalculateServiceWindow, replaceRoutes, saveSessionState } from '@/lib/parallax/session-db';
+import { countRoutes, countTrips, listVehicleTypes, recalculateServiceWindow, replaceRoutes, saveSessionState } from '@/lib/parallax/session-db';
 
 export const runtime = 'nodejs';
 
@@ -33,8 +34,21 @@ export async function POST(
     requireAuthorizedSessionAccess(request, session, 'edit');
 
     const fileBuffer = await readUploadedFile(request);
-    const { rows: routes, skipped } = parseRoutesFile(fileBuffer);
-    replaceRoutes(token, routes);
+    const { rows: routes, skipped, vehicleTypeMap, routeVehicleTypeNames } = parseRoutesFile(fileBuffer);
+
+    const existingVehicleTypes = listVehicleTypes(token);
+    const { updatedRoutes, newVehicleTypes } = matchVehicleTypesForRoutes(
+      routes,
+      existingVehicleTypes,
+      vehicleTypeMap,
+      routeVehicleTypeNames,
+    );
+
+    if (newVehicleTypes.length > 0) {
+      saveSessionState(token, { vehicle_types: [...existingVehicleTypes, ...newVehicleTypes] });
+    }
+
+    replaceRoutes(token, updatedRoutes);
     saveSessionState(token, { settings: { is_demo: 0 } });
     recalculateServiceWindow(token);
 

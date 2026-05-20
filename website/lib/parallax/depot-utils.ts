@@ -1,5 +1,31 @@
 import type { DepotRow, NewRouteRow, RouteRow, VehicleTypeRow } from './types';
 
+export function resolveVehicleTypes(
+  existingVehicleTypes: VehicleTypeRow[],
+  vehicleTypeMap: Map<string, string[]>,
+): { nameToId: Map<string, string>; newVehicleTypes: VehicleTypeRow[] } {
+  const nameToId = new Map<string, string>();
+  for (const vt of existingVehicleTypes) {
+    nameToId.set(vt.vehicle_type_name.toLowerCase(), vt.vehicle_type_id);
+  }
+
+  const newVehicleTypes: VehicleTypeRow[] = [];
+  for (const [lowerName, modes] of vehicleTypeMap) {
+    if (!nameToId.has(lowerName)) {
+      const vtId = crypto.randomUUID();
+      const displayName = lowerName.charAt(0).toUpperCase() + lowerName.slice(1);
+      newVehicleTypes.push({
+        vehicle_type_id: vtId,
+        vehicle_type_name: displayName,
+        supported_modes: JSON.stringify(modes),
+      });
+      nameToId.set(lowerName, vtId);
+    }
+  }
+
+  return { nameToId, newVehicleTypes };
+}
+
 export function generateDepotName(address: string): string {
   const trimmed = address.trim();
   // Strip leading house number (digits, optional dash/slash/space)
@@ -129,24 +155,7 @@ export function matchVehicleTypesForNewRoutes(
     return { updatedNewRoutes: newRoutes, newVehicleTypes: [] };
   }
 
-  const nameToId = new Map<string, string>();
-  for (const vt of existingVehicleTypes) {
-    nameToId.set(vt.vehicle_type_name.toLowerCase(), vt.vehicle_type_id);
-  }
-
-  const newVehicleTypes: VehicleTypeRow[] = [];
-  for (const [lowerName, modes] of vehicleTypeMap) {
-    if (!nameToId.has(lowerName)) {
-      const vtId = crypto.randomUUID();
-      const displayName = lowerName.charAt(0).toUpperCase() + lowerName.slice(1);
-      newVehicleTypes.push({
-        vehicle_type_id: vtId,
-        vehicle_type_name: displayName,
-        supported_modes: JSON.stringify(modes),
-      });
-      nameToId.set(lowerName, vtId);
-    }
-  }
+  const { nameToId, newVehicleTypes } = resolveVehicleTypes(existingVehicleTypes, vehicleTypeMap);
 
   const updatedNewRoutes = newRoutes.map((nr) => {
     const vtName = routeVehicleTypeNames.get(nr.new_route_id);
@@ -156,4 +165,26 @@ export function matchVehicleTypesForNewRoutes(
   });
 
   return { updatedNewRoutes, newVehicleTypes };
+}
+
+export function matchVehicleTypesForRoutes(
+  routes: RouteRow[],
+  existingVehicleTypes: VehicleTypeRow[],
+  vehicleTypeMap: Map<string, string[]>,
+  routeVehicleTypeNames: Map<string, string>,
+): { updatedRoutes: RouteRow[]; newVehicleTypes: VehicleTypeRow[] } {
+  if (vehicleTypeMap.size === 0) {
+    return { updatedRoutes: routes, newVehicleTypes: [] };
+  }
+
+  const { nameToId, newVehicleTypes } = resolveVehicleTypes(existingVehicleTypes, vehicleTypeMap);
+
+  const updatedRoutes = routes.map((r) => {
+    const vtName = routeVehicleTypeNames.get(r.route_id);
+    if (!vtName) return r;
+    const vtId = nameToId.get(vtName);
+    return vtId ? { ...r, vehicle_type_id: vtId } : r;
+  });
+
+  return { updatedRoutes, newVehicleTypes };
 }

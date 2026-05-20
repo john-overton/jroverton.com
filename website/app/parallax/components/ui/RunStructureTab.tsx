@@ -61,6 +61,8 @@ interface RunStructureTabProps {
   onNewRoutesChange: (newRoutes: NewRouteRow[]) => void;
   depots: DepotRow[];
   vehicleTypes: VehicleTypeRow[];
+  selectedVehicleTypes: string[];
+  availableZones: string[];
   filteredRoutes: RouteRow[];
   savedBidResult: BidResult | null;
   onBidResultChange: (result: BidResult | null) => void;
@@ -78,6 +80,8 @@ export default function RunStructureTab({
   onNewRoutesChange,
   depots,
   vehicleTypes,
+  selectedVehicleTypes,
+  availableZones,
   savedBidResult,
   onBidResultChange,
 }: RunStructureTabProps) {
@@ -210,8 +214,12 @@ export default function RunStructureTab({
     if (depotFilter !== 'all') {
       result = result.filter((newRoute) => newRoute.depot === depotFilter);
     }
+    if (selectedVehicleTypes.length > 0) {
+      const vtSet = new Set(selectedVehicleTypes);
+      result = result.filter((newRoute) => newRoute.vehicle_type_id && vtSet.has(newRoute.vehicle_type_id));
+    }
     return result;
-  }, [localNewRoutes, newRouteDayFilter, depotFilter]);
+  }, [localNewRoutes, newRouteDayFilter, depotFilter, selectedVehicleTypes]);
 
   // ── Vehicle counts by block ───────────────────────────────────────
 
@@ -508,7 +516,7 @@ export default function RunStructureTab({
         break_2_end: break2End,
         break_3_start: null,
         break_3_end: null,
-        vehicle_type_id: null,
+        vehicle_type_id: route.vehicle_type_id ?? null,
       };
       const svcHrs = computeServiceHours(newRouteRow);
       newRouteRow.platform_hours = String(svcHrs);
@@ -607,7 +615,7 @@ export default function RunStructureTab({
       break_2_end: b2End,
       break_3_start: null,
       break_3_end: null,
-      vehicle_type_id: null,
+      vehicle_type_id: matchedRoute?.vehicle_type_id ?? null,
     };
     const svcHrs = computeServiceHours(copiedNewRoute);
     copiedNewRoute.platform_hours = String(svcHrs);
@@ -710,6 +718,7 @@ export default function RunStructureTab({
           <ImportedRoutesPanel
             currentRunCut={currentRunCut}
             depots={depots}
+            vehicleTypes={vehicleTypes}
             readonlyView={readonlyView}
             intervalMinutes={intervalMinutes}
             avgDailyTrips={avgDailyTrips}
@@ -745,6 +754,7 @@ export default function RunStructureTab({
             filteredNewRoutes={filteredNewRoutes}
             depots={depots}
             vehicleTypes={vehicleTypes}
+            availableZones={availableZones}
             readonlyView={readonlyView}
             newRouteDayFilter={newRouteDayFilter}
             onNewRouteDayFilterChange={setNewRouteDayFilter}

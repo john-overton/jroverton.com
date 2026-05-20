@@ -77,6 +77,7 @@ export interface RouteRow {
   distance_to_first_pick: string | null;
   distance_from_last_drop: string | null;
   zone: string | null;
+  vehicle_type_id: string | null;
 }
 
 export type ServiceDay = 'M' | 'T' | 'W' | 'Th' | 'F' | 'Sa' | 'Su';

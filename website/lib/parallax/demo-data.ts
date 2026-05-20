@@ -5,7 +5,7 @@ import {
   listCities,
   withDemoLocationsDb,
 } from './demo-locations-db';
-import type { DepotRow, RouteRow, TripRow, VehicleTypeRow } from './types';
+import type { DepotRow, RouteRow, TripRow } from './types';
 
 // ── Demo Data Generation Configuration ──────────────────────────────
 
@@ -269,7 +269,8 @@ export function buildDemoTripsAndRoutes(): {
   trips: TripRow[];
   routes: RouteRow[];
   depots: DepotRow[];
-  vehicleTypes: VehicleTypeRow[];
+  vehicleTypeMap: Map<string, string[]>;
+  routeVehicleTypeNames: Map<string, string>;
 } {
   if (!demoLocationsDbExists()) {
     throw new Error(
@@ -316,24 +317,17 @@ export function buildDemoTripsAndRoutes(): {
       depot_lon: String(d.lon),
     }));
 
-    // Build vehicle types
-    const vehicleTypes: VehicleTypeRow[] = [
-      {
-        vehicle_type_id: 'VT-SEDAN',
-        vehicle_type_name: 'Sedan',
-        supported_modes: JSON.stringify(['ambulatory']),
-      },
-      {
-        vehicle_type_id: 'VT-PASSENGER-VAN',
-        vehicle_type_name: 'Passenger Van',
-        supported_modes: JSON.stringify(['ambulatory', 'wheelchair']),
-      },
-      {
-        vehicle_type_id: 'VT-CUTAWAY',
-        vehicle_type_name: 'Cutaway',
-        supported_modes: JSON.stringify(['ambulatory', 'wheelchair', 'extra_large']),
-      },
+    // Vehicle type definitions (resolved during save, same as route import)
+    const demoVehicleTypeDefs = [
+      { name: 'sedan', modes: ['ambulatory'] },
+      { name: 'passenger van', modes: ['ambulatory', 'wheelchair'] },
+      { name: 'cutaway', modes: ['ambulatory', 'wheelchair', 'extra_large'] },
     ];
+    const vehicleTypeMap = new Map<string, string[]>();
+    for (const def of demoVehicleTypeDefs) {
+      vehicleTypeMap.set(def.name, def.modes);
+    }
+    const routeVehicleTypeNames = new Map<string, string>();
 
     // Build zones based on geographic quadrants
     const allLats = [...locations.residential, ...locations.destinations].map((l) => l.lat);
@@ -469,9 +463,11 @@ export function buildDemoTripsAndRoutes(): {
           distance_to_first_pick: null,
           distance_from_last_drop: null,
           zone: pickZone(depot.lat, depot.lon),
+          vehicle_type_id: null,
         };
 
         routes.push(route);
+        routeVehicleTypeNames.set(routeId, demoVehicleTypeDefs[routeIndex % demoVehicleTypeDefs.length].name);
         dayRouteStates.push({
           route,
           depotLat: depot.lat,
@@ -839,6 +835,6 @@ export function buildDemoTripsAndRoutes(): {
       }
     }
 
-    return { trips, routes, depots, vehicleTypes };
+    return { trips, routes, depots, vehicleTypeMap, routeVehicleTypeNames };
   });
 }

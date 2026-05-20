@@ -28,6 +28,7 @@ interface FilterBarProps {
   zoneSummary?: string;
   statusSummary?: string;
   passengerTypeSummary?: string;
+  vehicleTypeSummary?: string;
   children: ReactNode;
 }
 
@@ -43,6 +44,7 @@ export default function FilterBar({
   zoneSummary,
   statusSummary,
   passengerTypeSummary,
+  vehicleTypeSummary,
   children,
 }: FilterBarProps) {
   const [expanded, setExpanded] = useState(false);
@@ -134,6 +136,12 @@ export default function FilterBar({
             <>
               <span className="text-cc-text-muted mx-1.5">&middot;</span>
               {passengerTypeSummary}
+            </>
+          )}
+          {vehicleTypeSummary && (
+            <>
+              <span className="text-cc-text-muted mx-1.5">&middot;</span>
+              {vehicleTypeSummary}
             </>
           )}
         </span>

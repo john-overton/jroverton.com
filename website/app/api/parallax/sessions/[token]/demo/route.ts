@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 import { buildDemoTripsAndRoutes } from '@/lib/parallax/demo-data';
+import { matchVehicleTypesForRoutes } from '@/lib/parallax/depot-utils';
 import { handleRouteError, successResponse } from '@/lib/parallax/errors';
 import {
   assertValidTokenParam,
@@ -23,11 +24,18 @@ export async function POST(
 
     const payload = buildDemoTripsAndRoutes();
 
+    const { updatedRoutes, newVehicleTypes } = matchVehicleTypesForRoutes(
+      payload.routes,
+      [],
+      payload.vehicleTypeMap,
+      payload.routeVehicleTypeNames,
+    );
+
     const updatedSession = saveAndRefreshSessionState(session, {
       trips: payload.trips,
-      routes: payload.routes,
+      routes: updatedRoutes,
       depots: payload.depots,
-      vehicle_types: payload.vehicleTypes,
+      vehicle_types: newVehicleTypes,
       settings: { is_demo: 1 },
     });
 

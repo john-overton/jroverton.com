@@ -65,6 +65,7 @@ const ROUTE_COLUMNS = [
   'distance_to_first_pick',
   'distance_from_last_drop',
   'zone',
+  'vehicle_type_id',
 ] as const;
 
 const NEW_ROUTE_COLUMNS = [
@@ -173,6 +174,9 @@ function ensureRouteColumns(db: Database.Database): void {
   }
   if (!existing.has('distance_from_last_drop')) {
     db.exec('ALTER TABLE routes ADD COLUMN distance_from_last_drop TEXT;');
+  }
+  if (!existing.has('vehicle_type_id')) {
+    db.exec('ALTER TABLE routes ADD COLUMN vehicle_type_id TEXT;');
   }
 }
 

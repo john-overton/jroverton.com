@@ -459,6 +459,7 @@ function coerceRouteDefaults(value: Partial<RouteRow>): RouteRow {
     distance_to_first_pick: value.distance_to_first_pick ?? null,
     distance_from_last_drop: value.distance_from_last_drop ?? null,
     zone: value.zone ?? null,
+    vehicle_type_id: value.vehicle_type_id ?? null,
   };
 }
 

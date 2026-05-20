@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy,
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/parallax/components/shadcn/button';
+import { ComboboxInput } from '@/app/parallax/components/shadcn/combobox-input';
 import { Input } from '@/app/parallax/components/shadcn/input';
 import {
   Select,
@@ -153,6 +154,7 @@ interface RouteEditorPanelProps {
   filteredNewRoutes: NewRouteRow[];
   depots: DepotRow[];
   vehicleTypes: VehicleTypeRow[];
+  availableZones: string[];
   readonlyView: boolean;
   newRouteDayFilter: ServiceDay | 'all';
   onNewRouteDayFilterChange: (filter: ServiceDay | 'all') => void;
@@ -175,6 +177,7 @@ export default function RouteEditorPanel({
   filteredNewRoutes,
   depots,
   vehicleTypes,
+  availableZones,
   readonlyView,
   newRouteDayFilter,
   onNewRouteDayFilterChange,
@@ -522,7 +525,7 @@ export default function RouteEditorPanel({
           </div>
           {depots.length > 0 && (
             <Select value={depotFilter} onValueChange={onDepotFilterChange}>
-              <SelectTrigger className="h-7 text-xs w-auto min-w-[100px]">
+              <SelectTrigger size="sm" className="w-auto min-w-[100px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -608,7 +611,7 @@ export default function RouteEditorPanel({
                           value={draftNewRoute.depot ?? 'none'}
                           onValueChange={(v) => updateDraft('depot', v === 'none' ? null : v)}
                         >
-                          <SelectTrigger className="h-7 text-xs">
+                          <SelectTrigger size="sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -626,7 +629,7 @@ export default function RouteEditorPanel({
                           value={draftNewRoute.vehicle_type_id ?? 'none'}
                           onValueChange={(v) => updateDraft('vehicle_type_id', v === 'none' ? null : v)}
                         >
-                          <SelectTrigger className="h-7 text-xs">
+                          <SelectTrigger size="sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -639,11 +642,12 @@ export default function RouteEditorPanel({
                       </TableCell>
                     )}
                     <TableCell>
-                      <Input
+                      <ComboboxInput
                         value={draftNewRoute.route_area ?? ''}
+                        options={availableZones}
                         className="h-7 text-xs"
                         placeholder="Zone"
-                        onChange={(e) => updateDraft('route_area', e.target.value || null)}
+                        onChange={(v) => updateDraft('route_area', v || null)}
                       />
                     </TableCell>
                     <TableCell>
@@ -894,12 +898,13 @@ export default function RouteEditorPanel({
                     </TableCell>
                   )}
                   <TableCell>
-                    <Input
+                    <ComboboxInput
                       value={newRoute.route_area ?? ''}
+                      options={availableZones}
                       disabled={disabled}
                       className="h-7 text-xs"
                       placeholder="Zone"
-                      onChange={(e) => updateNewRoute(newRoute.new_route_id, 'route_area', e.target.value || null)}
+                      onChange={(v) => updateNewRoute(newRoute.new_route_id, 'route_area', v || null)}
                     />
                   </TableCell>
                   <TableCell>

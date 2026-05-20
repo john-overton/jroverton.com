@@ -129,7 +129,8 @@ type TripDataColumnKey =
   | 'passenger_type'
   | 'passenger_count'
   | 'pick_odometer'
-  | 'drop_odometer';
+  | 'drop_odometer'
+  | 'zone';
 type RouteDataColumnKey =
   | 'route_id'
   | 'route_name'
@@ -145,7 +146,10 @@ type RouteDataColumnKey =
   | 'depot_lat'
   | 'depot_lon'
   | 'distance_to_first_pick'
-  | 'distance_from_last_drop';
+  | 'distance_from_last_drop'
+  | 'route_date'
+  | 'zone'
+  | 'vehicle_type_id';
 
 const TRIP_DATA_PAGE_SIZE = 10;
 const ROUTE_DATA_PAGE_SIZE = 10;
@@ -175,6 +179,7 @@ const TRIP_DATA_COLUMNS: Array<{
   { key: 'passenger_count', label: 'Passengers', getValue: (trip) => trip.passenger_count ?? '-' },
   { key: 'pick_odometer', label: 'Pick Odometer', getValue: (trip) => trip.pick_odometer ?? '-' },
   { key: 'drop_odometer', label: 'Drop Odometer', getValue: (trip) => trip.drop_odometer ?? '-' },
+  { key: 'zone', label: 'Zone', getValue: (trip) => trip.zone ?? '-' },
 ];
 
 const ROUTE_DATA_COLUMNS: Array<{
@@ -205,6 +210,9 @@ const ROUTE_DATA_COLUMNS: Array<{
   { key: 'depot_lon', label: 'Depot Lon', getValue: (route) => route.depot_lon ?? '-' },
   { key: 'distance_to_first_pick', label: 'Dist to 1st Pick', getValue: (route) => route.distance_to_first_pick ?? '-' },
   { key: 'distance_from_last_drop', label: 'Dist from Last Drop', getValue: (route) => route.distance_from_last_drop ?? '-' },
+  { key: 'route_date', label: 'Route Date', getValue: (route) => route.route_date ?? '-' },
+  { key: 'zone', label: 'Zone', getValue: (route) => route.zone ?? '-' },
+  { key: 'vehicle_type_id', label: 'Vehicle Type', getValue: (route) => route.vehicle_type_id ?? '-' },
 ];
 
 interface ImportTabProps {
@@ -297,6 +305,7 @@ export default function ImportTab({
     passenger_count: true,
     pick_odometer: true,
     drop_odometer: true,
+    zone: true,
   });
   const [routeVisibleColumns, setRouteVisibleColumns] = useState<Record<RouteDataColumnKey, boolean>>({
     route_id: true,
@@ -314,6 +323,9 @@ export default function ImportTab({
     depot_lon: true,
     distance_to_first_pick: true,
     distance_from_last_drop: true,
+    route_date: true,
+    zone: true,
+    vehicle_type_id: true,
   });
 
   // ── Debounced OTP settings ─────────────────────────────────────────
@@ -391,6 +403,12 @@ export default function ImportTab({
     };
   }, []);
 
+  const vehicleTypeNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const vt of vehicleTypes) map.set(vt.vehicle_type_id, vt.vehicle_type_name);
+    return map;
+  }, [vehicleTypes]);
+
   const passengerModes = useMemo(() => {
     const modes = new Set<string>();
     for (const t of state.trips) { if (t.passenger_type) modes.add(t.passenger_type); }
@@ -443,13 +461,14 @@ export default function ImportTab({
       '# DATETIME FORMAT: YYYY-MM-DD HH:MM:SS  |  DATE FORMAT: YYYY-MM-DD',
     ].join('\n');
     const routeSample = [
-      'route_id,route_date,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1_start,break1_end,break2_start,break2_end,depot_address,depot_lat,depot_lon,distance_to_first_pick,distance_from_last_drop',
-      'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 11:30:00,,,100 Depot Way,40.7128,-74.0060,3.2,4.5',
-      'ROUTE-002,2026-02-01,South Loop,2026-02-01 06:00:00,2026-02-01 14:00:00,,,,,,,200 Base Rd,40.7484,-73.9856,,',
+      'route_id,route_date,route_name,scheduled_start_time,scheduled_end_time,actual_start_time,actual_end_time,break1_start,break1_end,break2_start,break2_end,depot_address,depot_lat,depot_lon,distance_to_first_pick,distance_from_last_drop,vehicle_type,vehicle_person_types',
+      'ROUTE-001,2026-02-01,North Loop,2026-02-01 07:30:00,2026-02-01 17:00:00,2026-02-01 07:35:00,2026-02-01 16:55:00,2026-02-01 11:00:00,2026-02-01 11:30:00,,,100 Depot Way,40.7128,-74.0060,3.2,4.5,Cutaway,ambulatory;wheelchair;extra_large',
+      'ROUTE-002,2026-02-01,South Loop,2026-02-01 06:00:00,2026-02-01 14:00:00,,,,,,,200 Base Rd,40.7484,-73.9856,,,Sedan,ambulatory',
       '',
-      '# DATA TYPES: TEXT,DATE,TEXT,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,TEXT,DECIMAL,DECIMAL,DECIMAL,DECIMAL',
-      '# REQUIRED: yes,no,no,yes,yes,no,no,no,no,no,no,no,no,no,no,no',
+      '# DATA TYPES: TEXT,DATE,TEXT,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,TEXT,DECIMAL,DECIMAL,DECIMAL,DECIMAL,TEXT,TEXT (semicolon-separated)',
+      '# REQUIRED: yes,no,no,yes,yes,no,no,no,no,no,no,no,no,no,no,no,no,no',
       '# DATETIME FORMAT: YYYY-MM-DD HH:MM:SS  |  DATE FORMAT: YYYY-MM-DD',
+      '# VEHICLE_PERSON_TYPES VALUES: ambulatory | wheelchair | extra_large (semicolon-separated)',
     ].join('\n');
     const newRouteSample = [
       'new_route_name,start_time,end_time,service_days,depot_address,route_area,split_number,break_1_start,break_1_end,break_2_start,break_2_end,vehicle_type,vehicle_person_types',
@@ -856,7 +875,9 @@ export default function ImportTab({
                         <TableRow key={`route-view-${route.route_id}`}>
                           {activeRouteColumns.map((column) => (
                             <TableCell key={`route-row-${route.route_id}-${column.key}`}>
-                              {column.getValue(route) ?? '-'}
+                              {column.key === 'vehicle_type_id' && route.vehicle_type_id
+                                ? vehicleTypeNameMap.get(route.vehicle_type_id) ?? route.vehicle_type_id
+                                : column.getValue(route) ?? '-'}
                             </TableCell>
                           ))}
                         </TableRow>

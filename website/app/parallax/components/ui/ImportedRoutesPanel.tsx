@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/app/parallax/components/shadcn/table';
 import type { CurrentRunCutRow } from '@/lib/parallax/run-structure';
-import type { DepotRow, ServiceDay } from '@/lib/parallax/types';
+import type { DepotRow, ServiceDay, VehicleTypeRow } from '@/lib/parallax/types';
 
 import { ALL_SERVICE_DAYS, parseClockToMinutes } from './shared';
 
@@ -79,6 +79,7 @@ function parseClockFromLabel(label: string): number {
 interface ImportedRoutesPanelProps {
   currentRunCut: CurrentRunCutRow[];
   depots: DepotRow[];
+  vehicleTypes: VehicleTypeRow[];
   readonlyView: boolean;
   intervalMinutes: number;
   avgDailyTrips: number;
@@ -95,6 +96,7 @@ interface ImportedRoutesPanelProps {
 export default function ImportedRoutesPanel({
   currentRunCut,
   depots,
+  vehicleTypes,
   readonlyView,
   intervalMinutes,
   avgDailyTrips,
@@ -119,6 +121,12 @@ export default function ImportedRoutesPanel({
     }
     return map;
   }, [depots]);
+
+  const vehicleTypeNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const vt of vehicleTypes) map.set(vt.vehicle_type_id, vt.vehicle_type_name);
+    return map;
+  }, [vehicleTypes]);
 
   function toggleImportedSort(key: ImportedSortColumn) {
     if (importedSortKey === key) {
@@ -205,6 +213,7 @@ export default function ImportedRoutesPanel({
             <TableRow>
               <ImportedSortableHead column="routeName" label="Route" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
               {depots.length > 0 && <TableHead>Depot</TableHead>}
+              {vehicleTypes.length > 0 && <TableHead>Vehicle</TableHead>}
               <TableHead>Zone</TableHead>
               <ImportedSortableHead column="shiftStart" label="Shift Start" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
               <ImportedSortableHead column="shiftEnd" label="Shift End" sortKey={importedSortKey} sortDir={importedSortDir} onSort={toggleImportedSort} />
@@ -250,6 +259,11 @@ export default function ImportedRoutesPanel({
                 {depots.length > 0 && (
                   <TableCell className="text-xs text-cc-text-muted">
                     {row.depotAddress ? (depotAddressToName.get(row.depotAddress) ?? row.depotAddress) : '\u2014'}
+                  </TableCell>
+                )}
+                {vehicleTypes.length > 0 && (
+                  <TableCell className="text-xs text-cc-text-muted">
+                    {row.vehicleTypeId ? (vehicleTypeNameMap.get(row.vehicleTypeId) ?? row.vehicleTypeId) : '\u2014'}
                   </TableCell>
                 )}
                 <TableCell className="text-xs text-cc-text-muted">

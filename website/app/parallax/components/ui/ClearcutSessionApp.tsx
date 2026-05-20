@@ -100,6 +100,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedPassengerTypes, setSelectedPassengerTypes] = useState<string[]>([]);
+  const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<string[]>([]);
   const [copiedLink, setCopiedLink] = useState<'readonly' | 'edit' | null>(null);
 
   const readonlyView = mode === 'readonly';
@@ -304,6 +305,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     const types = new Set<string>();
     for (const t of ready.state.trips) { if (t.passenger_type) types.add(t.passenger_type); }
     return [...types].sort();
+  }, [ready]);
+
+  const availableVehicleTypes = useMemo(() => {
+    if (!ready) return [];
+    return ready.state.vehicle_types.map((vt) => ({ id: vt.vehicle_type_id, name: vt.vehicle_type_name }));
   }, [ready]);
 
   useEffect(() => {
@@ -781,6 +787,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             zoneSummary={selectedZones.length > 0 ? selectedZones.join(', ') : undefined}
             statusSummary={selectedStatuses.length > 0 ? selectedStatuses.join(', ') : undefined}
             passengerTypeSummary={selectedPassengerTypes.length > 0 ? selectedPassengerTypes.join(', ') : undefined}
+            vehicleTypeSummary={selectedVehicleTypes.length > 0 ? availableVehicleTypes.filter((vt) => selectedVehicleTypes.includes(vt.id)).map((vt) => vt.name).join(', ') : undefined}
           >
             {/* Filter controls — vertical stacked layout */}
             <div className="space-y-3">
@@ -897,8 +904,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                 )}
               </div>
 
-              {/* Row 3: Trip filters — Status, Passenger Type, Zone */}
-              {(availableStatuses.length > 0 || availablePassengerTypes.length > 0 || availableZones.length > 0) && (
+              {/* Row 3: Trip filters — Status, Passenger Type, Zone, Vehicle Type */}
+              {(availableStatuses.length > 0 || availablePassengerTypes.length > 0 || availableZones.length > 0 || availableVehicleTypes.length > 0) && (
                 <div className="border-t border-cc-border pt-3 flex flex-wrap gap-6">
                   {availableStatuses.length > 0 && (
                     <div>
@@ -953,6 +960,25 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
                         ))}
                         {selectedZones.length > 0 && (
                           <button className="px-2 py-0.5 text-xs rounded text-cc-text-muted underline" onClick={() => setSelectedZones([])}>Clear</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {availableVehicleTypes.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-cc-text mb-1.5">Vehicle Type</div>
+                      <div className="flex flex-wrap gap-1">
+                        {availableVehicleTypes.map((vt) => (
+                          <button
+                            key={vt.id}
+                            className={`px-2 py-0.5 text-xs rounded ${selectedVehicleTypes.includes(vt.id) ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                            onClick={() => setSelectedVehicleTypes((prev) =>
+                              prev.includes(vt.id) ? prev.filter((v) => v !== vt.id) : [...prev, vt.id]
+                            )}
+                          >{vt.name}</button>
+                        ))}
+                        {selectedVehicleTypes.length > 0 && (
+                          <button className="px-2 py-0.5 text-xs rounded text-cc-text-muted underline" onClick={() => setSelectedVehicleTypes([])}>Clear</button>
                         )}
                       </div>
                     </div>
@@ -1132,6 +1158,8 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onNewRoutesChange={onNewRoutesChange}
           depots={ready.state.depots}
           vehicleTypes={ready.state.vehicle_types}
+          selectedVehicleTypes={selectedVehicleTypes}
+          availableZones={availableZones}
           filteredRoutes={filteredRoutes}
           savedBidResult={ready.state.bid_result}
           onBidResultChange={onBidResultChange}

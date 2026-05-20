@@ -278,12 +278,19 @@ export function parseTripsFile(fileBuffer: Buffer): ParseResult<TripRow> {
   return { rows: trips, skipped };
 }
 
-export function parseRoutesFile(fileBuffer: Buffer): ParseResult<RouteRow> {
+export interface RouteParseResult extends ParseResult<RouteRow> {
+  vehicleTypeMap: Map<string, string[]>;
+  routeVehicleTypeNames: Map<string, string>;
+}
+
+export function parseRoutesFile(fileBuffer: Buffer): RouteParseResult {
   const rows = parseWorkbook(fileBuffer);
   assertColumnsExist(rows, ROUTE_REQUIRED_COLUMNS, 'Route file');
 
   const routes: RouteRow[] = [];
   const skipped: Array<{ row: number; reason: string }> = [];
+  const vehicleTypeMap = new Map<string, string[]>();
+  const routeVehicleTypeNames = new Map<string, string>();
 
   for (let index = 0; index < rows.length; index++) {
     const rowIndex = index + 2;
@@ -316,6 +323,19 @@ export function parseRoutesFile(fileBuffer: Buffer): ParseResult<RouteRow> {
       continue;
     }
 
+    const vehicleTypeName = getCellValue(row, 'vehicle_type')?.trim();
+    if (vehicleTypeName) {
+      routeVehicleTypeNames.set(routeId, vehicleTypeName.toLowerCase());
+      if (!vehicleTypeMap.has(vehicleTypeName.toLowerCase())) {
+        const defaultModes = ['ambulatory', 'wheelchair', 'extra_large'];
+        const modesRaw = getCellValue(row, 'vehicle_person_types');
+        const modes = modesRaw
+          ? modesRaw.split(';').map((m) => m.trim().toLowerCase()).filter(Boolean)
+          : [...defaultModes];
+        vehicleTypeMap.set(vehicleTypeName.toLowerCase(), modes.length > 0 ? modes : [...defaultModes]);
+      }
+    }
+
     routes.push({
       route_id: routeId,
       route_date: effectiveRouteDate,
@@ -334,10 +354,11 @@ export function parseRoutesFile(fileBuffer: Buffer): ParseResult<RouteRow> {
       distance_to_first_pick: getCellValue(row, 'distance_to_first_pick'),
       distance_from_last_drop: getCellValue(row, 'distance_from_last_drop'),
       zone: getCellValue(row, 'zone'),
+      vehicle_type_id: null,
     });
   }
 
-  return { rows: routes, skipped };
+  return { rows: routes, skipped, vehicleTypeMap, routeVehicleTypeNames };
 }
 
 // ── New Routes parser ─────────────────────────────────────────────────

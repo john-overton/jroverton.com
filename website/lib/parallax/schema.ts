@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS routes (
   depot_lon TEXT,
   distance_to_first_pick TEXT,
   distance_from_last_drop TEXT,
-  zone TEXT
+  zone TEXT,
+  vehicle_type_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (
