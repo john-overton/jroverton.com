@@ -213,16 +213,19 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       selectedZones: selectedZones.length > 0 ? selectedZones : undefined,
       selectedStatuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
       selectedPassengerTypes: selectedPassengerTypes.length > 0 ? selectedPassengerTypes : undefined,
+      selectedVehicleTypeIds: selectedVehicleTypes.length > 0 ? selectedVehicleTypes : undefined,
     }),
-    [dayMode, selectedDayIds, specificDate, depotFilteredRouteIds, selectedZones, selectedStatuses, selectedPassengerTypes],
+    [dayMode, selectedDayIds, specificDate, depotFilteredRouteIds, selectedZones, selectedStatuses, selectedPassengerTypes, selectedVehicleTypes],
   );
   const filteredRoutes = useMemo(() => {
     if (!ready) return [];
     const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;
     const zoneSet = selectedZones.length > 0 ? new Set(selectedZones) : null;
+    const vtSet = selectedVehicleTypes.length > 0 ? new Set(selectedVehicleTypes) : null;
     return ready.state.routes.filter((route) => {
       if (depotRouteIdSet && !depotRouteIdSet.has(route.route_id)) return false;
       if (zoneSet && (!route.zone || !zoneSet.has(route.zone))) return false;
+      if (vtSet && (!route.vehicle_type_id || !vtSet.has(route.vehicle_type_id))) return false;
       const t = parseDateTime(route.actual_start_time) ?? parseDateTime(route.scheduled_start_time);
       if (!t) return false;
       if (metricsOptions.specificDate) {
@@ -236,7 +239,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
       return true;
     });
-  }, [ready, metricsOptions, depotFilteredRouteIds, selectedZones]);
+  }, [ready, metricsOptions, depotFilteredRouteIds, selectedZones, selectedVehicleTypes]);
   const filteredTrips = useMemo(() => {
     if (!ready) return [];
     const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;

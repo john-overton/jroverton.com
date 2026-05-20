@@ -121,6 +121,7 @@ export interface ComputeMetricsOptions {
   selectedZones?: string[];
   selectedStatuses?: string[];
   selectedPassengerTypes?: string[];
+  selectedVehicleTypeIds?: string[];
 }
 
 function parseMinutes(value: string | null | undefined, fallback: number): number {
@@ -896,6 +897,9 @@ export function computeClearcutMetrics(
       continue;
     }
     if (options.selectedRouteIds?.length && !options.selectedRouteIds.includes(route.route_id)) {
+      continue;
+    }
+    if (options.selectedVehicleTypeIds?.length && !options.selectedVehicleTypeIds.includes(route.vehicle_type_id ?? '')) {
       continue;
     }
     const startM = dateToMinutes(start);
