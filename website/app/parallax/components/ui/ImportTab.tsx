@@ -1001,8 +1001,14 @@ function FlatFileImport({
   const [tripError, setTripError] = useState<string | null>(null);
   const [newRouteError, setNewRouteError] = useState<string | null>(null);
 
+  const MAX_UPLOAD_MB = 50;
+  const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
   function validateFile(file: File): { valid: true } | { valid: false; reason: string } {
     if (file.size === 0) return { valid: false, reason: 'File is empty (0 bytes).' };
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return { valid: false, reason: `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is ${MAX_UPLOAD_MB} MB.` };
+    }
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !['csv', 'xlsx', 'xls'].includes(ext)) {
       return { valid: false, reason: `Unsupported file type ".${ext ?? ''}". Use .csv, .xlsx, or .xls.` };
@@ -1112,7 +1118,7 @@ function FlatFileImport({
                 Browse
               </button>
               <div className="flex-1 flex items-center px-3 text-sm text-cc-text-muted truncate bg-cc-surface-1">
-                {routeFile ? <span className="text-cc-success truncate">{routeFile.name}</span> : 'No file selected — or drag & drop here'}
+                {routeFile ? <span className="text-cc-success truncate">{routeFile.name} ({(routeFile.size / 1024 / 1024).toFixed(1)} MB)</span> : 'No file selected — or drag & drop here'}
               </div>
             </div>
             {routeError && <div className="text-cc-danger text-[13px] mt-1.5">{routeError}</div>}
@@ -1162,7 +1168,7 @@ function FlatFileImport({
                 Browse
               </button>
               <div className="flex-1 flex items-center px-3 text-sm text-cc-text-muted truncate bg-cc-surface-1">
-                {tripFile ? <span className="text-cc-success truncate">{tripFile.name}</span> : 'No file selected — or drag & drop here'}
+                {tripFile ? <span className="text-cc-success truncate">{tripFile.name} ({(tripFile.size / 1024 / 1024).toFixed(1)} MB)</span> : 'No file selected — or drag & drop here'}
               </div>
             </div>
             {tripError && <div className="text-cc-danger text-[13px] mt-1.5">{tripError}</div>}
@@ -1212,7 +1218,7 @@ function FlatFileImport({
                 Browse
               </button>
               <div className="flex-1 flex items-center px-3 text-sm text-cc-text-muted truncate bg-cc-surface-1">
-                {newRouteFile ? <span className="text-cc-success truncate">{newRouteFile.name}</span> : 'No file selected — or drag & drop here'}
+                {newRouteFile ? <span className="text-cc-success truncate">{newRouteFile.name} ({(newRouteFile.size / 1024 / 1024).toFixed(1)} MB)</span> : 'No file selected — or drag & drop here'}
               </div>
             </div>
             {newRouteError && <div className="text-cc-danger text-[13px] mt-1.5">{newRouteError}</div>}
@@ -1227,6 +1233,11 @@ function FlatFileImport({
       >
         {importing ? 'Importing...' : 'Import Files'}
       </Button>
+      {importing && (
+        <div className="text-[13px] text-cc-text-muted mt-2 animate-pulse">
+          Uploading and processing files — this may take a moment for large files...
+        </div>
+      )}
       {!hasAnyFile && (
         <div className="text-[13px] text-cc-text-muted mt-2">
           {showOnly === 'new_routes'
