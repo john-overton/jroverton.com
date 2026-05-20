@@ -495,7 +495,7 @@ export function countRoutes(editToken: string): number {
 export function replaceTrips(editToken: string, trips: TripRow[]): void {
   withSessionDb(editToken, (db) => {
     const insertTrip = db.prepare(
-      `INSERT INTO trips (${TRIP_COLUMNS.join(',')})
+      `INSERT OR REPLACE INTO trips (${TRIP_COLUMNS.join(',')})
        VALUES (${TRIP_COLUMNS.map(() => '?').join(',')})`,
     );
     const transaction = db.transaction((rows: TripRow[]) => {
@@ -607,7 +607,7 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
 
       if (input.trips) {
         const insertTrip = db.prepare(
-          `INSERT INTO trips (${TRIP_COLUMNS.join(',')})
+          `INSERT OR REPLACE INTO trips (${TRIP_COLUMNS.join(',')})
            VALUES (${TRIP_COLUMNS.map(() => '?').join(',')})`,
         );
         db.prepare('DELETE FROM trips').run();
