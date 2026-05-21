@@ -390,6 +390,12 @@ export function DemandCompositeChart({
   onBoardByCategory,
   maxPickupsByCategory,
   maxOnBoardByCategory,
+  avgNzPickups,
+  avgNzOnBoard,
+  avgNzVehicles,
+  avgNzOnBreak,
+  avgNzPickupsByCategory,
+  avgNzOnBoardByCategory,
 }: {
   pickups: number[];
   onBoard: number[];
@@ -400,32 +406,43 @@ export function DemandCompositeChart({
   onBreak?: number[];
   maxOnBreak?: number[];
   blocks: Array<{ label: string }>;
-  mode?: 'avg' | 'max';
+  mode?: 'avg' | 'max' | 'avgNz';
   breakoutMode?: BreakoutMode;
   pickupsByCategory?: Record<string, number[]>;
   onBoardByCategory?: Record<string, number[]>;
   maxPickupsByCategory?: Record<string, number[]>;
   maxOnBoardByCategory?: Record<string, number[]>;
+  avgNzPickups?: number[];
+  avgNzOnBoard?: number[];
+  avgNzVehicles?: number[];
+  avgNzOnBreak?: number[];
+  avgNzPickupsByCategory?: Record<string, number[]>;
+  avgNzOnBoardByCategory?: Record<string, number[]>;
 }) {
   const { chartColors } = useClearcutTheme();
-  const activePickups = mode === 'max' && maxPickups ? maxPickups : pickups;
-  const activeOnBoard = mode === 'max' && maxOnBoard ? maxOnBoard : onBoard;
-  const activeVehicles = mode === 'max' && maxVehicles ? maxVehicles : vehicles;
-  const activeOnBreak = mode === 'max' && maxOnBreak ? maxOnBreak : (onBreak ?? []);
+  const activePickups = mode === 'max' && maxPickups ? maxPickups
+    : mode === 'avgNz' && avgNzPickups ? avgNzPickups : pickups;
+  const activeOnBoard = mode === 'max' && maxOnBoard ? maxOnBoard
+    : mode === 'avgNz' && avgNzOnBoard ? avgNzOnBoard : onBoard;
+  const activeVehicles = mode === 'max' && maxVehicles ? maxVehicles
+    : mode === 'avgNz' && avgNzVehicles ? avgNzVehicles : vehicles;
+  const activeOnBreak = mode === 'max' && maxOnBreak ? maxOnBreak
+    : mode === 'avgNz' && avgNzOnBreak ? avgNzOnBreak : (onBreak ?? []);
 
   const categoryKeys = useMemo(
     () => (breakoutMode !== 'total' && pickupsByCategory ? Object.keys(pickupsByCategory).sort() : []),
     [breakoutMode, pickupsByCategory],
   );
 
-  // Fix Y-axis to the max across both modes so the scale stays constant during transitions
+  // Fix Y-axis to the max across all modes so the scale stays constant during transitions
   const yMax = useMemo(() => {
     const allValues = [
       ...pickups, ...onBoard, ...vehicles,
       ...(maxPickups ?? []), ...(maxOnBoard ?? []), ...(maxVehicles ?? []),
+      ...(avgNzPickups ?? []), ...(avgNzOnBoard ?? []), ...(avgNzVehicles ?? []),
     ];
     return Math.ceil(Math.max(...allValues, 1));
-  }, [pickups, onBoard, vehicles, maxPickups, maxOnBoard, maxVehicles]);
+  }, [pickups, onBoard, vehicles, maxPickups, maxOnBoard, maxVehicles, avgNzPickups, avgNzOnBoard, avgNzVehicles]);
 
   const data = useMemo(
     () =>
@@ -440,15 +457,17 @@ export function DemandCompositeChart({
           point.onBoard = Math.round((activeOnBoard[index] ?? 0) * 10) / 10;
         } else {
           for (const cat of categoryKeys) {
-            const pickSrc = mode === 'max' && maxPickupsByCategory?.[cat] ? maxPickupsByCategory[cat] : pickupsByCategory![cat];
-            const obSrc = mode === 'max' && maxOnBoardByCategory?.[cat] ? maxOnBoardByCategory[cat] : onBoardByCategory?.[cat];
+            const pickSrc = mode === 'max' && maxPickupsByCategory?.[cat] ? maxPickupsByCategory[cat]
+              : mode === 'avgNz' && avgNzPickupsByCategory?.[cat] ? avgNzPickupsByCategory[cat] : pickupsByCategory![cat];
+            const obSrc = mode === 'max' && maxOnBoardByCategory?.[cat] ? maxOnBoardByCategory[cat]
+              : mode === 'avgNz' && avgNzOnBoardByCategory?.[cat] ? avgNzOnBoardByCategory[cat] : onBoardByCategory?.[cat];
             point[`pick_${cat}`] = Math.round((pickSrc?.[index] ?? 0) * 10) / 10;
             point[`ob_${cat}`] = Math.round((obSrc?.[index] ?? 0) * 10) / 10;
           }
         }
         return point;
       }),
-    [blocks, activeOnBoard, activePickups, activeVehicles, activeOnBreak, breakoutMode, pickupsByCategory, onBoardByCategory, maxPickupsByCategory, maxOnBoardByCategory, mode, categoryKeys],
+    [blocks, activeOnBoard, activePickups, activeVehicles, activeOnBreak, breakoutMode, pickupsByCategory, onBoardByCategory, maxPickupsByCategory, maxOnBoardByCategory, avgNzPickupsByCategory, avgNzOnBoardByCategory, mode, categoryKeys],
   );
 
   const nameMap = useMemo(() => {

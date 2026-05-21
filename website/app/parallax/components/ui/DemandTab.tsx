@@ -11,7 +11,7 @@ interface DemandTabProps {
 }
 
 export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) {
-  const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
+  const [demandMode, setDemandMode] = useState<'max' | 'avg' | 'avgNz'>('max');
   const [breakoutMode, setBreakoutMode] = useState<BreakoutMode>('total');
 
   return (
@@ -68,6 +68,10 @@ export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) 
                 className={`px-2 py-0.5 rounded ${demandMode === 'avg' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
                 onClick={() => setDemandMode('avg')}
               >Avg</button>
+              <button
+                className={`px-2 py-0.5 rounded ${demandMode === 'avgNz' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setDemandMode('avgNz')}
+              >Avg (Non-Zero)</button>
             </div>
           </div>
         </div>
@@ -109,6 +113,24 @@ export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) 
               ? metrics.maxOnBoardByBlockByStatus
               : breakoutMode === 'byPassengerType'
               ? metrics.maxOnBoardByBlockByPassengerType
+              : undefined
+          }
+          avgNzPickups={metrics.avgNzPickupsByBlock}
+          avgNzOnBoard={metrics.avgNzOnBoardByBlock}
+          avgNzVehicles={metrics.avgNzVehiclesByBlock}
+          avgNzOnBreak={metrics.avgNzVehiclesOnBreakByBlock}
+          avgNzPickupsByCategory={
+            breakoutMode === 'byStatus'
+              ? metrics.avgNzPickupsByBlockByStatus
+              : breakoutMode === 'byPassengerType'
+              ? metrics.avgNzPickupsByBlockByPassengerType
+              : undefined
+          }
+          avgNzOnBoardByCategory={
+            breakoutMode === 'byStatus'
+              ? metrics.avgNzOnBoardByBlockByStatus
+              : breakoutMode === 'byPassengerType'
+              ? metrics.avgNzOnBoardByBlockByPassengerType
               : undefined
           }
         />

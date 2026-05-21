@@ -85,7 +85,7 @@ export default function RunStructureTab({
   savedBidResult,
   onBidResultChange,
 }: RunStructureTabProps) {
-  const [demandMode, setDemandMode] = useState<'max' | 'avg'>('max');
+  const [demandMode, setDemandMode] = useState<'max' | 'avg' | 'avgNz'>('max');
   const [breakoutMode, setBreakoutMode] = useState<BreakoutMode>('total');
   const [subTab, setSubTab] = useState<'imported' | 'bids' | 'runeditor' | 'help'>('runeditor');
   const [localNewRoutes, setLocalNewRoutes] = useState<NewRouteRow[]>(newRoutes);
@@ -658,15 +658,19 @@ export default function RunStructureTab({
                 className={`px-2 py-0.5 rounded ${demandMode === 'avg' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
                 onClick={() => setDemandMode('avg')}
               >Avg</button>
+              <button
+                className={`px-2 py-0.5 rounded ${demandMode === 'avgNz' ? 'bg-cc-accent text-white' : 'bg-cc-surface-2 text-cc-text-muted'}`}
+                onClick={() => setDemandMode('avgNz')}
+              >Avg (Non-Zero)</button>
             </div>
           </div>
         </div>
         <RunStructureChart
-          pickups={demandMode === 'max' ? metrics.maxPickupsByBlock : metrics.pickupsByBlock}
-          onBoard={demandMode === 'max' ? metrics.maxOnBoardByBlock : metrics.onBoardByBlock}
+          pickups={demandMode === 'max' ? metrics.maxPickupsByBlock : demandMode === 'avgNz' ? metrics.avgNzPickupsByBlock : metrics.pickupsByBlock}
+          onBoard={demandMode === 'max' ? metrics.maxOnBoardByBlock : demandMode === 'avgNz' ? metrics.avgNzOnBoardByBlock : metrics.onBoardByBlock}
           currentVehicles={chartCurrentVehiclesByBlock}
           runVehicles={newRouteVehiclesByBlock}
-          crOnBreak={demandMode === 'max' ? metrics.maxVehiclesOnBreakByBlock : metrics.vehiclesOnBreakByBlock}
+          crOnBreak={demandMode === 'max' ? metrics.maxVehiclesOnBreakByBlock : demandMode === 'avgNz' ? metrics.avgNzVehiclesOnBreakByBlock : metrics.vehiclesOnBreakByBlock}
           nrOnBreak={nrOnBreakByBlock}
           blocks={metrics.blocks}
           importedDateVehicles={subTab === 'imported' && selectedRunCutDate ? importedDateVehiclesByBlock : undefined}
@@ -678,16 +682,16 @@ export default function RunStructureTab({
           breakoutMode={breakoutMode}
           pickupsByCategory={
             breakoutMode === 'byStatus'
-              ? (demandMode === 'max' ? metrics.maxPickupsByBlockByStatus : metrics.pickupsByBlockByStatus)
+              ? (demandMode === 'max' ? metrics.maxPickupsByBlockByStatus : demandMode === 'avgNz' ? metrics.avgNzPickupsByBlockByStatus : metrics.pickupsByBlockByStatus)
               : breakoutMode === 'byPassengerType'
-              ? (demandMode === 'max' ? metrics.maxPickupsByBlockByPassengerType : metrics.pickupsByBlockByPassengerType)
+              ? (demandMode === 'max' ? metrics.maxPickupsByBlockByPassengerType : demandMode === 'avgNz' ? metrics.avgNzPickupsByBlockByPassengerType : metrics.pickupsByBlockByPassengerType)
               : undefined
           }
           onBoardByCategory={
             breakoutMode === 'byStatus'
-              ? (demandMode === 'max' ? metrics.maxOnBoardByBlockByStatus : metrics.onBoardByBlockByStatus)
+              ? (demandMode === 'max' ? metrics.maxOnBoardByBlockByStatus : demandMode === 'avgNz' ? metrics.avgNzOnBoardByBlockByStatus : metrics.onBoardByBlockByStatus)
               : breakoutMode === 'byPassengerType'
-              ? (demandMode === 'max' ? metrics.maxOnBoardByBlockByPassengerType : metrics.onBoardByBlockByPassengerType)
+              ? (demandMode === 'max' ? metrics.maxOnBoardByBlockByPassengerType : demandMode === 'avgNz' ? metrics.avgNzOnBoardByBlockByPassengerType : metrics.onBoardByBlockByPassengerType)
               : undefined
           }
         />

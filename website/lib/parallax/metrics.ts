@@ -96,6 +96,14 @@ export interface ClearcutMetrics {
   maxPickupsByBlockByPassengerType: Record<string, number[]>;
   maxOnBoardByBlockByStatus: Record<string, number[]>;
   maxOnBoardByBlockByPassengerType: Record<string, number[]>;
+  avgNzPickupsByBlock: number[];
+  avgNzOnBoardByBlock: number[];
+  avgNzVehiclesByBlock: number[];
+  avgNzVehiclesOnBreakByBlock: number[];
+  avgNzPickupsByBlockByStatus: Record<string, number[]>;
+  avgNzPickupsByBlockByPassengerType: Record<string, number[]>;
+  avgNzOnBoardByBlockByStatus: Record<string, number[]>;
+  avgNzOnBoardByBlockByPassengerType: Record<string, number[]>;
 }
 
 export interface PerRouteMetrics {
@@ -1131,6 +1139,77 @@ export function computeClearcutMetrics(
     maxOnBoardByBlockByPassengerType[cat] = maxArr;
   }
 
+  // Non-zero averages: for each block, average only across days that had >0 in that block
+  function nonZeroAvgFromDayBlock(dayBlockMap: Map<string, number[]>, bc: number): number[] {
+    const result = Array.from({ length: bc }).fill(0) as number[];
+    for (let i = 0; i < bc; i++) {
+      let sum = 0, count = 0;
+      for (const [, dayArr] of dayBlockMap) {
+        if (dayArr[i] > 0) { sum += dayArr[i]; count++; }
+      }
+      result[i] = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+    }
+    return result;
+  }
+
+  const avgNzPickupsByBlock = nonZeroAvgFromDayBlock(pickupsByDayBlock, blockCount);
+  const avgNzVehiclesByBlock = nonZeroAvgFromDayBlock(vehiclesByDayBlock, blockCount);
+  const avgNzBreaksByBlock = nonZeroAvgFromDayBlock(breaksByDayBlock, blockCount);
+
+  // On-board non-zero avg: compute rolling sum per day, then average non-zero
+  const avgNzOnBoardByBlock = (() => {
+    const result = Array.from({ length: blockCount }).fill(0) as number[];
+    for (let i = 0; i < blockCount; i++) {
+      let sum = 0, count = 0;
+      for (const [, dayCompleted] of completedPickupsByDayBlock) {
+        let rollingSum = 0;
+        for (let k = 0; k <= lookBackBlocks && i - k >= 0; k++) rollingSum += dayCompleted[i - k];
+        if (rollingSum > 0) { sum += rollingSum; count++; }
+      }
+      result[i] = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+    }
+    return result;
+  })();
+
+  // Non-zero avg per category
+  const avgNzPickupsByBlockByStatus: Record<string, number[]> = {};
+  const avgNzPickupsByBlockByPassengerType: Record<string, number[]> = {};
+  const avgNzOnBoardByBlockByStatus: Record<string, number[]> = {};
+  const avgNzOnBoardByBlockByPassengerType: Record<string, number[]> = {};
+
+  for (const [cat, dayMap] of Object.entries(pickupsByDayBlockByStatus)) {
+    avgNzPickupsByBlockByStatus[cat] = nonZeroAvgFromDayBlock(dayMap, blockCount);
+  }
+  for (const [cat, dayMap] of Object.entries(pickupsByDayBlockByPassengerType)) {
+    avgNzPickupsByBlockByPassengerType[cat] = nonZeroAvgFromDayBlock(dayMap, blockCount);
+  }
+  for (const [cat, dayMap] of Object.entries(completedPickupsByDayBlockByStatus)) {
+    const result = Array.from({ length: blockCount }).fill(0) as number[];
+    for (let i = 0; i < blockCount; i++) {
+      let sum = 0, count = 0;
+      for (const [, dayArr] of dayMap) {
+        let rollingSum = 0;
+        for (let k = 0; k <= lookBackBlocks && i - k >= 0; k++) rollingSum += dayArr[i - k];
+        if (rollingSum > 0) { sum += rollingSum; count++; }
+      }
+      result[i] = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+    }
+    avgNzOnBoardByBlockByStatus[cat] = result;
+  }
+  for (const [cat, dayMap] of Object.entries(completedPickupsByDayBlockByPassengerType)) {
+    const result = Array.from({ length: blockCount }).fill(0) as number[];
+    for (let i = 0; i < blockCount; i++) {
+      let sum = 0, count = 0;
+      for (const [, dayArr] of dayMap) {
+        let rollingSum = 0;
+        for (let k = 0; k <= lookBackBlocks && i - k >= 0; k++) rollingSum += dayArr[i - k];
+        if (rollingSum > 0) { sum += rollingSum; count++; }
+      }
+      result[i] = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+    }
+    avgNzOnBoardByBlockByPassengerType[cat] = result;
+  }
+
   // Passenger-based on-board for cards — only completed trips
   const onBoardPassengersByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   for (let i = 0; i < blockCount; i += 1) {
@@ -1441,5 +1520,13 @@ export function computeClearcutMetrics(
     maxPickupsByBlockByPassengerType,
     maxOnBoardByBlockByStatus,
     maxOnBoardByBlockByPassengerType,
+    avgNzPickupsByBlock,
+    avgNzOnBoardByBlock,
+    avgNzVehiclesByBlock,
+    avgNzVehiclesOnBreakByBlock: avgNzBreaksByBlock,
+    avgNzPickupsByBlockByStatus,
+    avgNzPickupsByBlockByPassengerType,
+    avgNzOnBoardByBlockByStatus,
+    avgNzOnBoardByBlockByPassengerType,
   };
 }
