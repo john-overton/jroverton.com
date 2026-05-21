@@ -129,8 +129,6 @@ export default function RunStructureTab({
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
       const doSave = () => {
-        ownPersistRef.current = 2;
-
         const prevMap = new Map(prevNewRoutes.map((r) => [r.new_route_id, r]));
         const nextMap = new Map(nextNewRoutes.map((r) => [r.new_route_id, r]));
 
@@ -151,8 +149,13 @@ export default function RunStructureTab({
           && upsert.length + deleteIds.length > 0;
 
         if (isSmallDelta) {
+          // Delta: skip optimistic bounce only (1). If conflict, server
+          // response carries the full state and must flow through.
+          ownPersistRef.current = 1;
           onNewRoutesDelta(upsert, deleteIds);
         } else {
+          // Full replacement: skip both optimistic + server response bounces.
+          ownPersistRef.current = 2;
           onNewRoutesChange(nextNewRoutes);
         }
       };

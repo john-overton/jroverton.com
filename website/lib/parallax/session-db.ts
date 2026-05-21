@@ -886,11 +886,7 @@ export function applyNewRoutesDelta(
     const result = db.transaction(() => {
       const row = db.prepare('SELECT new_routes_version FROM settings WHERE id = 1').get() as { new_routes_version: number };
       const currentVersion = row.new_routes_version;
-
-      if (currentVersion !== delta.expected_version) {
-        const all = db.prepare('SELECT * FROM new_routes ORDER BY new_route_name, split_number').all() as NewRouteRow[];
-        return { conflict: true as const, version: currentVersion, all };
-      }
+      const hasConflict = currentVersion !== delta.expected_version;
 
       if (delta.delete_ids.length > 0) {
         const deleteSt = db.prepare('DELETE FROM new_routes WHERE new_route_id = ?');
@@ -911,6 +907,12 @@ export function applyNewRoutesDelta(
 
       db.prepare('UPDATE settings SET new_routes_version = new_routes_version + 1 WHERE id = 1').run();
       const updated = db.prepare('SELECT new_routes_version FROM settings WHERE id = 1').get() as { new_routes_version: number };
+
+      if (hasConflict) {
+        const all = db.prepare('SELECT * FROM new_routes ORDER BY new_route_name, split_number').all() as NewRouteRow[];
+        return { conflict: true as const, version: updated.new_routes_version, all };
+      }
+
       return { conflict: false as const, version: updated.new_routes_version };
     })();
 
