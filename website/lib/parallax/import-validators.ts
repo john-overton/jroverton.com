@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 
 import { ApiError } from './errors';
 import type { NewRouteRow, RouteRow, TripRow } from './types';
+import { UNROUTED_ROUTE_ID } from './types';
 
 const DATETIME_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
@@ -103,7 +104,6 @@ function extractDatePart(value: string | null | undefined): string {
 
 const TRIP_REQUIRED_COLUMNS = [
   'trip_id',
-  'route_id',
   'scheduled_pickup_time',
   // scheduled_appointment_time is optional – many trips do not have an appointment
   'status',
@@ -211,11 +211,11 @@ export function parseTripsFile(fileBuffer: Buffer): ParseResult<TripRow> {
     const scheduledPickup = getCellValue(row, 'scheduled_pickup_time');
     const scheduledAppointment = getCellValue(row, 'scheduled_appointment_time');
 
-    if (!tripId || !routeId || !status || !scheduledPickup) {
+    if (!tripId || !status || !scheduledPickup) {
       skipped.push({
         row: rowIndex,
         reason:
-          'Missing required fields (trip_id, route_id, status, or scheduled_pickup_time). scheduled_appointment_time is optional.',
+          'Missing required fields (trip_id, status, or scheduled_pickup_time).',
       });
       continue;
     }
@@ -259,7 +259,7 @@ export function parseTripsFile(fileBuffer: Buffer): ParseResult<TripRow> {
       pickup_leave_time: normalizedPickupLeave,
       dropoff_arrive_time: normalizedDropoffArrive,
       dropoff_leave_time: normalizedDropoffLeave,
-      route_id: routeId,
+      route_id: routeId || UNROUTED_ROUTE_ID,
       pickup_address: getCellValue(row, 'pickup_address'),
       pickup_lat: getCellValue(row, 'pickup_lat'),
       pickup_lon: getCellValue(row, 'pickup_lon'),

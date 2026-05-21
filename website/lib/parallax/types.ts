@@ -1,3 +1,13 @@
+export const UNROUTED_ROUTE_ID = '__UNROUTED__';
+
+export function isUnrouted(routeId: string): boolean {
+  return routeId === UNROUTED_ROUTE_ID;
+}
+
+export function displayRouteId(routeId: string): string {
+  return routeId === UNROUTED_ROUTE_ID ? '(Unrouted)' : routeId;
+}
+
 export type AccessLevel = 'edit' | 'readonly';
 
 export interface ApiErrorPayload {

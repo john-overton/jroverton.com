@@ -45,6 +45,7 @@ import type {
   TripRow,
   VehicleTypeRow,
 } from '@/lib/parallax/types';
+import { displayRouteId } from '@/lib/parallax/types';
 
 import { SectionCard } from './shared';
 
@@ -161,7 +162,7 @@ const TRIP_DATA_COLUMNS: Array<{
 }> = [
   { key: 'trip_id', label: 'Trip ID', getValue: (trip) => trip.trip_id },
   { key: 'trip_date', label: 'Trip Date', getValue: (trip) => trip.trip_date ?? '-' },
-  { key: 'route_id', label: 'Route', getValue: (trip) => trip.route_id },
+  { key: 'route_id', label: 'Route', getValue: (trip) => displayRouteId(trip.route_id) },
   { key: 'scheduled_pickup_time', label: 'Sched. Pickup', getValue: (trip) => trip.scheduled_pickup_time },
   { key: 'scheduled_appointment_time', label: 'Sched. Appt.', getValue: (trip) => trip.scheduled_appointment_time ?? '-' },
   { key: 'pickup_arrive_time', label: 'Pickup Arrive', getValue: (trip) => trip.pickup_arrive_time ?? '-' },
@@ -456,7 +457,7 @@ export default function ImportTab({
       'TRIP-002,2026-02-01,2026-02-01 09:15:00,2026-02-01 09:45:00,,,,,ROUTE-001,789 Elm Blvd,40.7484,-73.9856,321 Pine St,40.7614,-73.9776,scheduled,wheelchair,1,,,',
       '',
       '# DATA TYPES: TEXT,DATE,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,TEXT,TEXT,DECIMAL,DECIMAL,TEXT,DECIMAL,DECIMAL,TEXT,ENUM,INTEGER,DECIMAL,DECIMAL,TEXT',
-      '# REQUIRED: yes,no,yes,no,no,no,no,no,yes,no,no,no,no,no,no,yes,no (default: ambulatory),no,no,no,no',
+      '# REQUIRED: yes,no,yes,no,no,no,no,no,no,no,no,no,no,no,no,yes,no (default: ambulatory),no,no,no,no',
       '# ENUM VALUES for passenger_type: ambulatory | wheelchair | extra_large',
       '# DATETIME FORMAT: YYYY-MM-DD HH:MM:SS  |  DATE FORMAT: YYYY-MM-DD',
     ].join('\n');

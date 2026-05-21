@@ -9,6 +9,7 @@ import type {
   RouteRow,
   TripRow,
 } from './types';
+import { isUnrouted, UNROUTED_ROUTE_ID } from './types';
 
 const CANONICAL_EVENTS = new Set(['pullout', 'pullin', 'pickup', 'dropoff', 'break', 'other']);
 
@@ -238,7 +239,7 @@ export function validateImportMapping(
     }
   }
 
-  const requiredTripTargets: Array<keyof TripRow> = ['trip_id', 'route_id', 'scheduled_pickup_time'];
+  const requiredTripTargets: Array<keyof TripRow> = ['trip_id', 'scheduled_pickup_time'];
   for (const target of requiredTripTargets) {
     if (!config.field_mapping.trip[target]) {
       warnings.push(`Trip target '${target}' is not mapped.`);
@@ -423,7 +424,7 @@ function coerceTripDefaults(value: Partial<TripRow>): TripRow {
     pickup_leave_time: value.pickup_leave_time ?? null,
     dropoff_arrive_time: value.dropoff_arrive_time ?? null,
     dropoff_leave_time: value.dropoff_leave_time ?? null,
-    route_id: value.route_id ?? '',
+    route_id: value.route_id ?? UNROUTED_ROUTE_ID,
     pickup_address: value.pickup_address ?? null,
     pickup_lat: value.pickup_lat ?? null,
     pickup_lon: value.pickup_lon ?? null,
@@ -560,8 +561,8 @@ export function applyImportMapping(params: {
         rowUsed = true;
       } else {
         const created = coerceTripDefaults(tripPartial);
-        if (!created.trip_id || !created.route_id) {
-          errors.push({ row: rowNumber, reason: 'Trip create is missing required trip_id/route_id.' });
+        if (!created.trip_id) {
+          errors.push({ row: rowNumber, reason: 'Trip create is missing required trip_id.' });
         } else {
           nextTrips.push(created);
           incrementDateCount(insertedTripDates, created.trip_date);
@@ -618,7 +619,7 @@ export function applyImportMapping(params: {
   const filteredTrips: TripRow[] = [];
   let removedTripCount = 0;
   for (const trip of nextTrips) {
-    if (existingTripIds.has(trip.trip_id) || validRouteIds.has(trip.route_id.trim())) {
+    if (existingTripIds.has(trip.trip_id) || isUnrouted(trip.route_id) || validRouteIds.has(trip.route_id.trim())) {
       filteredTrips.push(trip);
     } else {
       removedTripCount += 1;
