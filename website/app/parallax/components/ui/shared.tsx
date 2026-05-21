@@ -9,6 +9,7 @@ import {
   ComposedChart,
   Legend,
   Line,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -296,12 +297,13 @@ const TOOLTIP_STYLE = {
   fontSize: 13,
 } as const;
 
-function ChartTooltip({ active, payload, label, nameMap, breakColors }: {
+function ChartTooltip({ active, payload, label, nameMap, breakColors, showSlotUtil }: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string }>;
   label?: string;
   nameMap: Record<string, string>;
   breakColors?: Record<string, string>;
+  showSlotUtil?: boolean;
 }) {
   if (!active || !payload?.length) return null;
   const dataPoint = (payload[0] as unknown as { payload: Record<string, number> }).payload;
@@ -309,12 +311,18 @@ function ChartTooltip({ active, payload, label, nameMap, breakColors }: {
   const crOnBreak = dataPoint.crOnBreak ?? 0;
   const nrOnBreak = dataPoint.nrOnBreak ?? 0;
   const irOnBreak = dataPoint.irOnBreak ?? 0;
+  const slotUtil = dataPoint.slotUtil ?? 0;
   const breakStyle = { color: 'var(--color-cc-text-muted)', lineHeight: 1.6 } as const;
-  const visible = payload.filter((e) => e.value !== 0);
+  const visible = payload.filter((e) => e.value !== 0 && e.name !== 'slotUtil');
   if (visible.length === 0 && onBreak === 0 && crOnBreak === 0 && nrOnBreak === 0 && irOnBreak === 0) return null;
   return (
     <div style={TOOLTIP_STYLE}>
       <div style={{ color: 'var(--color-cc-text)', marginBottom: 4, fontWeight: 500 }}>Time: {label}</div>
+      {showSlotUtil && slotUtil > 0 && (
+        <div style={{ color: 'var(--color-cc-text-muted)', lineHeight: 1.6, marginBottom: 2 }}>
+          Slot Utilization: {slotUtil}%
+        </div>
+      )}
       {visible.map((entry) => (
         <div key={entry.name} style={{ color: 'var(--color-cc-text-secondary)', lineHeight: 1.6 }}>
           <span style={{ color: entry.color }}>●</span>{' '}
@@ -396,6 +404,7 @@ export function DemandCompositeChart({
   avgNzOnBreak,
   avgNzPickupsByCategory,
   avgNzOnBoardByCategory,
+  slotUtilization,
 }: {
   pickups: number[];
   onBoard: number[];
@@ -418,6 +427,7 @@ export function DemandCompositeChart({
   avgNzOnBreak?: number[];
   avgNzPickupsByCategory?: Record<string, number[]>;
   avgNzOnBoardByCategory?: Record<string, number[]>;
+  slotUtilization?: number[];
 }) {
   const { chartColors } = useClearcutTheme();
   const activePickups = mode === 'max' && maxPickups ? maxPickups
@@ -451,6 +461,7 @@ export function DemandCompositeChart({
           label: block.label,
           vehicles: Math.round((activeVehicles[index] ?? 0) * 10) / 10,
           onBreak: Math.round((activeOnBreak[index] ?? 0) * 10) / 10,
+          slotUtil: slotUtilization?.[index] ?? 0,
         };
         if (breakoutMode === 'total' || categoryKeys.length === 0) {
           point.pickups = Math.round((activePickups[index] ?? 0) * 10) / 10;
@@ -467,7 +478,7 @@ export function DemandCompositeChart({
         }
         return point;
       }),
-    [blocks, activeOnBoard, activePickups, activeVehicles, activeOnBreak, breakoutMode, pickupsByCategory, onBoardByCategory, maxPickupsByCategory, maxOnBoardByCategory, avgNzPickupsByCategory, avgNzOnBoardByCategory, mode, categoryKeys],
+    [blocks, activeOnBoard, activePickups, activeVehicles, activeOnBreak, breakoutMode, pickupsByCategory, onBoardByCategory, maxPickupsByCategory, maxOnBoardByCategory, avgNzPickupsByCategory, avgNzOnBoardByCategory, mode, categoryKeys, slotUtilization],
   );
 
   const nameMap = useMemo(() => {
@@ -489,17 +500,32 @@ export function DemandCompositeChart({
         <BarChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-          <YAxis allowDecimals={false} width={38} domain={[0, yMax]} />
-          <Tooltip content={<ChartTooltip nameMap={nameMap} breakColors={{ onBreak: chartColors[1] }} />} />
+          <YAxis yAxisId="left" allowDecimals={false} width={38} domain={[0, yMax]} />
+          <Tooltip content={<ChartTooltip nameMap={nameMap} breakColors={{ onBreak: chartColors[1] }} showSlotUtil={mode === 'avgNz'} />} />
+          {mode === 'avgNz' && data.map((entry, i) => {
+            const util = (entry.slotUtil as number) ?? 0;
+            return util > 0 ? (
+              <ReferenceArea
+                key={`util-${i}`}
+                yAxisId="left"
+                x1={entry.label as string}
+                x2={entry.label as string}
+                fill={chartColors[0]}
+                fillOpacity={util / 100 * 0.25}
+                ifOverflow="visible"
+              />
+            ) : null;
+          })}
           {breakoutMode === 'total' || categoryKeys.length === 0 ? (
             <>
-              <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
-              <Bar dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="left" dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="left" dataKey="pickups" fill={chartColors[0]} radius={[3, 3, 0, 0]} />
             </>
           ) : (
             <>
               {categoryKeys.map((cat, i) => (
                 <Bar
+                  yAxisId="left"
                   key={`ob_${cat}`}
                   dataKey={`ob_${cat}`}
                   stackId="onBoard"
@@ -509,6 +535,7 @@ export function DemandCompositeChart({
               ))}
               {categoryKeys.map((cat, i) => (
                 <Bar
+                  yAxisId="left"
                   key={`pick_${cat}`}
                   dataKey={`pick_${cat}`}
                   stackId="pickups"
@@ -519,6 +546,7 @@ export function DemandCompositeChart({
             </>
           )}
           <Line
+            yAxisId="left"
             type="monotone"
             dataKey="vehicles"
             stroke={chartColors[1]}
@@ -742,6 +770,8 @@ export function RunStructureChart({
   breakoutMode = 'total',
   pickupsByCategory,
   onBoardByCategory,
+  slotUtilization,
+  showSlotUtil = false,
 }: {
   pickups: number[];
   onBoard: number[];
@@ -756,6 +786,8 @@ export function RunStructureChart({
   breakoutMode?: BreakoutMode;
   pickupsByCategory?: Record<string, number[]>;
   onBoardByCategory?: Record<string, number[]>;
+  slotUtilization?: number[];
+  showSlotUtil?: boolean;
 }) {
   const { chartColors } = useClearcutTheme();
   const showImportedDate = importedDateVehicles && importedDateVehicles.length > 0;
@@ -775,6 +807,7 @@ export function RunStructureChart({
           runVehicles: Math.round((runVehicles[index] ?? 0) * 10) / 10,
           crOnBreak: Math.round((crOnBreak?.[index] ?? 0) * 10) / 10,
           nrOnBreak: Math.round((nrOnBreak?.[index] ?? 0) * 10) / 10,
+          slotUtil: slotUtilization?.[index] ?? 0,
           importedDateVehicles: showImportedDate ? Math.round((importedDateVehicles[index] ?? 0) * 10) / 10 : undefined,
           irOnBreak: showImportedDate ? Math.round((irOnBreak?.[index] ?? 0) * 10) / 10 : undefined,
         };
@@ -789,7 +822,7 @@ export function RunStructureChart({
         }
         return point;
       }),
-    [blocks, onBoard, pickups, currentVehicles, runVehicles, crOnBreak, nrOnBreak, importedDateVehicles, irOnBreak, showImportedDate, breakoutMode, pickupsByCategory, onBoardByCategory, categoryKeys],
+    [blocks, onBoard, pickups, currentVehicles, runVehicles, crOnBreak, nrOnBreak, importedDateVehicles, irOnBreak, showImportedDate, breakoutMode, pickupsByCategory, onBoardByCategory, categoryKeys, slotUtilization],
   );
 
   const nameMap = useMemo(() => {
@@ -814,10 +847,23 @@ export function RunStructureChart({
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-cc-border)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} width={38} />
-          <Tooltip content={<ChartTooltip nameMap={nameMap} breakColors={{ crOnBreak: chartColors[1], nrOnBreak: chartColors[3], irOnBreak: importedDateColor }} />} />
+          <Tooltip content={<ChartTooltip nameMap={nameMap} breakColors={{ crOnBreak: chartColors[1], nrOnBreak: chartColors[3], irOnBreak: importedDateColor }} showSlotUtil={showSlotUtil} />} />
           <Legend
             formatter={(value) => nameMap[value] ?? value}
           />
+          {showSlotUtil && data.map((entry, i) => {
+            const util = ((entry.slotUtil as number) ?? 0);
+            return util > 0 ? (
+              <ReferenceArea
+                key={`util-${i}`}
+                x1={entry.label as string}
+                x2={entry.label as string}
+                fill={chartColors[0]}
+                fillOpacity={util / 100 * 0.25}
+                ifOverflow="visible"
+              />
+            ) : null;
+          })}
           {breakoutMode === 'total' || categoryKeys.length === 0 ? (
             <>
               <Bar dataKey="onBoard" fill={`${chartColors[0]}40`} radius={[3, 3, 0, 0]} />

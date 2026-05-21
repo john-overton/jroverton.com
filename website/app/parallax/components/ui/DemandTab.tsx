@@ -115,6 +115,7 @@ export default function DemandTab({ metrics, intervalMinutes }: DemandTabProps) 
               ? metrics.maxOnBoardByBlockByPassengerType
               : undefined
           }
+          slotUtilization={metrics.slotUtilizationByBlock}
           avgNzPickups={metrics.avgNzPickupsByBlock}
           avgNzOnBoard={metrics.avgNzOnBoardByBlock}
           avgNzVehicles={metrics.avgNzVehiclesByBlock}

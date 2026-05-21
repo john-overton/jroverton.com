@@ -104,6 +104,7 @@ export interface ClearcutMetrics {
   avgNzPickupsByBlockByPassengerType: Record<string, number[]>;
   avgNzOnBoardByBlockByStatus: Record<string, number[]>;
   avgNzOnBoardByBlockByPassengerType: Record<string, number[]>;
+  slotUtilizationByBlock: number[];
 }
 
 export interface PerRouteMetrics {
@@ -1210,6 +1211,18 @@ export function computeClearcutMetrics(
     avgNzOnBoardByBlockByPassengerType[cat] = result;
   }
 
+  // Slot utilization: % of days with >0 pickups in each block
+  const slotUtilizationByBlock = Array.from({ length: blockCount }).fill(0) as number[];
+  for (let i = 0; i < blockCount; i++) {
+    let daysWithTrips = 0;
+    for (const [, dayArr] of pickupsByDayBlock) {
+      if (dayArr[i] > 0) daysWithTrips++;
+    }
+    slotUtilizationByBlock[i] = dayCount > 0
+      ? Math.round((daysWithTrips / dayCount) * 1000) / 10
+      : 0;
+  }
+
   // Passenger-based on-board for cards — only completed trips
   const onBoardPassengersByBlock = Array.from({ length: blockCount }).fill(0) as number[];
   for (let i = 0; i < blockCount; i += 1) {
@@ -1528,5 +1541,6 @@ export function computeClearcutMetrics(
     avgNzPickupsByBlockByPassengerType,
     avgNzOnBoardByBlockByStatus,
     avgNzOnBoardByBlockByPassengerType,
+    slotUtilizationByBlock,
   };
 }

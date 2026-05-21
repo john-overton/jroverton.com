@@ -672,6 +672,8 @@ export default function RunStructureTab({
           </div>
         </div>
         <RunStructureChart
+          slotUtilization={metrics.slotUtilizationByBlock}
+          showSlotUtil={demandMode === 'avgNz'}
           pickups={demandMode === 'max' ? metrics.maxPickupsByBlock : demandMode === 'avgNz' ? metrics.avgNzPickupsByBlock : metrics.pickupsByBlock}
           onBoard={demandMode === 'max' ? metrics.maxOnBoardByBlock : demandMode === 'avgNz' ? metrics.avgNzOnBoardByBlock : metrics.onBoardByBlock}
           currentVehicles={chartCurrentVehiclesByBlock}
