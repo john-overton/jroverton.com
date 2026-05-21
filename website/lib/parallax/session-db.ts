@@ -525,6 +525,59 @@ export function replaceRoutes(editToken: string, routes: RouteRow[]): void {
   });
 }
 
+export function upsertTrips(editToken: string, trips: TripRow[]): { inserted: number; updated: number } {
+  let inserted = 0;
+  let updated = 0;
+  withSessionDb(editToken, (db) => {
+    const existingIds = new Set(
+      (db.prepare('SELECT trip_id FROM trips').all() as { trip_id: string }[]).map((r) => r.trip_id),
+    );
+    const stmt = db.prepare(
+      `INSERT OR REPLACE INTO trips (${TRIP_COLUMNS.join(',')})
+       VALUES (${TRIP_COLUMNS.map(() => '?').join(',')})`,
+    );
+    const transaction = db.transaction((rows: TripRow[]) => {
+      for (const row of rows) {
+        const normalized = normalizeTripRow(row);
+        stmt.run(...TRIP_COLUMNS.map((column) => normalized[column]));
+        if (existingIds.has(normalized.trip_id)) {
+          updated += 1;
+        } else {
+          inserted += 1;
+        }
+      }
+    });
+    transaction(trips);
+  });
+  return { inserted, updated };
+}
+
+export function upsertRoutes(editToken: string, routes: RouteRow[]): { inserted: number; updated: number } {
+  let inserted = 0;
+  let updated = 0;
+  withSessionDb(editToken, (db) => {
+    const existingIds = new Set(
+      (db.prepare('SELECT route_id FROM routes').all() as { route_id: string }[]).map((r) => r.route_id),
+    );
+    const stmt = db.prepare(
+      `INSERT OR REPLACE INTO routes (${ROUTE_COLUMNS.join(',')})
+       VALUES (${ROUTE_COLUMNS.map(() => '?').join(',')})`,
+    );
+    const transaction = db.transaction((rows: RouteRow[]) => {
+      for (const row of rows) {
+        stmt.run(...ROUTE_COLUMNS.map((column) => row[column]));
+        if (existingIds.has(row.route_id)) {
+          updated += 1;
+        } else {
+          inserted += 1;
+        }
+      }
+    });
+    transaction(routes);
+  });
+  return { inserted, updated };
+}
+
 export function replaceNewRoutes(editToken: string, newRoutes: NewRouteRow[]): void {
   withSessionDb(editToken, (db) => {
     const insertNewRoute = db.prepare(

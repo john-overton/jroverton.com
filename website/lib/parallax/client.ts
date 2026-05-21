@@ -80,6 +80,8 @@ export interface ImportResponse {
   trip_count: number;
   route_count: number;
   skipped_rows?: Array<{ row: number; reason: string }>;
+  inserted_count?: number;
+  updated_count?: number;
 }
 
 export interface ListTripsResponse {

@@ -494,45 +494,68 @@ export default function ImportTab({
     URL.revokeObjectURL(url);
   }
 
+  function groupSkipReasons(skipped: Array<{ row: number; reason: string }>): string[] {
+    const counts = new Map<string, number>();
+    for (const s of skipped) {
+      counts.set(s.reason, (counts.get(s.reason) ?? 0) + 1);
+    }
+    return [...counts.entries()].map(([reason, count]) => `(${count}) ${reason}`);
+  }
+
+  function buildUpsertSummary(label: string, result: ImportResponse | undefined): string[] {
+    if (!result) return [];
+    const parts: string[] = [];
+    const counts: string[] = [];
+    if (result.inserted_count) counts.push(`${result.inserted_count} inserted`);
+    if (result.updated_count) counts.push(`${result.updated_count} updated`);
+    if (counts.length > 0) parts.push(`${label}: ${counts.join(', ')}.`);
+    if (result.skipped_rows?.length) {
+      const grouped = groupSkipReasons(result.skipped_rows);
+      for (const line of grouped) parts.push(`${label} skipped: ${line}`);
+    }
+    return parts;
+  }
+
   async function performImport(tripFile: File | null, routeFile: File | null, newRouteFile: File | null) {
     if (readonlyView) return;
     setStatus('Importing files...');
     setError(null);
     setFlatImportLog(null);
     try {
-      const skippedMessages: string[] = [];
       let routeSkipped: Array<{ row: number; reason: string }> = [];
       let tripSkipped: Array<{ row: number; reason: string }> = [];
       let newRouteSkipped: Array<{ row: number; reason: string }> = [];
+      const summaryParts: string[] = [];
+
+      let routeResult: ImportResponse | undefined;
+      let tripResult: ImportResponse | undefined;
+      let newRouteResult: ImportResponse | undefined;
+
       if (routeFile) {
-        const routeResult = await session.uploadRoutes(routeFile);
-        if (routeResult?.skipped_rows?.length) {
-          skippedMessages.push(`${routeResult.skipped_rows.length} route row(s) skipped.`);
-          routeSkipped = routeResult.skipped_rows;
-        }
+        routeResult = await session.uploadRoutes(routeFile);
+        if (routeResult?.skipped_rows?.length) routeSkipped = routeResult.skipped_rows;
+        summaryParts.push(...buildUpsertSummary('Routes', routeResult));
       }
       if (tripFile) {
-        const tripResult = await session.uploadTrips(tripFile);
-        if (tripResult?.skipped_rows?.length) {
-          skippedMessages.push(`${tripResult.skipped_rows.length} trip row(s) skipped.`);
-          tripSkipped = tripResult.skipped_rows;
-        }
+        tripResult = await session.uploadTrips(tripFile);
+        if (tripResult?.skipped_rows?.length) tripSkipped = tripResult.skipped_rows;
+        summaryParts.push(...buildUpsertSummary('Trips', tripResult));
       }
       if (newRouteFile) {
-        const newRouteResult = await session.uploadNewRoutes(newRouteFile);
+        newRouteResult = await session.uploadNewRoutes(newRouteFile);
+        if (newRouteResult?.skipped_rows?.length) newRouteSkipped = newRouteResult.skipped_rows;
         if (newRouteResult?.skipped_rows?.length) {
-          skippedMessages.push(`${newRouteResult.skipped_rows.length} new route row(s) skipped.`);
-          newRouteSkipped = newRouteResult.skipped_rows;
+          const grouped = groupSkipReasons(newRouteResult.skipped_rows);
+          for (const line of grouped) summaryParts.push(`New routes skipped: ${line}`);
         }
       }
       if (routeSkipped.length > 0 || tripSkipped.length > 0 || newRouteSkipped.length > 0) {
         setFlatImportLog({ routes: routeSkipped, trips: tripSkipped, newRoutes: newRouteSkipped });
       }
-      const statusParts = ['Import complete.'];
-      if (skippedMessages.length > 0) {
-        statusParts.push(skippedMessages.join(' '));
-      }
-      setStatus(statusParts.join(' '));
+      const statusLine = summaryParts.length > 0
+        ? `Import complete. ${summaryParts.join(' ')}`
+        : 'Import complete.';
+      setStatus(statusLine);
     } catch (uploadError) {
       setStatus(null);
       setError(uploadError instanceof Error ? uploadError.message : 'Import failed.');

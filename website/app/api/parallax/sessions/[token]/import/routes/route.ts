@@ -10,7 +10,7 @@ import {
 import { readUploadedFile } from '@/lib/parallax/import-upload';
 import { parseRoutesFile } from '@/lib/parallax/import-validators';
 import { updateSessionCounts } from '@/lib/parallax/registry-db';
-import { countRoutes, countTrips, listVehicleTypes, recalculateServiceWindow, replaceRoutes, saveSessionState } from '@/lib/parallax/session-db';
+import { countRoutes, countTrips, listVehicleTypes, recalculateServiceWindow, upsertRoutes, saveSessionState } from '@/lib/parallax/session-db';
 
 export const runtime = 'nodejs';
 
@@ -39,7 +39,7 @@ export async function POST(
       saveSessionState(token, { vehicle_types: [...existingVehicleTypes, ...newVehicleTypes] });
     }
 
-    replaceRoutes(token, updatedRoutes);
+    const { inserted, updated } = upsertRoutes(token, updatedRoutes);
     saveSessionState(token, { settings: { is_demo: 0 } });
     recalculateServiceWindow(token);
 
@@ -53,6 +53,8 @@ export async function POST(
       trip_count: tripCount,
       route_count: routeCount,
       skipped_rows: skipped,
+      inserted_count: inserted,
+      updated_count: updated,
     });
   } catch (err) {
     return handleRouteError(err);
