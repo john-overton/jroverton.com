@@ -1263,6 +1263,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           depots={ready.state.depots}
           vehicleTypes={ready.state.vehicle_types}
           selectedVehicleTypes={selectedVehicleTypes}
+          selectedZones={selectedZones}
           availableZones={availableZones}
           filteredRoutes={filteredRoutes}
           savedBidResult={ready.state.bid_result}

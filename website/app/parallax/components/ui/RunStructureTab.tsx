@@ -62,6 +62,7 @@ interface RunStructureTabProps {
   depots: DepotRow[];
   vehicleTypes: VehicleTypeRow[];
   selectedVehicleTypes: string[];
+  selectedZones: string[];
   availableZones: string[];
   filteredRoutes: RouteRow[];
   savedBidResult: BidResult | null;
@@ -81,6 +82,7 @@ export default function RunStructureTab({
   depots,
   vehicleTypes,
   selectedVehicleTypes,
+  selectedZones,
   availableZones,
   savedBidResult,
   onBidResultChange,
@@ -218,8 +220,12 @@ export default function RunStructureTab({
       const vtSet = new Set(selectedVehicleTypes);
       result = result.filter((newRoute) => newRoute.vehicle_type_id && vtSet.has(newRoute.vehicle_type_id));
     }
+    if (selectedZones.length > 0) {
+      const zoneSet = new Set(selectedZones);
+      result = result.filter((newRoute) => newRoute.route_area && zoneSet.has(newRoute.route_area));
+    }
     return result;
-  }, [localNewRoutes, newRouteDayFilter, depotFilter, selectedVehicleTypes]);
+  }, [localNewRoutes, newRouteDayFilter, depotFilter, selectedVehicleTypes, selectedZones]);
 
   // ── Vehicle counts by block ───────────────────────────────────────
 

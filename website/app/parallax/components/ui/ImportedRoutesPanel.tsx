@@ -161,22 +161,25 @@ export default function ImportedRoutesPanel({
   return (
     <>
       <div className="flex items-center gap-3 mb-3 mt-3">
-        <Select
-          value={selectedRunCutDate ?? ''}
-          onValueChange={(v) => onSelectedRunCutDateChange(v || null)}
-        >
-          <SelectTrigger className="w-auto min-w-[200px]">
-            <SelectValue placeholder="No dates available" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableDates.length === 0 && <SelectItem value="">No dates available</SelectItem>}
-            {availableDates.map((dateStr) => {
-              const d = new Date(dateStr + 'T00:00:00');
-              const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-              return <SelectItem key={dateStr} value={dateStr}>{label}</SelectItem>;
-            })}
-          </SelectContent>
-        </Select>
+        {availableDates.length > 0 ? (
+          <Select
+            value={selectedRunCutDate ?? ''}
+            onValueChange={(v) => onSelectedRunCutDateChange(v || null)}
+          >
+            <SelectTrigger className="w-auto min-w-[200px]">
+              <SelectValue placeholder="Select a date" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableDates.map((dateStr) => {
+                const d = new Date(dateStr + 'T00:00:00');
+                const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                return <SelectItem key={dateStr} value={dateStr}>{label}</SelectItem>;
+              })}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="text-sm text-cc-text-muted">No imported routes available</span>
+        )}
         {!readonlyView && currentRunCut.length > 0 && (
           <Button variant="outline" size="sm" onClick={onCopyAllFromLiveDay} disabled={copyDaysSelection.length === 0} type="button">
             <Copy size={14} className="mr-1.5" /> Copy Day to Route Editor
