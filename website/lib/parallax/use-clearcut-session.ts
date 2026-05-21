@@ -206,13 +206,31 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
 
   const saveState = useCallback(
     async (input: SessionStateUpdateInput): Promise<SessionState> => {
+      setLoadState((prev) => {
+        if (prev.status !== 'ready') return prev;
+        const s = prev.state;
+        const optimistic: SessionState = {
+          ...s,
+          settings: input.settings ? { ...s.settings, ...input.settings } : s.settings,
+          optimization: input.optimization ? { ...s.optimization, ...input.optimization } : s.optimization,
+          trips: input.trips ?? s.trips,
+          routes: input.routes ?? s.routes,
+          new_routes: input.new_routes ?? s.new_routes,
+          depots: input.depots ?? s.depots,
+          vehicle_types: input.vehicle_types ?? s.vehicle_types,
+        };
+        return { ...prev, state: optimistic };
+      });
       return withEditJwt(async (jwt) => {
         const state = await updateSession(token, jwt, input);
-        setLoadState({ status: 'ready', state, access: mode, hasJwt: true });
+        setLoadState((prev) => {
+          if (prev.status !== 'ready') return prev;
+          return { ...prev, state };
+        });
         return state;
       });
     },
-    [mode, token, withEditJwt],
+    [token, withEditJwt],
   );
 
   const rename = useCallback(
