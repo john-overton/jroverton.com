@@ -19,11 +19,6 @@ import type {
   VehicleTypeRow,
 } from './types';
 
-const PASSENGER_TYPES = new Set<TripRow['passenger_type']>([
-  'ambulatory',
-  'wheelchair',
-  'extra_large',
-]);
 
 const TRIP_COLUMNS = [
   'trip_id',
@@ -115,7 +110,7 @@ function ensureTripPassengerTypeColumn(db: Database.Database): void {
   const hasPassengerType = columns.some((column) => column.name === 'passenger_type');
   if (!hasPassengerType) {
     db.exec(
-      "ALTER TABLE trips ADD COLUMN passenger_type TEXT NOT NULL DEFAULT 'ambulatory' CHECK (passenger_type IN ('ambulatory', 'wheelchair', 'extra_large'));",
+      "ALTER TABLE trips ADD COLUMN passenger_type TEXT NOT NULL DEFAULT 'ambulatory';",
     );
   }
 }
@@ -348,18 +343,11 @@ function ensureRouteZoneColumn(db: Database.Database): void {
   }
 }
 
-function normalizePassengerType(value: string | null | undefined): TripRow['passenger_type'] {
-  if (value && PASSENGER_TYPES.has(value as TripRow['passenger_type'])) {
-    return value as TripRow['passenger_type'];
-  }
-  return 'ambulatory';
-}
-
 function normalizeTripRow(row: TripRow): TripRow {
   return {
     ...row,
     trip_date: row.trip_date ?? null,
-    passenger_type: normalizePassengerType(row.passenger_type),
+    passenger_type: row.passenger_type || 'ambulatory',
   };
 }
 

@@ -458,7 +458,7 @@ export default function ImportTab({
       '',
       '# DATA TYPES: TEXT,DATE,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,DATETIME,TEXT,TEXT,DECIMAL,DECIMAL,TEXT,DECIMAL,DECIMAL,TEXT,ENUM,INTEGER,DECIMAL,DECIMAL,TEXT',
       '# REQUIRED: yes,no,yes,no,no,no,no,no,no,no,no,no,no,no,no,yes,no (default: ambulatory),no,no,no,no',
-      '# ENUM VALUES for passenger_type: ambulatory | wheelchair | extra_large',
+      '# passenger_type: free-text field (e.g. ambulatory, wheelchair, stretcher, etc.)',
       '# DATETIME FORMAT: YYYY-MM-DD HH:MM:SS  |  DATE FORMAT: YYYY-MM-DD',
     ].join('\n');
     const routeSample = [

@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS trips (
   dropoff_lat TEXT,
   dropoff_lon TEXT,
   status TEXT NOT NULL,
-  passenger_type TEXT NOT NULL DEFAULT 'ambulatory' CHECK (passenger_type IN ('ambulatory', 'wheelchair', 'extra_large')),
+  passenger_type TEXT NOT NULL DEFAULT 'ambulatory',
   passenger_count TEXT,
   pick_odometer TEXT,
   drop_odometer TEXT,

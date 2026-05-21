@@ -177,17 +177,10 @@ function isValidDatetime(value: string | null, required: boolean): boolean {
   return DATETIME_REGEX.test(value);
 }
 
-function parsePassengerType(value: string | null): TripRow['passenger_type'] {
-  if (!value) {
-    return 'ambulatory';
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'ambulatory' || normalized === 'wheelchair' || normalized === 'extra_large') {
-    return normalized;
-  }
-
-  return 'ambulatory';
+function parsePassengerType(value: string | null): string {
+  if (!value) return 'ambulatory';
+  const trimmed = value.trim().toLowerCase();
+  return trimmed || 'ambulatory';
 }
 
 export interface ParseResult<T> {
