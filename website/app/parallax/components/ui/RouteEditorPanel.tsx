@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy, Download, Plus, SquareSplitHorizontal, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/parallax/components/shadcn/button';
 import { ComboboxInput } from '@/app/parallax/components/shadcn/combobox-input';
@@ -147,6 +147,254 @@ function SortableHead({
   );
 }
 
+// ── Memoized route row ─────────────────────────────────────────────
+
+interface RouteRowProps {
+  newRoute: NewRouteRow;
+  depots: DepotRow[];
+  vehicleTypes: VehicleTypeRow[];
+  availableZones: string[];
+  disabled: boolean;
+  hasOverlap: boolean;
+  highlighted: boolean;
+  breaksExpanded: boolean;
+  onUpdateRoute: (newRouteId: string, field: keyof NewRouteRow, value: string | number | null, immediate?: boolean) => void;
+  onToggleServiceDay: (newRouteId: string, day: ServiceDay) => void;
+  onAddSplit: (newRoute: NewRouteRow) => void;
+  onDuplicate: (newRoute: NewRouteRow) => void;
+  onDelete: (newRouteId: string) => void;
+}
+
+const RouteTableRow = React.memo(function RouteTableRow({
+  newRoute,
+  depots,
+  vehicleTypes,
+  availableZones,
+  disabled,
+  hasOverlap,
+  highlighted,
+  breaksExpanded,
+  onUpdateRoute,
+  onToggleServiceDay,
+  onAddSplit,
+  onDuplicate,
+  onDelete,
+}: RouteRowProps) {
+  const days = parseServiceDays(newRoute.service_days);
+  return (
+    <TableRow className={highlighted ? 'animate-highlight-row' : ''}>
+      <TableCell>
+        <Input
+          value={newRoute.new_route_name}
+          disabled={disabled}
+          className="h-7 text-xs"
+          onChange={(e) => onUpdateRoute(newRoute.new_route_id, 'new_route_name', e.target.value)}
+        />
+      </TableCell>
+      {depots.length > 0 && (
+        <TableCell>
+          <Select
+            value={newRoute.depot ?? 'none'}
+            onValueChange={(v) => onUpdateRoute(newRoute.new_route_id, 'depot', v === 'none' ? null : v, true)}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{'—'}</SelectItem>
+              {depots.map((d) => (
+                <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </TableCell>
+      )}
+      {vehicleTypes.length > 0 && (
+        <TableCell>
+          <Select
+            value={newRoute.vehicle_type_id ?? 'none'}
+            onValueChange={(v) => onUpdateRoute(newRoute.new_route_id, 'vehicle_type_id', v === 'none' ? null : v, true)}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{'—'}</SelectItem>
+              {vehicleTypes.map((vt) => (
+                <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>{vt.vehicle_type_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </TableCell>
+      )}
+      <TableCell>
+        <ComboboxInput
+          value={newRoute.route_area ?? ''}
+          options={availableZones}
+          disabled={disabled}
+          className="h-7 text-xs"
+          placeholder="Zone"
+          onChange={(v) => onUpdateRoute(newRoute.new_route_id, 'route_area', v || null, true)}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-cc-text-muted">
+            {newRoute.split_number === 0 ? '—' : newRoute.split_number}
+          </span>
+          {hasOverlap && (
+            <span className="text-[10px] text-cc-danger" title="Split times overlap">
+              overlap
+            </span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <Input
+          type="time"
+          value={newRoute.start_time}
+          disabled={disabled}
+          className="h-7 text-xs"
+          onChange={(e) => onUpdateRoute(newRoute.new_route_id, 'start_time', e.target.value)}
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          type="time"
+          value={newRoute.end_time}
+          disabled={disabled}
+          className="h-7 text-xs"
+          onChange={(e) => onUpdateRoute(newRoute.new_route_id, 'end_time', e.target.value)}
+        />
+      </TableCell>
+      <TableCell>
+        <span className="text-xs">{newRoute.platform_hours}</span>
+      </TableCell>
+      {breaksExpanded ? (
+        <>
+          <TableCell>
+            <div className="flex gap-1 items-center">
+              <Input
+                type="time"
+                value={newRoute.break_1_start ?? ''}
+                disabled={disabled}
+                className="h-7 text-xs"
+                min={newRoute.start_time}
+                max={newRoute.end_time}
+                onChange={(e) => onUpdateRoute(newRoute.new_route_id, 'break_1_start', e.target.value || null)}
+              />
+              <span className="text-xs text-cc-text-muted">-</span>
+              <Input
+                type="time"
+                value={newRoute.break_1_end ?? ''}
+                disabled={disabled}
+                className="h-7 text-xs"
+                min={newRoute.break_1_start ?? newRoute.start_time}
+                max={newRoute.end_time}
+                onChange={(e) => onUpdateRoute(newRoute.new_route_id, 'break_1_end', e.target.value || null)}
+              />
+            </div>
+          </TableCell>
+          <TableCell>
+            <div className="flex gap-1 items-center">
+              <Input
+                type="time"
+                value={newRoute.break_2_start ?? ''}
+                disabled={disabled}
+                className="h-7 text-xs"
+                min={newRoute.start_time}
+                max={newRoute.end_time}
+                onChange={(e) => onUpdateRoute(newRoute.new_route_id, 'break_2_start', e.target.value || null)}
+              />
+              <span className="text-xs text-cc-text-muted">-</span>
+              <Input
+                type="time"
+                value={newRoute.break_2_end ?? ''}
+                disabled={disabled}
+                className="h-7 text-xs"
+                min={newRoute.break_2_start ?? newRoute.start_time}
+                max={newRoute.end_time}
+                onChange={(e) => onUpdateRoute(newRoute.new_route_id, 'break_2_end', e.target.value || null)}
+              />
+            </div>
+          </TableCell>
+        </>
+      ) : (
+        <TableCell>
+          <span className="text-xs text-cc-text-muted">
+            {(() => {
+              const b1 = breakDurationLabel(newRoute.break_1_start, newRoute.break_1_end);
+              const b2 = breakDurationLabel(newRoute.break_2_start, newRoute.break_2_end);
+              if (b1 && b2) return `${b1}, ${b2}`;
+              if (b1) return b1;
+              if (b2) return b2;
+              return '—';
+            })()}
+          </span>
+        </TableCell>
+      )}
+      <TableCell>
+        <div className="flex gap-0.5">
+          {ALL_SERVICE_DAYS.map((day) => (
+            <button
+              key={day}
+              className={`px-1 py-0 text-[10px] rounded ${
+                days.includes(day)
+                  ? 'bg-cc-accent text-white'
+                  : 'bg-cc-surface-2 text-cc-text-muted'
+              }`}
+              onClick={() => onToggleServiceDay(newRoute.new_route_id, day)}
+              disabled={disabled}
+            >
+              {day}
+            </button>
+          ))}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex gap-1">
+          {!disabled && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onAddSplit(newRoute)}
+                title="Add split"
+                type="button"
+              >
+                <SquareSplitHorizontal size={13} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onDuplicate(newRoute)}
+                title="Copy route"
+                type="button"
+              >
+                <Copy size={13} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-cc-danger"
+                onClick={() => onDelete(newRoute.new_route_id)}
+                title="Delete route"
+                type="button"
+              >
+                <Trash2 size={13} />
+              </Button>
+            </>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+});
+
 // ── Main component ──────────────────────────────────────────────────
 
 interface RouteEditorPanelProps {
@@ -195,6 +443,8 @@ export default function RouteEditorPanel({
   const [highlightedNewRouteId, setHighlightedNewRouteId] = useState<string | null>(null);
   const sortFreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastEditedNewRouteIdRef = useRef<string | null>(null);
+  const localNewRoutesRef = useRef(localNewRoutes);
+  localNewRoutesRef.current = localNewRoutes;
 
   // Cleanup sort-freeze timer on unmount
   useEffect(() => {
@@ -271,6 +521,9 @@ export default function RouteEditorPanel({
       return a.split_number - b.split_number;
     });
   }, [filteredNewRoutes, sortKey, sortDir]);
+
+  const sortedNewRoutesRef = useRef(sortedNewRoutes);
+  sortedNewRoutesRef.current = sortedNewRoutes;
 
   // Display order: use frozen order during edits, otherwise follow sort
   const displayNewRoutes = useMemo(() => {
@@ -395,13 +648,14 @@ export default function RouteEditorPanel({
     setDraftBreakCount((prev) => prev - 1);
   }
 
-  function addSplit(newRoute: NewRouteRow) {
-    const siblings = localNewRoutes.filter((r) => r.new_route_name === newRoute.new_route_name && r.split_number > 0);
+  const addSplit = useCallback((newRoute: NewRouteRow) => {
+    const routes = localNewRoutesRef.current;
+    const siblings = routes.filter((r) => r.new_route_name === newRoute.new_route_name && r.split_number > 0);
     const nextSplitNumber = siblings.length > 0
       ? Math.max(...siblings.map((s) => s.split_number)) + 1
       : 2;
 
-    let nextNewRoutes = localNewRoutes;
+    let nextNewRoutes = routes;
     if (newRoute.split_number === 0) {
       nextNewRoutes = nextNewRoutes.map((r) =>
         r.new_route_id === newRoute.new_route_id ? { ...r, split_number: 1 } : r,
@@ -428,28 +682,26 @@ export default function RouteEditorPanel({
       vehicle_type_id: newRoute.vehicle_type_id,
     };
     updateLocalNewRoutes([...nextNewRoutes, newSplit], true);
-  }
+  }, [updateLocalNewRoutes]);
 
-  function deleteNewRoute(newRouteId: string) {
-    updateLocalNewRoutes(localNewRoutes.filter((r) => r.new_route_id !== newRouteId), true);
-  }
+  const deleteNewRoute = useCallback((newRouteId: string) => {
+    updateLocalNewRoutes(localNewRoutesRef.current.filter((r) => r.new_route_id !== newRouteId), true);
+  }, [updateLocalNewRoutes]);
 
-  function duplicateNewRoute(newRoute: NewRouteRow) {
+  const duplicateNewRoute = useCallback((newRoute: NewRouteRow) => {
     const copy: NewRouteRow = {
       ...newRoute,
       new_route_id: crypto.randomUUID(),
       new_route_name: `${newRoute.new_route_name} copy`,
       split_number: 0,
     };
-    updateLocalNewRoutes([...localNewRoutes, copy], true);
-  }
+    updateLocalNewRoutes([...localNewRoutesRef.current, copy], true);
+  }, [updateLocalNewRoutes]);
 
-  function updateNewRoute(newRouteId: string, field: keyof NewRouteRow, value: string | number | null, immediate?: boolean) {
-    // Freeze current display order on first edit so the row doesn't jump
-    setFrozenOrder((prev) => prev ?? sortedNewRoutes.map((r) => r.new_route_id));
+  const updateNewRoute = useCallback((newRouteId: string, field: keyof NewRouteRow, value: string | number | null, immediate?: boolean) => {
+    setFrozenOrder((prev) => prev ?? sortedNewRoutesRef.current.map((r) => r.new_route_id));
     lastEditedNewRouteIdRef.current = newRouteId;
 
-    // Reset the 5-second debounce before re-sorting
     if (sortFreezeTimerRef.current) clearTimeout(sortFreezeTimerRef.current);
     sortFreezeTimerRef.current = setTimeout(() => {
       setFrozenOrder(null);
@@ -460,7 +712,7 @@ export default function RouteEditorPanel({
     }, 5000);
 
     updateLocalNewRoutes(
-      localNewRoutes.map((r) => {
+      localNewRoutesRef.current.map((r) => {
         if (r.new_route_id !== newRouteId) return r;
         const next = { ...r, [field]: value };
         if (field === 'start_time' || field === 'end_time' || field.startsWith('break_')) {
@@ -472,10 +724,10 @@ export default function RouteEditorPanel({
       }),
       immediate,
     );
-  }
+  }, [updateLocalNewRoutes]);
 
-  function toggleServiceDay(newRouteId: string, day: ServiceDay) {
-    const newRoute = localNewRoutes.find((r) => r.new_route_id === newRouteId);
+  const toggleServiceDay = useCallback((newRouteId: string, day: ServiceDay) => {
+    const newRoute = localNewRoutesRef.current.find((r) => r.new_route_id === newRouteId);
     if (!newRoute) return;
     const days = parseServiceDays(newRoute.service_days);
     const next = days.includes(day)
@@ -483,7 +735,7 @@ export default function RouteEditorPanel({
       : [...days, day];
     const sorted = ALL_SERVICE_DAYS.filter((d) => next.includes(d));
     updateNewRoute(newRouteId, 'service_days', JSON.stringify(sorted), true);
-  }
+  }, [updateNewRoute]);
 
   // ── Render ──────────────────────────────────────────────────────
 
@@ -846,223 +1098,24 @@ export default function RouteEditorPanel({
                 </TableCell>
               </TableRow>
             )}
-            {displayNewRoutes.map((newRoute) => {
-              const days = parseServiceDays(newRoute.service_days);
-              const disabled = readonlyView;
-              const hasOverlap = splitOverlapIds.has(newRoute.new_route_id);
-              return (
-                <TableRow key={newRoute.new_route_id} className={newRoute.new_route_id === highlightedNewRouteId ? 'animate-highlight-row' : ''}>
-                  <TableCell>
-                    <Input
-                      value={newRoute.new_route_name}
-                      disabled={disabled}
-                      className="h-7 text-xs"
-                      onChange={(e) => updateNewRoute(newRoute.new_route_id, 'new_route_name', e.target.value)}
-                    />
-                  </TableCell>
-                  {depots.length > 0 && (
-                    <TableCell>
-                      <Select
-                        value={newRoute.depot ?? 'none'}
-                        onValueChange={(v) => updateNewRoute(newRoute.new_route_id, 'depot', v === 'none' ? null : v, true)}
-                        disabled={disabled}
-                      >
-                        <SelectTrigger className="h-7 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">{'\u2014'}</SelectItem>
-                          {depots.map((d) => (
-                            <SelectItem key={d.depot_id} value={d.depot_id}>{d.depot_name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  )}
-                  {vehicleTypes.length > 0 && (
-                    <TableCell>
-                      <Select
-                        value={newRoute.vehicle_type_id ?? 'none'}
-                        onValueChange={(v) => updateNewRoute(newRoute.new_route_id, 'vehicle_type_id', v === 'none' ? null : v, true)}
-                        disabled={disabled}
-                      >
-                        <SelectTrigger className="h-7 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">{'\u2014'}</SelectItem>
-                          {vehicleTypes.map((vt) => (
-                            <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>{vt.vehicle_type_name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <ComboboxInput
-                      value={newRoute.route_area ?? ''}
-                      options={availableZones}
-                      disabled={disabled}
-                      className="h-7 text-xs"
-                      placeholder="Zone"
-                      onChange={(v) => updateNewRoute(newRoute.new_route_id, 'route_area', v || null, true)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-cc-text-muted">
-                        {newRoute.split_number === 0 ? '\u2014' : newRoute.split_number}
-                      </span>
-                      {hasOverlap && (
-                        <span className="text-[10px] text-cc-danger" title="Split times overlap">
-                          overlap
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="time"
-                      value={newRoute.start_time}
-                      disabled={disabled}
-                      className="h-7 text-xs"
-                      onChange={(e) => updateNewRoute(newRoute.new_route_id, 'start_time', e.target.value)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="time"
-                      value={newRoute.end_time}
-                      disabled={disabled}
-                      className="h-7 text-xs"
-                      onChange={(e) => updateNewRoute(newRoute.new_route_id, 'end_time', e.target.value)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs">{newRoute.platform_hours}</span>
-                  </TableCell>
-                  {breaksExpanded ? (
-                    <>
-                      <TableCell>
-                        <div className="flex gap-1 items-center">
-                          <Input
-                            type="time"
-                            value={newRoute.break_1_start ?? ''}
-                            disabled={disabled}
-                            className="h-7 text-xs"
-                            min={newRoute.start_time}
-                            max={newRoute.end_time}
-                            onChange={(e) => updateNewRoute(newRoute.new_route_id, 'break_1_start', e.target.value || null)}
-                          />
-                          <span className="text-xs text-cc-text-muted">-</span>
-                          <Input
-                            type="time"
-                            value={newRoute.break_1_end ?? ''}
-                            disabled={disabled}
-                            className="h-7 text-xs"
-                            min={newRoute.break_1_start ?? newRoute.start_time}
-                            max={newRoute.end_time}
-                            onChange={(e) => updateNewRoute(newRoute.new_route_id, 'break_1_end', e.target.value || null)}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 items-center">
-                          <Input
-                            type="time"
-                            value={newRoute.break_2_start ?? ''}
-                            disabled={disabled}
-                            className="h-7 text-xs"
-                            min={newRoute.start_time}
-                            max={newRoute.end_time}
-                            onChange={(e) => updateNewRoute(newRoute.new_route_id, 'break_2_start', e.target.value || null)}
-                          />
-                          <span className="text-xs text-cc-text-muted">-</span>
-                          <Input
-                            type="time"
-                            value={newRoute.break_2_end ?? ''}
-                            disabled={disabled}
-                            className="h-7 text-xs"
-                            min={newRoute.break_2_start ?? newRoute.start_time}
-                            max={newRoute.end_time}
-                            onChange={(e) => updateNewRoute(newRoute.new_route_id, 'break_2_end', e.target.value || null)}
-                          />
-                        </div>
-                      </TableCell>
-                    </>
-                  ) : (
-                    <TableCell>
-                      <span className="text-xs text-cc-text-muted">
-                        {(() => {
-                          const b1 = breakDurationLabel(newRoute.break_1_start, newRoute.break_1_end);
-                          const b2 = breakDurationLabel(newRoute.break_2_start, newRoute.break_2_end);
-                          if (b1 && b2) return `${b1}, ${b2}`;
-                          if (b1) return b1;
-                          if (b2) return b2;
-                          return '\u2014';
-                        })()}
-                      </span>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <div className="flex gap-0.5">
-                      {ALL_SERVICE_DAYS.map((day) => (
-                        <button
-                          key={day}
-                          className={`px-1 py-0 text-[10px] rounded ${
-                            days.includes(day)
-                              ? 'bg-cc-accent text-white'
-                              : 'bg-cc-surface-2 text-cc-text-muted'
-                          }`}
-                          onClick={() => toggleServiceDay(newRoute.new_route_id, day)}
-                          disabled={disabled}
-                        >
-                          {day}
-                        </button>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {!disabled && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => addSplit(newRoute)}
-                            title="Add split"
-                            type="button"
-                          >
-                            <SquareSplitHorizontal size={13} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => duplicateNewRoute(newRoute)}
-                            title="Copy route"
-                            type="button"
-                          >
-                            <Copy size={13} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-cc-danger"
-                            onClick={() => deleteNewRoute(newRoute.new_route_id)}
-                            title="Delete route"
-                            type="button"
-                          >
-                            <Trash2 size={13} />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {displayNewRoutes.map((newRoute) => (
+              <RouteTableRow
+                key={newRoute.new_route_id}
+                newRoute={newRoute}
+                depots={depots}
+                vehicleTypes={vehicleTypes}
+                availableZones={availableZones}
+                disabled={readonlyView}
+                hasOverlap={splitOverlapIds.has(newRoute.new_route_id)}
+                highlighted={newRoute.new_route_id === highlightedNewRouteId}
+                breaksExpanded={breaksExpanded}
+                onUpdateRoute={updateNewRoute}
+                onToggleServiceDay={toggleServiceDay}
+                onAddSplit={addSplit}
+                onDuplicate={duplicateNewRoute}
+                onDelete={deleteNewRoute}
+              />
+            ))}
           </TableBody>
         </Table>
       </div>
