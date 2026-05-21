@@ -168,7 +168,7 @@ interface RouteEditorPanelProps {
     estFTE: number;
     estPT: number;
   };
-  onUpdateLocalNewRoutes: (nextNewRoutes: NewRouteRow[]) => void;
+  onUpdateLocalNewRoutes: (nextNewRoutes: NewRouteRow[], immediate?: boolean) => void;
   showToast: (message: string) => void;
 }
 
@@ -292,9 +292,9 @@ export default function RouteEditorPanel({
 
   // ── Actions ──────────────────────────────────────────────────────
 
-  function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[]) {
+  function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[], immediate?: boolean) {
     const withSplits = applySplitDetection(nextNewRoutes);
-    onUpdateLocalNewRoutes(withSplits);
+    onUpdateLocalNewRoutes(withSplits, immediate);
   }
 
   function addNewRoute() {
@@ -345,7 +345,7 @@ export default function RouteEditorPanel({
 
   function saveDraft() {
     if (!draftNewRoute) return;
-    updateLocalNewRoutes([...localNewRoutes, draftNewRoute]);
+    updateLocalNewRoutes([...localNewRoutes, draftNewRoute], true);
     setDraftNewRoute(null);
     setDraftBreakCount(0);
   }
@@ -427,11 +427,11 @@ export default function RouteEditorPanel({
       break_3_end: null,
       vehicle_type_id: newRoute.vehicle_type_id,
     };
-    updateLocalNewRoutes([...nextNewRoutes, newSplit]);
+    updateLocalNewRoutes([...nextNewRoutes, newSplit], true);
   }
 
   function deleteNewRoute(newRouteId: string) {
-    updateLocalNewRoutes(localNewRoutes.filter((r) => r.new_route_id !== newRouteId));
+    updateLocalNewRoutes(localNewRoutes.filter((r) => r.new_route_id !== newRouteId), true);
   }
 
   function duplicateNewRoute(newRoute: NewRouteRow) {
@@ -441,10 +441,10 @@ export default function RouteEditorPanel({
       new_route_name: `${newRoute.new_route_name} copy`,
       split_number: 0,
     };
-    updateLocalNewRoutes([...localNewRoutes, copy]);
+    updateLocalNewRoutes([...localNewRoutes, copy], true);
   }
 
-  function updateNewRoute(newRouteId: string, field: keyof NewRouteRow, value: string | number | null) {
+  function updateNewRoute(newRouteId: string, field: keyof NewRouteRow, value: string | number | null, immediate?: boolean) {
     // Freeze current display order on first edit so the row doesn't jump
     setFrozenOrder((prev) => prev ?? sortedNewRoutes.map((r) => r.new_route_id));
     lastEditedNewRouteIdRef.current = newRouteId;
@@ -470,6 +470,7 @@ export default function RouteEditorPanel({
         }
         return next;
       }),
+      immediate,
     );
   }
 
@@ -481,7 +482,7 @@ export default function RouteEditorPanel({
       ? days.filter((d) => d !== day)
       : [...days, day];
     const sorted = ALL_SERVICE_DAYS.filter((d) => next.includes(d));
-    updateNewRoute(newRouteId, 'service_days', JSON.stringify(sorted));
+    updateNewRoute(newRouteId, 'service_days', JSON.stringify(sorted), true);
   }
 
   // ── Render ──────────────────────────────────────────────────────
@@ -863,7 +864,7 @@ export default function RouteEditorPanel({
                     <TableCell>
                       <Select
                         value={newRoute.depot ?? 'none'}
-                        onValueChange={(v) => updateNewRoute(newRoute.new_route_id, 'depot', v === 'none' ? null : v)}
+                        onValueChange={(v) => updateNewRoute(newRoute.new_route_id, 'depot', v === 'none' ? null : v, true)}
                         disabled={disabled}
                       >
                         <SelectTrigger className="h-7 text-xs">
@@ -882,7 +883,7 @@ export default function RouteEditorPanel({
                     <TableCell>
                       <Select
                         value={newRoute.vehicle_type_id ?? 'none'}
-                        onValueChange={(v) => updateNewRoute(newRoute.new_route_id, 'vehicle_type_id', v === 'none' ? null : v)}
+                        onValueChange={(v) => updateNewRoute(newRoute.new_route_id, 'vehicle_type_id', v === 'none' ? null : v, true)}
                         disabled={disabled}
                       >
                         <SelectTrigger className="h-7 text-xs">
@@ -904,7 +905,7 @@ export default function RouteEditorPanel({
                       disabled={disabled}
                       className="h-7 text-xs"
                       placeholder="Zone"
-                      onChange={(v) => updateNewRoute(newRoute.new_route_id, 'route_area', v || null)}
+                      onChange={(v) => updateNewRoute(newRoute.new_route_id, 'route_area', v || null, true)}
                     />
                   </TableCell>
                   <TableCell>

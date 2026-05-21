@@ -97,7 +97,7 @@ export default function RunStructureTab({
   const [copyDaysSelection, setCopyDaysSelection] = useState<ServiceDay[]>([...ALL_SERVICE_DAYS]);
   const [highlightFilter, setHighlightFilter] = useState<{ routeName: string; days: ServiceDay[] } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ownPersistRef = useRef(false);
+  const ownPersistRef = useRef(0);
 
   // ── Undo/Redo: new routes ──────────────────────────────────────────
   const { pushState: pushNewRouteState, undo: undoNewRoute, redo: redoNewRoute, clearHistory: clearNewRouteHistory, canUndo: canNewRouteUndo, canRedo: canNewRouteRedo } = useUndoRedo<NewRouteRow[]>();
@@ -111,22 +111,28 @@ export default function RunStructureTab({
   const { toasts, showToast, dismissToast } = useToast();
 
   // Sync from server when newRoutes prop changes (skip if it's our own save bouncing back)
+  // Counter handles two bounces: optimistic update (immediate) + server response (delayed)
   useEffect(() => {
-    if (ownPersistRef.current) {
-      ownPersistRef.current = false;
+    if (ownPersistRef.current > 0) {
+      ownPersistRef.current--;
       return;
     }
     setLocalNewRoutes(newRoutes);
     clearNewRouteHistory();
   }, [newRoutes, clearNewRouteHistory]);
 
-  // Debounced save for new routes
+  // Debounced save for new routes (immediate: true bypasses debounce for discrete changes like dropdowns)
   const persistNewRoutes = useCallback(
-    (nextNewRoutes: NewRouteRow[]) => {
+    (nextNewRoutes: NewRouteRow[], immediate?: boolean) => {
       if (readonlyView) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (immediate) {
+        ownPersistRef.current = 2;
+        onNewRoutesChange(nextNewRoutes);
+        return;
+      }
       saveTimerRef.current = setTimeout(() => {
-        ownPersistRef.current = true;
+        ownPersistRef.current = 2;
         onNewRoutesChange(nextNewRoutes);
       }, 500);
     },
@@ -145,10 +151,10 @@ export default function RunStructureTab({
     [readonlyView, onBidResultChange],
   );
 
-  function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[]) {
+  function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[], immediate?: boolean) {
     pushNewRouteState(localNewRoutes);
     setLocalNewRoutes(nextNewRoutes);
-    persistNewRoutes(nextNewRoutes);
+    persistNewRoutes(nextNewRoutes, immediate);
   }
 
   // ── Consolidated undo/redo ─────────────────────────────────────────
@@ -555,7 +561,7 @@ export default function RunStructureTab({
     }
 
     const copiedNewRoutes: NewRouteRow[] = rawNewRoutes.map(({ _originalName, ...rest }) => rest);
-    updateLocalNewRoutes([...localNewRoutes, ...copiedNewRoutes]);
+    updateLocalNewRoutes([...localNewRoutes, ...copiedNewRoutes], true);
     showToast(`Day copied to ${copyDaysSelection.join(', ')}`);
   }
 
@@ -627,7 +633,7 @@ export default function RunStructureTab({
     copiedNewRoute.platform_hours = String(svcHrs);
     copiedNewRoute.pay_hours = String(svcHrs);
 
-    updateLocalNewRoutes([...localNewRoutes, copiedNewRoute]);
+    updateLocalNewRoutes([...localNewRoutes, copiedNewRoute], true);
     showToast(`Route copied to ${copyDaysSelection.join(', ')}`);
   }
 

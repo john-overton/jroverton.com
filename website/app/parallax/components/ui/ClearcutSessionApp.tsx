@@ -317,7 +317,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
     }
     return [...dates].sort();
-  }, [ready, summary]);
+  }, [ready?.state.trips, ready?.state.routes, summary]);
   const selectedDayIds = useMemo(
     () => [...selectedWeekdayDays, ...selectedWeekendDays].sort((a, b) => a - b),
     [selectedWeekdayDays, selectedWeekendDays],
@@ -338,7 +338,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     return ready.state.depots.filter(
       (d) => d.depot_address && routeAddresses.has(d.depot_address.toLowerCase()),
     );
-  }, [ready]);
+  }, [ready?.state.routes, ready?.state.depots]);
 
   // Committed filter snapshot — expensive computations read from this, not live state.
   // Only updates when FilterBar closes (or when panel is already closed).
@@ -365,7 +365,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       .filter((r) => r.depot_address?.toLowerCase() === addr)
       .map((r) => r.route_id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_cfv, ready]);
+  }, [_cfv, ready?.state.routes, ready?.state.depots]);
   const metricsOptions = useMemo(
     () => ({
       selectedDays: cf.dayMode === 'dow' ? committedDayIds : undefined,
@@ -401,7 +401,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
       return true;
     });
-  }, [ready, metricsOptions, depotFilteredRouteIds, _cfv]);
+  }, [ready?.state.routes, metricsOptions, depotFilteredRouteIds, _cfv]);
   const filteredTrips = useMemo(() => {
     if (!ready) return [];
     const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;
@@ -415,7 +415,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       if (ptSet && !ptSet.has(trip.passenger_type)) return false;
       return true;
     });
-  }, [ready, depotFilteredRouteIds, _cfv]);
+  }, [ready?.state.trips, depotFilteredRouteIds, _cfv]);
   const metrics = useMemo(
     () =>
       ready
@@ -427,7 +427,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           })
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, metricsOptions, _cfv],
+    [ready?.state.trips, ready?.state.routes, ready?.state.new_routes, ready?.state.settings, metricsOptions, _cfv],
   );
   const fullDayMetrics = useMemo(
     () =>
@@ -440,7 +440,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           })
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, metricsOptions, _cfv],
+    [ready?.state.trips, ready?.state.routes, ready?.state.new_routes, ready?.state.settings, metricsOptions, _cfv],
   );
   const hasTrips = ready ? ready.state.session.trip_count > 0 : false;
   const hasData = ready ? hasTrips || ready.state.session.route_count > 0 || ready.state.new_routes.length > 0 : false;
@@ -449,7 +449,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     if (selectedDepot === 'all') return 'All Depots';
     const depot = ready?.state.depots.find((d) => d.depot_id === selectedDepot);
     return depot?.depot_name ?? selectedDepot;
-  }, [selectedDepot, ready]);
+  }, [selectedDepot, ready?.state.depots]);
 
   const availableZones = useMemo(() => {
     if (!ready) return [];
@@ -459,7 +459,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     for (const r of ready.state.routes) { if (r.zone) zones.add(r.zone); }
     for (const nr of ready.state.new_routes) { if (nr.route_area) zones.add(nr.route_area); }
     return [...zones].sort();
-  }, [ready, summary]);
+  }, [ready?.state.trips, ready?.state.routes, ready?.state.new_routes, summary]);
 
   const availableStatuses = useMemo(() => {
     if (!ready) return [];
@@ -467,7 +467,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     const statuses = new Set<string>();
     for (const t of ready.state.trips) { if (t.status) statuses.add(t.status); }
     return [...statuses].sort();
-  }, [ready, summary]);
+  }, [ready?.state.trips, summary]);
 
   const availablePassengerTypes = useMemo(() => {
     if (!ready) return [];
@@ -475,12 +475,12 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     const types = new Set<string>();
     for (const t of ready.state.trips) { if (t.passenger_type) types.add(t.passenger_type); }
     return [...types].sort();
-  }, [ready, summary]);
+  }, [ready?.state.trips, summary]);
 
   const availableVehicleTypes = useMemo(() => {
     if (!ready) return [];
     return ready.state.vehicle_types.map((vt) => ({ id: vt.vehicle_type_id, name: vt.vehicle_type_name }));
-  }, [ready]);
+  }, [ready?.state.vehicle_types]);
 
   useEffect(() => {
     if (!ready) return;
