@@ -32,6 +32,7 @@ import type {
   AccessLevel,
   ImportMappingConfig,
   ImportPreviewResponse,
+  PartialSessionState,
   RouteRow,
   SessionMetadata,
   SessionState,
@@ -58,18 +59,18 @@ export type ClearcutLoadState =
 
 function mergeServerResponse(
   current: SessionState,
-  server: SessionState,
+  server: PartialSessionState,
   sentFields: Set<string>,
 ): SessionState {
   return {
     session: server.session,
-    settings: sentFields.has('settings') ? server.settings : current.settings,
-    optimization: sentFields.has('optimization') ? server.optimization : current.optimization,
-    trips: sentFields.has('trips') ? server.trips : current.trips,
-    routes: sentFields.has('routes') ? server.routes : current.routes,
-    new_routes: sentFields.has('new_routes') ? server.new_routes : current.new_routes,
-    depots: sentFields.has('depots') ? server.depots : current.depots,
-    vehicle_types: sentFields.has('vehicle_types') ? server.vehicle_types : current.vehicle_types,
+    settings: server.settings ?? current.settings,
+    optimization: server.optimization ?? current.optimization,
+    trips: server.trips ?? current.trips,
+    routes: server.routes ?? current.routes,
+    new_routes: server.new_routes ?? current.new_routes,
+    depots: server.depots ?? current.depots,
+    vehicle_types: server.vehicle_types ?? current.vehicle_types,
     bid_result: sentFields.has('optimization') ? server.bid_result : current.bid_result,
   };
 }
@@ -223,7 +224,7 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
   }, [token]);
 
   const saveState = useCallback(
-    async (input: SessionStateUpdateInput): Promise<SessionState> => {
+    async (input: SessionStateUpdateInput): Promise<PartialSessionState> => {
       setLoadState((prev) => {
         if (prev.status !== 'ready') return prev;
         const s = prev.state;

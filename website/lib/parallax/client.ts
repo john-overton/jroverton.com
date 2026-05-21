@@ -8,6 +8,7 @@ import type {
   ImportTemplateRecord,
   ImportValidateResponse,
   OptimizationRow,
+  PartialSessionState,
   RouteRow,
   SessionMetadata,
   SessionState,
@@ -192,8 +193,8 @@ export async function updateSession(
   token: string,
   jwt: string,
   input: SessionStateUpdateInput,
-): Promise<SessionState> {
-  return request<SessionState>(`/api/parallax/sessions/${token}`, {
+): Promise<PartialSessionState> {
+  return request<PartialSessionState>(`/api/parallax/sessions/${token}`, {
     method: 'PUT',
     body: input,
     jwt,
@@ -308,7 +309,7 @@ export async function saveSettings(
   token: string,
   jwt: string,
   settings: Partial<Omit<SettingsRow, 'id'>>,
-): Promise<SessionState> {
+): Promise<PartialSessionState> {
   return updateSession(token, jwt, { settings });
 }
 
@@ -316,7 +317,7 @@ export async function saveOptimization(
   token: string,
   jwt: string,
   optimization: Partial<Omit<OptimizationRow, 'id'>>,
-): Promise<SessionState> {
+): Promise<PartialSessionState> {
   return updateSession(token, jwt, { optimization });
 }
 

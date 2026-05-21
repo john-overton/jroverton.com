@@ -16,6 +16,7 @@ import {
 import { recordApiEvent } from '@/lib/parallax/metrics-db';
 import {
   deleteClearcutSession,
+  getPartialSessionState,
   getSessionState,
   saveAndRefreshSessionState,
 } from '@/lib/parallax/service';
@@ -85,8 +86,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       throw new ApiError(400, 'invalid_json', 'Request body must be a valid JSON object.');
     }
 
+    const updatedFields = new Set(Object.keys(body));
     const updatedSession = saveAndRefreshSessionState(session, body);
-    const state = getSessionState(updatedSession);
+    const state = getPartialSessionState(updatedSession, updatedFields);
     return successResponse(state);
   } catch (err) {
     return handleRouteError(err);

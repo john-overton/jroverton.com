@@ -25,7 +25,7 @@ import {
   saveSessionState,
 } from './session-db';
 import { generateToken } from './tokens';
-import type { AccessLevel, BidResult, SessionMetadata, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
+import type { AccessLevel, BidResult, PartialSessionState, SessionMetadata, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
 
 const MAX_TOKEN_GENERATION_ATTEMPTS = 8;
 
@@ -110,9 +110,13 @@ export function saveAndRefreshSessionState(
   input: SessionStateUpdateInput,
 ): SessionRecord {
   saveSessionState(record.edit_token, input);
-  const tripCount = countTrips(record.edit_token);
-  const routeCount = countRoutes(record.edit_token);
-  updateSessionCounts(record.edit_token, tripCount, routeCount);
+
+  if (input.trips || input.routes) {
+    const tripCount = input.trips ? countTrips(record.edit_token) : record.trip_count;
+    const routeCount = input.routes ? countRoutes(record.edit_token) : record.route_count;
+    updateSessionCounts(record.edit_token, tripCount, routeCount);
+  }
+
   touchSessionUpdate(record.edit_token);
 
   const updated = findSessionByEditToken(record.edit_token);
@@ -121,6 +125,48 @@ export function saveAndRefreshSessionState(
   }
 
   return updated;
+}
+
+export function getPartialSessionState(
+  record: SessionRecord,
+  updatedFields: Set<string>,
+): PartialSessionState {
+  touchSessionAccess(record.edit_token);
+
+  const optimization = updatedFields.has('optimization')
+    ? getOptimization(record.edit_token)
+    : null;
+
+  let bidResult: BidResult | null = null;
+  if (optimization?.bid_result_json) {
+    try {
+      bidResult = JSON.parse(optimization.bid_result_json) as BidResult;
+    } catch {
+      bidResult = null;
+    }
+  }
+
+  return {
+    session: {
+      edit_token: record.edit_token,
+      readonly_token: record.readonly_token,
+      name: record.name,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      accessed_at: record.accessed_at,
+      trip_count: record.trip_count,
+      route_count: record.route_count,
+      has_password: Boolean(record.password_hash),
+    },
+    settings: updatedFields.has('settings') ? getSettings(record.edit_token) : null,
+    optimization,
+    trips: updatedFields.has('trips') ? listTrips(record.edit_token) : null,
+    routes: updatedFields.has('routes') ? listRoutes(record.edit_token) : null,
+    new_routes: updatedFields.has('new_routes') ? listNewRoutes(record.edit_token) : null,
+    depots: updatedFields.has('depots') ? listDepots(record.edit_token) : null,
+    vehicle_types: updatedFields.has('vehicle_types') ? listVehicleTypes(record.edit_token) : null,
+    bid_result: bidResult,
+  };
 }
 
 export async function cloneClearcutSession(source: SessionRecord): Promise<SessionRecord> {

@@ -251,6 +251,18 @@ export interface SessionState {
   bid_result: BidResult | null;
 }
 
+export interface PartialSessionState {
+  session: SessionState['session'];
+  settings: SettingsRow | null;
+  optimization: OptimizationRow | null;
+  trips: TripRow[] | null;
+  routes: RouteRow[] | null;
+  new_routes: NewRouteRow[] | null;
+  depots: DepotRow[] | null;
+  vehicle_types: VehicleTypeRow[] | null;
+  bid_result: BidResult | null;
+}
+
 export interface SessionSummary {
   tripCount: number;
   routeCount: number;
