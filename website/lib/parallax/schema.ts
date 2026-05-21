@@ -94,7 +94,8 @@ CREATE TABLE IF NOT EXISTS settings (
   day_type TEXT NOT NULL DEFAULT 'weekday',
   time_range_start TEXT,
   time_range_end TEXT,
-  is_demo INTEGER NOT NULL DEFAULT 0
+  is_demo INTEGER NOT NULL DEFAULT 0,
+  new_routes_version INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS optimization (

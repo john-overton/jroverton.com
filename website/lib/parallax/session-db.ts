@@ -8,9 +8,11 @@ import { SESSION_SCHEMA_SQL } from './schema';
 import { computeServiceDayWindow } from './metrics';
 import type {
   DepotRow,
+  NewRouteRow,
+  NewRoutesDelta,
+  NewRoutesDeltaResult,
   OptimizationRow,
   RouteRow,
-  NewRouteRow,
   SessionMetadata,
   SessionSummary,
   SessionStateUpdateInput,
@@ -343,6 +345,16 @@ function ensureRouteZoneColumn(db: Database.Database): void {
   }
 }
 
+function ensureNewRoutesVersionColumn(db: Database.Database): void {
+  const columns = db
+    .prepare("SELECT name FROM pragma_table_info('settings')")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('new_routes_version')) {
+    db.exec('ALTER TABLE settings ADD COLUMN new_routes_version INTEGER NOT NULL DEFAULT 0;');
+  }
+}
+
 function normalizeTripRow(row: TripRow): TripRow {
   return {
     ...row,
@@ -368,6 +380,7 @@ function openSessionDb(editToken: string): Database.Database {
   ensureSettingsIsDemoColumn(db);
   ensureTripZoneColumn(db);
   ensureRouteZoneColumn(db);
+  ensureNewRoutesVersionColumn(db);
   db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
   db.prepare('INSERT OR IGNORE INTO optimization (id) VALUES (1)').run();
   return db;
@@ -601,6 +614,7 @@ export function getAllSessionMetadata(editToken: string, access: 'edit' | 'reado
       depots,
       vehicle_types: vehicleTypes,
       bid_result: bidResult,
+      new_routes_version: (settings as SettingsRow & { new_routes_version: number }).new_routes_version ?? 0,
       summary: {
         tripCount,
         routeCount,
@@ -827,6 +841,7 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
         for (const row of input.new_routes) {
           insertNewRoute.run(...NEW_ROUTE_COLUMNS.map((column) => row[column as keyof NewRouteRow]));
         }
+        db.prepare('UPDATE settings SET new_routes_version = new_routes_version + 1 WHERE id = 1').run();
       }
 
       if (input.depots) {
@@ -853,6 +868,53 @@ export function saveSessionState(editToken: string, input: SessionStateUpdateInp
     });
 
     transaction();
+  });
+}
+
+export function getNewRoutesVersion(editToken: string): number {
+  return withSessionDb(editToken, (db) => {
+    const row = db.prepare('SELECT new_routes_version FROM settings WHERE id = 1').get() as { new_routes_version: number } | undefined;
+    return row?.new_routes_version ?? 0;
+  });
+}
+
+export function applyNewRoutesDelta(
+  editToken: string,
+  delta: NewRoutesDelta,
+): NewRoutesDeltaResult {
+  return withSessionDb(editToken, (db) => {
+    const result = db.transaction(() => {
+      const row = db.prepare('SELECT new_routes_version FROM settings WHERE id = 1').get() as { new_routes_version: number };
+      const currentVersion = row.new_routes_version;
+
+      if (currentVersion !== delta.expected_version) {
+        const all = db.prepare('SELECT * FROM new_routes ORDER BY new_route_name, split_number').all() as NewRouteRow[];
+        return { conflict: true as const, version: currentVersion, all };
+      }
+
+      if (delta.delete_ids.length > 0) {
+        const deleteSt = db.prepare('DELETE FROM new_routes WHERE new_route_id = ?');
+        for (const id of delta.delete_ids) {
+          deleteSt.run(id);
+        }
+      }
+
+      if (delta.upsert.length > 0) {
+        const upsertSt = db.prepare(
+          `INSERT OR REPLACE INTO new_routes (${NEW_ROUTE_COLUMNS.join(',')})
+           VALUES (${NEW_ROUTE_COLUMNS.map(() => '?').join(',')})`,
+        );
+        for (const row of delta.upsert) {
+          upsertSt.run(...NEW_ROUTE_COLUMNS.map((column) => row[column as keyof NewRouteRow]));
+        }
+      }
+
+      db.prepare('UPDATE settings SET new_routes_version = new_routes_version + 1 WHERE id = 1').run();
+      const updated = db.prepare('SELECT new_routes_version FROM settings WHERE id = 1').get() as { new_routes_version: number };
+      return { conflict: false as const, version: updated.new_routes_version };
+    })();
+
+    return result;
   });
 }
 

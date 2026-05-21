@@ -251,6 +251,16 @@ export interface SessionState {
   bid_result: BidResult | null;
 }
 
+export interface NewRoutesDelta {
+  upsert: NewRouteRow[];
+  delete_ids: string[];
+  expected_version: number;
+}
+
+export type NewRoutesDeltaResult =
+  | { conflict: true; version: number; all: NewRouteRow[] }
+  | { conflict: false; version: number };
+
 export interface PartialSessionState {
   session: SessionState['session'];
   settings: SettingsRow | null;
@@ -261,6 +271,8 @@ export interface PartialSessionState {
   depots: DepotRow[] | null;
   vehicle_types: VehicleTypeRow[] | null;
   bid_result: BidResult | null;
+  new_routes_version?: number;
+  new_routes_conflict?: boolean;
 }
 
 export interface SessionSummary {
@@ -281,6 +293,7 @@ export interface SessionMetadata {
   depots: DepotRow[];
   vehicle_types: VehicleTypeRow[];
   bid_result: BidResult | null;
+  new_routes_version: number;
   summary: SessionSummary;
 }
 
@@ -290,6 +303,7 @@ export interface SessionStateUpdateInput {
   trips?: TripRow[];
   routes?: RouteRow[];
   new_routes?: NewRouteRow[];
+  new_routes_delta?: NewRoutesDelta;
   depots?: DepotRow[];
   vehicle_types?: VehicleTypeRow[];
 }

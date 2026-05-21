@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   applyImportMappingConfig,
@@ -32,6 +32,8 @@ import type {
   AccessLevel,
   ImportMappingConfig,
   ImportPreviewResponse,
+  NewRouteRow,
+  NewRoutesDelta,
   PartialSessionState,
   RouteRow,
   SessionMetadata,
@@ -62,13 +64,20 @@ function mergeServerResponse(
   server: PartialSessionState,
   sentFields: Set<string>,
 ): SessionState {
+  let newRoutes = current.new_routes;
+  if (server.new_routes_conflict && server.new_routes) {
+    newRoutes = server.new_routes;
+  } else if (server.new_routes) {
+    newRoutes = server.new_routes;
+  }
+
   return {
     session: server.session,
     settings: server.settings ?? current.settings,
     optimization: server.optimization ?? current.optimization,
     trips: server.trips ?? current.trips,
     routes: server.routes ?? current.routes,
-    new_routes: server.new_routes ?? current.new_routes,
+    new_routes: newRoutes,
     depots: server.depots ?? current.depots,
     vehicle_types: server.vehicle_types ?? current.vehicle_types,
     bid_result: sentFields.has('optimization') ? server.bid_result : current.bid_result,
@@ -87,6 +96,7 @@ function isJwtAuthError(error: unknown): boolean {
 
 export function useClearcutSession(token: string, mode: ClearcutMode) {
   const [loadState, setLoadState] = useState<ClearcutLoadState>({ status: 'loading' });
+  const newRoutesVersionRef = useRef<number>(0);
 
   const TRIP_PAGE_SIZE = 5000;
 
@@ -134,6 +144,8 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
 
         await routesPromise;
         setLoadState({ status: 'loading', stage: 'routes', progress: { loaded: allRoutes.length, total: allRoutes.length }, metadata });
+
+        newRoutesVersionRef.current = metadata.new_routes_version;
 
         const state: SessionState = {
           session: metadata.session,
@@ -228,13 +240,28 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
       setLoadState((prev) => {
         if (prev.status !== 'ready') return prev;
         const s = prev.state;
+
+        let newRoutes = input.new_routes ?? s.new_routes;
+        if (input.new_routes_delta) {
+          const deleteSet = new Set(input.new_routes_delta.delete_ids);
+          const upsertMap = new Map(input.new_routes_delta.upsert.map((r) => [r.new_route_id, r]));
+          newRoutes = s.new_routes
+            .filter((r) => !deleteSet.has(r.new_route_id))
+            .map((r) => upsertMap.get(r.new_route_id) ?? r);
+          for (const r of input.new_routes_delta.upsert) {
+            if (!s.new_routes.some((existing) => existing.new_route_id === r.new_route_id)) {
+              newRoutes.push(r);
+            }
+          }
+        }
+
         const optimistic: SessionState = {
           ...s,
           settings: input.settings ? { ...s.settings, ...input.settings } : s.settings,
           optimization: input.optimization ? { ...s.optimization, ...input.optimization } : s.optimization,
           trips: input.trips ?? s.trips,
           routes: input.routes ?? s.routes,
-          new_routes: input.new_routes ?? s.new_routes,
+          new_routes: newRoutes,
           depots: input.depots ?? s.depots,
           vehicle_types: input.vehicle_types ?? s.vehicle_types,
         };
@@ -243,6 +270,9 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
       const sentFields = new Set(Object.keys(input));
       return withEditJwt(async (jwt) => {
         const serverState = await updateSession(token, jwt, input);
+        if (serverState.new_routes_version != null) {
+          newRoutesVersionRef.current = serverState.new_routes_version;
+        }
         setLoadState((prev) => {
           if (prev.status !== 'ready') return prev;
           const merged = mergeServerResponse(prev.state, serverState, sentFields);
@@ -391,6 +421,7 @@ export function useClearcutSession(token: string, mode: ClearcutMode) {
     loadSession,
     unlock,
     saveState,
+    getNewRoutesVersion: () => newRoutesVersionRef.current,
     rename,
     clone,
     remove,

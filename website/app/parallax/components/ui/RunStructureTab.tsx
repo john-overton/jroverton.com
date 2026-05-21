@@ -59,6 +59,7 @@ interface RunStructureTabProps {
     value: number | string | null,
   ) => void;
   onNewRoutesChange: (newRoutes: NewRouteRow[]) => void;
+  onNewRoutesDelta: (upsert: NewRouteRow[], deleteIds: string[]) => void;
   depots: DepotRow[];
   vehicleTypes: VehicleTypeRow[];
   selectedVehicleTypes: string[];
@@ -79,6 +80,7 @@ export default function RunStructureTab({
   filteredRoutes,
   intervalMinutes,
   onNewRoutesChange,
+  onNewRoutesDelta,
   depots,
   vehicleTypes,
   selectedVehicleTypes,
@@ -121,22 +123,47 @@ export default function RunStructureTab({
     clearNewRouteHistory();
   }, [newRoutes, clearNewRouteHistory]);
 
-  // Debounced save for new routes (immediate: true bypasses debounce for discrete changes like dropdowns)
   const persistNewRoutes = useCallback(
-    (nextNewRoutes: NewRouteRow[], immediate?: boolean) => {
+    (prevNewRoutes: NewRouteRow[], nextNewRoutes: NewRouteRow[], immediate?: boolean) => {
       if (readonlyView) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (immediate) {
+
+      const doSave = () => {
         ownPersistRef.current = 2;
-        onNewRoutesChange(nextNewRoutes);
+
+        const prevMap = new Map(prevNewRoutes.map((r) => [r.new_route_id, r]));
+        const nextMap = new Map(nextNewRoutes.map((r) => [r.new_route_id, r]));
+
+        const upsert: NewRouteRow[] = [];
+        const deleteIds: string[] = [];
+
+        for (const [id] of prevMap) {
+          if (!nextMap.has(id)) deleteIds.push(id);
+        }
+        for (const [id, route] of nextMap) {
+          const prev = prevMap.get(id);
+          if (!prev || JSON.stringify(prev) !== JSON.stringify(route)) {
+            upsert.push(route);
+          }
+        }
+
+        const isSmallDelta = upsert.length + deleteIds.length <= 10
+          && upsert.length + deleteIds.length > 0;
+
+        if (isSmallDelta) {
+          onNewRoutesDelta(upsert, deleteIds);
+        } else {
+          onNewRoutesChange(nextNewRoutes);
+        }
+      };
+
+      if (immediate) {
+        doSave();
         return;
       }
-      saveTimerRef.current = setTimeout(() => {
-        ownPersistRef.current = 2;
-        onNewRoutesChange(nextNewRoutes);
-      }, 500);
+      saveTimerRef.current = setTimeout(doSave, 500);
     },
-    [readonlyView, onNewRoutesChange],
+    [readonlyView, onNewRoutesChange, onNewRoutesDelta],
   );
 
   // Debounced save for bids
@@ -152,9 +179,10 @@ export default function RunStructureTab({
   );
 
   function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[], immediate?: boolean) {
-    pushNewRouteState(localNewRoutes);
+    const prev = localNewRoutes;
+    pushNewRouteState(prev);
     setLocalNewRoutes(nextNewRoutes);
-    persistNewRoutes(nextNewRoutes, immediate);
+    persistNewRoutes(prev, nextNewRoutes, immediate);
   }
 
   // ── Consolidated undo/redo ─────────────────────────────────────────
@@ -165,7 +193,7 @@ export default function RunStructureTab({
   function handleUndo() {
     if (subTab === 'runeditor') {
       const previous = undoNewRoute(localNewRoutes);
-      if (previous) { setLocalNewRoutes(previous); persistNewRoutes(previous); }
+      if (previous) { setLocalNewRoutes(previous); persistNewRoutes(localNewRoutes, previous); }
     } else if (subTab === 'bids' && bidResult) {
       const previous = undoBid(bidResult);
       if (previous) { setBidResult(previous); persistBidResult(previous); }
@@ -175,7 +203,7 @@ export default function RunStructureTab({
   function handleRedo() {
     if (subTab === 'runeditor') {
       const next = redoNewRoute(localNewRoutes);
-      if (next) { setLocalNewRoutes(next); persistNewRoutes(next); }
+      if (next) { setLocalNewRoutes(next); persistNewRoutes(localNewRoutes, next); }
     } else if (subTab === 'bids' && bidResult) {
       const next = redoBid(bidResult);
       if (next) { setBidResult(next); persistBidResult(next); }

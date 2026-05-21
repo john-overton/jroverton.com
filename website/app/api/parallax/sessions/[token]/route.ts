@@ -86,9 +86,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       throw new ApiError(400, 'invalid_json', 'Request body must be a valid JSON object.');
     }
 
+    if (body.new_routes && body.new_routes_delta) {
+      throw new ApiError(400, 'invalid_input', 'Cannot send both new_routes and new_routes_delta.');
+    }
+
     const updatedFields = new Set(Object.keys(body));
-    const updatedSession = saveAndRefreshSessionState(session, body);
-    const state = getPartialSessionState(updatedSession, updatedFields);
+    const { record: updatedSession, deltaResult } = saveAndRefreshSessionState(session, body);
+    const state = getPartialSessionState(updatedSession, updatedFields, deltaResult);
     return successResponse(state);
   } catch (err) {
     return handleRouteError(err);

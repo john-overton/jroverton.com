@@ -10,11 +10,13 @@ import {
   updateSessionCounts,
 } from './registry-db';
 import {
+  applyNewRoutesDelta,
   cloneSessionDb,
   countRoutes,
   countTrips,
   deleteSessionDb,
   getAllSessionMetadata,
+  getNewRoutesVersion,
   getOptimization,
   getSettings,
   listDepots,
@@ -25,7 +27,7 @@ import {
   saveSessionState,
 } from './session-db';
 import { generateToken } from './tokens';
-import type { AccessLevel, BidResult, PartialSessionState, SessionMetadata, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
+import type { AccessLevel, BidResult, NewRouteRow, NewRoutesDeltaResult, PartialSessionState, SessionMetadata, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
 
 const MAX_TOKEN_GENERATION_ATTEMPTS = 8;
 
@@ -108,7 +110,13 @@ export function getSessionMetadataResponse(record: SessionRecord, access: Access
 export function saveAndRefreshSessionState(
   record: SessionRecord,
   input: SessionStateUpdateInput,
-): SessionRecord {
+): { record: SessionRecord; deltaResult?: NewRoutesDeltaResult } {
+  let deltaResult: NewRoutesDeltaResult | undefined;
+
+  if (input.new_routes_delta) {
+    deltaResult = applyNewRoutesDelta(record.edit_token, input.new_routes_delta);
+  }
+
   saveSessionState(record.edit_token, input);
 
   if (input.trips || input.routes) {
@@ -124,12 +132,13 @@ export function saveAndRefreshSessionState(
     throw new ApiError(500, 'session_refresh_failed', 'Session was not found after update.');
   }
 
-  return updated;
+  return { record: updated, deltaResult };
 }
 
 export function getPartialSessionState(
   record: SessionRecord,
   updatedFields: Set<string>,
+  deltaResult?: NewRoutesDeltaResult,
 ): PartialSessionState {
   touchSessionAccess(record.edit_token);
 
@@ -144,6 +153,21 @@ export function getPartialSessionState(
     } catch {
       bidResult = null;
     }
+  }
+
+  let newRoutes: NewRouteRow[] | null = null;
+  let newRoutesVersion: number | undefined;
+  let newRoutesConflict: boolean | undefined;
+
+  if (deltaResult) {
+    newRoutesVersion = deltaResult.version;
+    if (deltaResult.conflict) {
+      newRoutesConflict = true;
+      newRoutes = deltaResult.all;
+    }
+  } else if (updatedFields.has('new_routes')) {
+    newRoutes = listNewRoutes(record.edit_token);
+    newRoutesVersion = getNewRoutesVersion(record.edit_token);
   }
 
   return {
@@ -162,10 +186,12 @@ export function getPartialSessionState(
     optimization,
     trips: updatedFields.has('trips') ? listTrips(record.edit_token) : null,
     routes: updatedFields.has('routes') ? listRoutes(record.edit_token) : null,
-    new_routes: updatedFields.has('new_routes') ? listNewRoutes(record.edit_token) : null,
+    new_routes: newRoutes,
     depots: updatedFields.has('depots') ? listDepots(record.edit_token) : null,
     vehicle_types: updatedFields.has('vehicle_types') ? listVehicleTypes(record.edit_token) : null,
     bid_result: bidResult,
+    new_routes_version: newRoutesVersion,
+    new_routes_conflict: newRoutesConflict,
   };
 }
 

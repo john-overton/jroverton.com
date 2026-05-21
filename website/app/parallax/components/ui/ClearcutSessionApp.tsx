@@ -822,6 +822,21 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     });
   }
 
+  function onNewRoutesDelta(upsert: NewRouteRow[], deleteIds: string[]) {
+    if (!ready || readonlyView) {
+      return;
+    }
+    session.saveState({
+      new_routes_delta: {
+        upsert,
+        delete_ids: deleteIds,
+        expected_version: session.getNewRoutesVersion(),
+      },
+    }).catch((saveError) => {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save new routes.');
+    });
+  }
+
   function onBidResultChange(bidResult: BidResult | null) {
     if (!ready || readonlyView) {
       return;
@@ -1327,6 +1342,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           intervalMinutes={cf.intervalMinutes}
           onOptimizationChange={onOptimizationChange}
           onNewRoutesChange={onNewRoutesChange}
+          onNewRoutesDelta={onNewRoutesDelta}
           depots={ready.state.depots}
           vehicleTypes={ready.state.vehicle_types}
           selectedVehicleTypes={selectedVehicleTypes}

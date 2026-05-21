@@ -31,7 +31,7 @@ export async function POST(
       payload.routeVehicleTypeNames,
     );
 
-    const updatedSession = saveAndRefreshSessionState(session, {
+    const { record: updatedSession } = saveAndRefreshSessionState(session, {
       trips: payload.trips,
       routes: updatedRoutes,
       depots: payload.depots,
