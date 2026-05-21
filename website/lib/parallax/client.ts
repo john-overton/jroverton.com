@@ -9,6 +9,7 @@ import type {
   ImportValidateResponse,
   OptimizationRow,
   RouteRow,
+  SessionMetadata,
   SessionState,
   SessionStateUpdateInput,
   SettingsRow,
@@ -89,6 +90,7 @@ export interface ListTripsResponse {
   limit: number | null;
   offset: number | null;
   count: number;
+  total: number;
 }
 
 export interface ListRoutesResponse {
@@ -157,6 +159,33 @@ export async function createSession(input?: {
 
 export async function getSession(token: string, jwt?: string | null): Promise<GetSessionResponse> {
   return request<GetSessionResponse>(`/api/parallax/sessions/${token}`, { jwt });
+}
+
+export interface GetSessionMetadataResponse extends SessionMetadata {
+  jwt?: string;
+}
+
+export async function getSessionMetadata(token: string, jwt?: string | null): Promise<GetSessionMetadataResponse> {
+  return request<GetSessionMetadataResponse>(`/api/parallax/sessions/${token}/metadata`, { jwt });
+}
+
+export async function listTripsPage(
+  token: string,
+  jwt: string | null,
+  limit: number,
+  offset: number,
+): Promise<ListTripsResponse> {
+  return request<ListTripsResponse>(
+    `/api/parallax/sessions/${token}/trips?limit=${limit}&offset=${offset}`,
+    { jwt },
+  );
+}
+
+export async function listAllRoutes(
+  token: string,
+  jwt: string | null,
+): Promise<ListRoutesResponse> {
+  return request<ListRoutesResponse>(`/api/parallax/sessions/${token}/routes`, { jwt });
 }
 
 export async function updateSession(

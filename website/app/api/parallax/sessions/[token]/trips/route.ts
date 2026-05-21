@@ -7,7 +7,7 @@ import {
   requireSessionByToken,
 } from '@/lib/parallax/http';
 import { touchSessionAccess } from '@/lib/parallax/registry-db';
-import { listTrips } from '@/lib/parallax/session-db';
+import { countTrips, listTrips } from '@/lib/parallax/session-db';
 
 export const runtime = 'nodejs';
 
@@ -25,11 +25,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const offset = offsetRaw ? Number(offsetRaw) : undefined;
 
     const trips = listTrips(resolved.session.edit_token, limit, offset);
+    const total = countTrips(resolved.session.edit_token);
     return successResponse({
       items: trips,
       limit: limit ?? null,
       offset: offset ?? null,
       count: trips.length,
+      total,
     });
   } catch (err) {
     return handleRouteError(err);

@@ -11,10 +11,13 @@ import {
   deleteSession,
   deleteImportTemplateRecord,
   getSession,
+  getSessionMetadata,
   importNewRoutes,
   importRoutes,
   importTrips,
+  listAllRoutes,
   listImportTemplates,
+  listTripsPage,
   loadDemoData,
   previewImportFile,
   removeSessionPassword,
@@ -29,14 +32,19 @@ import type {
   AccessLevel,
   ImportMappingConfig,
   ImportPreviewResponse,
+  RouteRow,
+  SessionMetadata,
   SessionState,
   SessionStateUpdateInput,
+  TripRow,
 } from './types';
 
 export type ClearcutMode = 'edit' | 'readonly';
 
+export type LoadingStage = 'metadata' | 'trips' | 'routes';
+
 export type ClearcutLoadState =
-  | { status: 'loading' }
+  | { status: 'loading'; stage?: LoadingStage; progress?: { loaded: number; total: number }; metadata?: SessionMetadata }
   | { status: 'password_required'; name: string; retryAfterSeconds?: number }
   | { status: 'not_found' }
   | { status: 'error'; message: string }
@@ -45,6 +53,7 @@ export type ClearcutLoadState =
       state: SessionState;
       access: AccessLevel;
       hasJwt: boolean;
+      summary?: SessionMetadata['summary'];
     };
 
 function isJwtAuthError(error: unknown): boolean {
@@ -60,30 +69,82 @@ function isJwtAuthError(error: unknown): boolean {
 export function useClearcutSession(token: string, mode: ClearcutMode) {
   const [loadState, setLoadState] = useState<ClearcutLoadState>({ status: 'loading' });
 
+  const TRIP_PAGE_SIZE = 5000;
+
   const loadSession = useCallback(
     async (options?: { forceNoJwt?: boolean }) => {
-      setLoadState({ status: 'loading' });
-      const attempt = async (jwt: string | null) => {
-        const data = await getSession(token, jwt);
-        if (data.jwt) {
-          setSessionJwt(token, data.jwt);
+      setLoadState({ status: 'loading', stage: 'metadata' });
+
+      const attemptProgressiveLoad = async (jwt: string | null) => {
+        const metadata = await getSessionMetadata(token, jwt);
+        if (metadata.jwt) {
+          setSessionJwt(token, metadata.jwt);
         }
+        const resolvedJwt = metadata.jwt ?? jwt;
+
+        setLoadState({
+          status: 'loading',
+          stage: 'trips',
+          progress: { loaded: 0, total: metadata.summary.tripCount },
+          metadata,
+        });
+
+        const allTrips: TripRow[] = [];
+        const allRoutes: RouteRow[] = [];
+        const totalTrips = metadata.summary.tripCount;
+
+        const routesPromise = listAllRoutes(token, resolvedJwt).then((res) => {
+          allRoutes.push(...res.items);
+        });
+
+        if (totalTrips > 0) {
+          let offset = 0;
+          while (offset < totalTrips) {
+            const page = await listTripsPage(token, resolvedJwt, TRIP_PAGE_SIZE, offset);
+            allTrips.push(...page.items);
+            offset += page.items.length;
+            if (page.items.length === 0) break;
+            setLoadState({
+              status: 'loading',
+              stage: 'trips',
+              progress: { loaded: allTrips.length, total: totalTrips },
+              metadata,
+            });
+          }
+        }
+
+        await routesPromise;
+        setLoadState({ status: 'loading', stage: 'routes', progress: { loaded: allRoutes.length, total: allRoutes.length }, metadata });
+
+        const state: SessionState = {
+          session: metadata.session,
+          settings: metadata.settings,
+          optimization: metadata.optimization,
+          trips: allTrips,
+          routes: allRoutes,
+          new_routes: metadata.new_routes,
+          depots: metadata.depots,
+          vehicle_types: metadata.vehicle_types,
+          bid_result: metadata.bid_result,
+        };
+
         setLoadState({
           status: 'ready',
-          state: data,
+          state,
           access: mode === 'readonly' ? 'readonly' : 'edit',
-          hasJwt: Boolean(data.jwt || jwt),
+          hasJwt: Boolean(resolvedJwt),
+          summary: metadata.summary,
         });
       };
 
       try {
         const jwt = options?.forceNoJwt ? null : getSessionJwt(token);
-        await attempt(jwt);
+        await attemptProgressiveLoad(jwt);
       } catch (error) {
         if (isJwtAuthError(error) && !options?.forceNoJwt) {
           clearSessionJwt(token);
           try {
-            await attempt(null);
+            await attemptProgressiveLoad(null);
             return;
           } catch (retryError) {
             error = retryError;

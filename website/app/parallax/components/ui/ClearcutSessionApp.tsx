@@ -17,7 +17,7 @@ import { extractNewDepotsFromRoutes } from '@/lib/parallax/depot-utils';
 import { checkMapboxStatus, trackPageView } from '@/lib/parallax/tracking';
 import { computeClearcutMetrics } from '@/lib/parallax/metrics';
 import type { BidResult, DepotRow, NewRouteRow, VehicleTypeRow } from '@/lib/parallax/types';
-import { useClearcutSession, type ClearcutMode } from '@/lib/parallax/use-clearcut-session';
+import { useClearcutSession, type ClearcutLoadState, type ClearcutMode } from '@/lib/parallax/use-clearcut-session';
 import { useClearcutTheme } from '@/app/parallax/theme/ClearcutThemeProvider';
 
 import ClearcutShell from './ClearcutShell';
@@ -52,6 +52,100 @@ const DAY_LABELS: Record<number, string> = {
   5: 'Fri',
   6: 'Sat',
 };
+
+function LoadingRow({
+  label,
+  status,
+  loaded,
+  total,
+}: {
+  label: string;
+  status: 'waiting' | 'active' | 'done';
+  loaded?: number;
+  total?: number;
+}) {
+  const pct = total && total > 0 ? Math.min(100, Math.round((loaded ?? 0) / total * 100)) : 0;
+  const formatCount = (n: number) => n.toLocaleString();
+
+  return (
+    <div className="flex items-center gap-3 h-8">
+      <div className="w-28 text-sm font-medium text-cc-text-secondary shrink-0">{label}</div>
+      <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--color-cc-border)' }}>
+        {status !== 'waiting' && (
+          <div
+            className="h-full rounded-full transition-all duration-300 ease-out"
+            style={{
+              width: `${status === 'done' ? 100 : pct}%`,
+              backgroundColor: 'var(--color-cc-accent)',
+            }}
+          />
+        )}
+      </div>
+      <div className="w-40 text-xs text-right font-mono text-cc-text-muted shrink-0">
+        {status === 'waiting' && <span className="opacity-40">waiting</span>}
+        {status === 'active' && total != null && total > 0 && (
+          <span>{formatCount(loaded ?? 0)} / {formatCount(total)}</span>
+        )}
+        {status === 'active' && (total == null || total === 0) && (
+          <span className="opacity-60">loading...</span>
+        )}
+        {status === 'done' && total != null && total > 0 && (
+          <span>{formatCount(total)} ✓</span>
+        )}
+        {status === 'done' && (total == null || total === 0) && (
+          <span>✓</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SessionLoadingProgress({ loadState }: { loadState: Extract<ClearcutLoadState, { status: 'loading' }> }) {
+  const { stage, progress, metadata } = loadState;
+  const summary = metadata?.summary;
+
+  type RowStatus = 'waiting' | 'active' | 'done';
+
+  const metadataStatus: RowStatus = stage === 'metadata' ? 'active' : 'done';
+
+  let tripsStatus: RowStatus = 'waiting';
+  let tripsLoaded = 0;
+  let tripsTotal = summary?.tripCount ?? 0;
+  if (stage === 'trips') {
+    tripsStatus = 'active';
+    tripsLoaded = progress?.loaded ?? 0;
+    if (progress && progress.loaded >= (summary?.tripCount ?? 0) && tripsTotal > 0) {
+      tripsStatus = 'done';
+    }
+  } else if (stage === 'routes') {
+    tripsStatus = 'done';
+    tripsLoaded = tripsTotal;
+  }
+
+  let routesStatus: RowStatus = 'waiting';
+  let routesLoaded = 0;
+  let routesTotal = summary?.routeCount ?? 0;
+  if (stage === 'routes') {
+    routesStatus = 'done';
+    routesLoaded = routesTotal;
+  }
+
+  return (
+    <div className="pt-16 pb-8 flex flex-col items-center justify-center">
+      <h2 className="text-lg font-semibold mb-6" style={{ color: 'var(--color-cc-text)' }}>
+        Loading Session{metadata?.session.name ? `: ${metadata.session.name}` : ''}...
+      </h2>
+      <div className="w-full max-w-md space-y-1">
+        <LoadingRow label="Settings" status={metadataStatus} />
+        <LoadingRow label="Depots" status={metadataStatus} total={metadata?.depots.length} loaded={metadata?.depots.length} />
+        <LoadingRow label="Vehicle Types" status={metadataStatus} total={metadata?.vehicle_types.length} loaded={metadata?.vehicle_types.length} />
+        <LoadingRow label="Routes" status={routesStatus} loaded={routesLoaded} total={routesTotal} />
+        <LoadingRow label="Trips" status={tripsStatus} loaded={tripsLoaded} total={tripsTotal} />
+        <LoadingRow label="New Routes" status={metadataStatus} total={metadata?.new_routes.length} loaded={metadata?.new_routes.length} />
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   token: string;
@@ -113,6 +207,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   }, []);
 
   const ready = session.loadState.status === 'ready' ? session.loadState : null;
+  const summary = ready?.summary;
   readyRef.current = ready;
 
   // Track page view once the session loads
@@ -127,14 +222,16 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const fallbackServiceEndMinutes = parseClockToMinutes(ready?.state.settings.service_day_end, 21 * 60);
   const sliderBounds = useMemo(
     () =>
-      deriveSliderBounds({
-        trips: ready?.state.trips ?? [],
-        routes: ready?.state.routes ?? [],
-        newRoutes: ready?.state.new_routes ?? [],
-        fallbackStartMinutes: fallbackServiceStartMinutes,
-        fallbackEndMinutes: fallbackServiceEndMinutes,
-      }),
-    [fallbackServiceEndMinutes, fallbackServiceStartMinutes, ready?.state.trips, ready?.state.routes, ready?.state.new_routes],
+      summary
+        ? summary.sliderBounds
+        : deriveSliderBounds({
+            trips: ready?.state.trips ?? [],
+            routes: ready?.state.routes ?? [],
+            newRoutes: ready?.state.new_routes ?? [],
+            fallbackStartMinutes: fallbackServiceStartMinutes,
+            fallbackEndMinutes: fallbackServiceEndMinutes,
+          }),
+    [fallbackServiceEndMinutes, fallbackServiceStartMinutes, ready?.state.trips, ready?.state.routes, ready?.state.new_routes, summary],
   );
   const serviceStartMinutes = sliderBounds.startMinutes;
   const serviceEndMinutes = sliderBounds.endMinutes;
@@ -151,6 +248,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   }, [serviceStartMinutes, serviceEndMinutes]);
   const availableDates = useMemo(() => {
     if (!ready) return [];
+    if (summary) return summary.dates;
     const dates = new Set<string>();
     for (const trip of ready.state.trips) {
       const t =
@@ -174,7 +272,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
     }
     return [...dates].sort();
-  }, [ready]);
+  }, [ready, summary]);
   const selectedDayIds = useMemo(
     () => [...selectedWeekdayDays, ...selectedWeekendDays].sort((a, b) => a - b),
     [selectedWeekdayDays, selectedWeekendDays],
@@ -289,26 +387,29 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
 
   const availableZones = useMemo(() => {
     if (!ready) return [];
+    if (summary) return summary.zones;
     const zones = new Set<string>();
     for (const t of ready.state.trips) { if (t.zone) zones.add(t.zone); }
     for (const r of ready.state.routes) { if (r.zone) zones.add(r.zone); }
     for (const nr of ready.state.new_routes) { if (nr.route_area) zones.add(nr.route_area); }
     return [...zones].sort();
-  }, [ready]);
+  }, [ready, summary]);
 
   const availableStatuses = useMemo(() => {
     if (!ready) return [];
+    if (summary) return summary.statuses;
     const statuses = new Set<string>();
     for (const t of ready.state.trips) { if (t.status) statuses.add(t.status); }
     return [...statuses].sort();
-  }, [ready]);
+  }, [ready, summary]);
 
   const availablePassengerTypes = useMemo(() => {
     if (!ready) return [];
+    if (summary) return summary.passengerTypes;
     const types = new Set<string>();
     for (const t of ready.state.trips) { if (t.passenger_type) types.add(t.passenger_type); }
     return [...types].sort();
-  }, [ready]);
+  }, [ready, summary]);
 
   const availableVehicleTypes = useMemo(() => {
     if (!ready) return [];
@@ -686,7 +787,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   if (session.loadState.status === 'loading') {
     return (
       <main className="max-w-[1100px] mx-auto px-5 pt-16 pb-8">
-        <p>Loading session...</p>
+        <SessionLoadingProgress loadState={session.loadState} />
       </main>
     );
   }

@@ -14,6 +14,7 @@ import {
   countRoutes,
   countTrips,
   deleteSessionDb,
+  getAllSessionMetadata,
   getOptimization,
   getSettings,
   listDepots,
@@ -24,7 +25,7 @@ import {
   saveSessionState,
 } from './session-db';
 import { generateToken } from './tokens';
-import type { AccessLevel, BidResult, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
+import type { AccessLevel, BidResult, SessionMetadata, SessionRecord, SessionState, SessionStateUpdateInput } from './types';
 
 const MAX_TOKEN_GENERATION_ATTEMPTS = 8;
 
@@ -97,6 +98,11 @@ export function getSessionState(record: SessionRecord, access: AccessLevel = 'ed
     vehicle_types: listVehicleTypes(record.edit_token),
     bid_result: bidResult,
   };
+}
+
+export function getSessionMetadataResponse(record: SessionRecord, access: AccessLevel = 'edit'): SessionMetadata {
+  touchSessionAccess(record.edit_token);
+  return getAllSessionMetadata(record.edit_token, access, record);
 }
 
 export function saveAndRefreshSessionState(

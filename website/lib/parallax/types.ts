@@ -251,6 +251,27 @@ export interface SessionState {
   bid_result: BidResult | null;
 }
 
+export interface SessionSummary {
+  tripCount: number;
+  routeCount: number;
+  dates: string[];
+  zones: string[];
+  statuses: string[];
+  passengerTypes: string[];
+  sliderBounds: { startMinutes: number; endMinutes: number };
+}
+
+export interface SessionMetadata {
+  session: SessionState['session'];
+  settings: SettingsRow;
+  optimization: OptimizationRow;
+  new_routes: NewRouteRow[];
+  depots: DepotRow[];
+  vehicle_types: VehicleTypeRow[];
+  bid_result: BidResult | null;
+  summary: SessionSummary;
+}
+
 export interface SessionStateUpdateInput {
   settings?: Partial<Omit<SettingsRow, 'id'>>;
   optimization?: Partial<Omit<OptimizationRow, 'id'>>;

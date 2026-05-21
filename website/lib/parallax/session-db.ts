@@ -11,6 +11,8 @@ import type {
   OptimizationRow,
   RouteRow,
   NewRouteRow,
+  SessionMetadata,
+  SessionSummary,
   SessionStateUpdateInput,
   SettingsRow,
   TripRow,
@@ -490,6 +492,153 @@ export function countRoutes(editToken: string): number {
     const row = db.prepare('SELECT COUNT(*) as count FROM routes').get() as { count: number };
     return row.count;
   });
+}
+
+export function getAllSessionMetadata(editToken: string, access: 'edit' | 'readonly', session: {
+  edit_token: string;
+  readonly_token: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  accessed_at: string;
+  trip_count: number;
+  route_count: number;
+  password_hash: string | null;
+}): SessionMetadata {
+  return withSessionDb(editToken, (db) => {
+    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
+    const optimization = db.prepare('SELECT * FROM optimization WHERE id = 1').get() as OptimizationRow;
+    const newRoutes = db.prepare('SELECT * FROM new_routes ORDER BY new_route_name, split_number').all() as NewRouteRow[];
+    const depots = db.prepare('SELECT * FROM depots ORDER BY depot_name').all() as DepotRow[];
+    const vehicleTypes = db.prepare('SELECT * FROM vehicle_types ORDER BY vehicle_type_name').all() as VehicleTypeRow[];
+
+    const tripCount = (db.prepare('SELECT COUNT(*) as count FROM trips').get() as { count: number }).count;
+    const routeCount = (db.prepare('SELECT COUNT(*) as count FROM routes').get() as { count: number }).count;
+
+    const dateRows = db.prepare(`
+      SELECT DISTINCT SUBSTR(COALESCE(
+        REPLACE(pickup_arrive_time, 'T', ' '),
+        REPLACE(pickup_leave_time, 'T', ' '),
+        REPLACE(scheduled_pickup_time, 'T', ' ')
+      ), 1, 10) as d
+      FROM trips
+      WHERE d IS NOT NULL
+      UNION
+      SELECT DISTINCT SUBSTR(COALESCE(
+        REPLACE(actual_start_time, 'T', ' '),
+        REPLACE(scheduled_start_time, 'T', ' ')
+      ), 1, 10) as d
+      FROM routes
+      WHERE d IS NOT NULL
+      ORDER BY d
+    `).all() as { d: string }[];
+
+    const zoneRows = db.prepare(`
+      SELECT DISTINCT zone FROM trips WHERE zone IS NOT NULL
+      UNION
+      SELECT DISTINCT zone FROM routes WHERE zone IS NOT NULL
+      UNION
+      SELECT DISTINCT route_area FROM new_routes WHERE route_area IS NOT NULL
+      ORDER BY 1
+    `).all() as { zone: string }[];
+
+    const statusRows = db.prepare(
+      'SELECT DISTINCT status FROM trips WHERE status IS NOT NULL ORDER BY status',
+    ).all() as { status: string }[];
+
+    const ptRows = db.prepare(
+      'SELECT DISTINCT passenger_type FROM trips WHERE passenger_type IS NOT NULL ORDER BY passenger_type',
+    ).all() as { passenger_type: string }[];
+
+    const timeMinutesExpr = (col: string) =>
+      `(CAST(SUBSTR(REPLACE(${col}, 'T', ' '), 12, 2) AS INTEGER) * 60 + CAST(SUBSTR(REPLACE(${col}, 'T', ' '), 15, 2) AS INTEGER))`;
+
+    const boundsRow = db.prepare(`
+      SELECT MIN(m) as earliest, MAX(m) as latest FROM (
+        SELECT ${timeMinutesExpr('COALESCE(pickup_arrive_time, pickup_leave_time, scheduled_pickup_time)')} as m
+        FROM trips WHERE COALESCE(pickup_arrive_time, pickup_leave_time, scheduled_pickup_time) IS NOT NULL
+        UNION ALL
+        SELECT ${timeMinutesExpr('COALESCE(dropoff_leave_time, dropoff_arrive_time, scheduled_appointment_time)')} as m
+        FROM trips WHERE COALESCE(dropoff_leave_time, dropoff_arrive_time, scheduled_appointment_time) IS NOT NULL
+        UNION ALL
+        SELECT ${timeMinutesExpr('COALESCE(actual_start_time, scheduled_start_time)')} as m
+        FROM routes WHERE COALESCE(actual_start_time, scheduled_start_time) IS NOT NULL
+        UNION ALL
+        SELECT ${timeMinutesExpr('COALESCE(actual_end_time, scheduled_end_time)')} as m
+        FROM routes WHERE COALESCE(actual_end_time, scheduled_end_time) IS NOT NULL
+      )
+    `).get() as { earliest: number | null; latest: number | null };
+
+    let startMinutes: number;
+    let endMinutes: number;
+    const fallbackStart = clockToMinutesOrDefault(settings.service_day_start, 4 * 60);
+    const fallbackEnd = clockToMinutesOrDefault(settings.service_day_end, 21 * 60);
+
+    if (boundsRow.earliest == null || boundsRow.latest == null) {
+      startMinutes = fallbackStart;
+      endMinutes = fallbackEnd;
+    } else {
+      let earliest = boundsRow.earliest;
+      let latest = boundsRow.latest;
+      for (const nr of newRoutes) {
+        const s = parseClockMinutes(nr.start_time);
+        const e = parseClockMinutes(nr.end_time);
+        if (s >= 0) { if (s < earliest) earliest = s; if (s > latest) latest = s; }
+        if (e >= 0) { if (e < earliest) earliest = e; if (e > latest) latest = e; }
+      }
+      startMinutes = Math.max(0, Math.floor((earliest - 30) / 15) * 15);
+      endMinutes = Math.min(24 * 60, Math.ceil((Math.max(startMinutes + 60, latest + 30)) / 15) * 15);
+    }
+
+    let bidResult = null;
+    if (optimization.bid_result_json) {
+      try { bidResult = JSON.parse(optimization.bid_result_json); } catch { /* ignore */ }
+    }
+
+    return {
+      session: {
+        edit_token: access === 'edit' ? session.edit_token : null,
+        readonly_token: session.readonly_token,
+        name: session.name,
+        created_at: session.created_at,
+        updated_at: session.updated_at,
+        accessed_at: session.accessed_at,
+        trip_count: session.trip_count,
+        route_count: session.route_count,
+        has_password: Boolean(session.password_hash),
+      },
+      settings,
+      optimization,
+      new_routes: newRoutes,
+      depots,
+      vehicle_types: vehicleTypes,
+      bid_result: bidResult,
+      summary: {
+        tripCount,
+        routeCount,
+        dates: dateRows.map((r) => r.d),
+        zones: zoneRows.map((r) => r.zone),
+        statuses: statusRows.map((r) => r.status),
+        passengerTypes: ptRows.map((r) => r.passenger_type),
+        sliderBounds: { startMinutes, endMinutes },
+      },
+    };
+  });
+}
+
+function parseClockMinutes(value: string | null | undefined): number {
+  if (!value) return -1;
+  const parts = value.split(':');
+  if (parts.length < 2) return -1;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return -1;
+  return h * 60 + m;
+}
+
+function clockToMinutesOrDefault(value: string | null | undefined, fallback: number): number {
+  const m = parseClockMinutes(value);
+  return m >= 0 ? m : fallback;
 }
 
 export function replaceTrips(editToken: string, trips: TripRow[]): void {
