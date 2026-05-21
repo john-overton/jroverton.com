@@ -29,6 +29,7 @@ interface FilterBarProps {
   statusSummary?: string;
   passengerTypeSummary?: string;
   vehicleTypeSummary?: string;
+  onExpandedChange?: (expanded: boolean) => void;
   children: ReactNode;
 }
 
@@ -45,6 +46,7 @@ export default function FilterBar({
   statusSummary,
   passengerTypeSummary,
   vehicleTypeSummary,
+  onExpandedChange,
   children,
 }: FilterBarProps) {
   const [expanded, setExpanded] = useState(false);
@@ -66,9 +68,10 @@ export default function FilterBar({
     clearTimer();
     dissolveTimer.current = setTimeout(() => {
       setExpanded(false);
+      onExpandedChange?.(false);
       dissolveTimer.current = null;
     }, DISSOLVE_DELAY_MS);
-  }, [clearTimer]);
+  }, [clearTimer, onExpandedChange]);
 
   useEffect(() => {
     return () => clearTimer();
@@ -78,9 +81,10 @@ export default function FilterBar({
     clearTimer();
     expandTimer.current = setTimeout(() => {
       setExpanded(true);
+      onExpandedChange?.(true);
       expandTimer.current = null;
     }, EXPAND_DELAY_MS);
-  }, [clearTimer]);
+  }, [clearTimer, onExpandedChange]);
 
   const onMouseLeaveContainer = useCallback(() => {
     startDissolveTimer();

@@ -196,6 +196,51 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
   const [selectedPassengerTypes, setSelectedPassengerTypes] = useState<string[]>([]);
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<string[]>([]);
   const [copiedLink, setCopiedLink] = useState<'readonly' | 'edit' | null>(null);
+  const [filterBarOpen, setFilterBarOpen] = useState(false);
+  const [committedFilterVersion, setCommittedFilterVersion] = useState(0);
+  const committedFiltersRef = useRef({
+    dayMode: 'dow' as 'dow' | 'specific',
+    selectedWeekdayDays: [] as number[],
+    selectedWeekendDays: [] as number[],
+    specificDate: null as string | null,
+    selectedDepot: 'all',
+    selectedZones: [] as string[],
+    selectedStatuses: [] as string[],
+    selectedPassengerTypes: [] as string[],
+    selectedVehicleTypes: [] as string[],
+    intervalMinutes: 15 as 15 | 30 | 60,
+    timeStartIndex: 0,
+    timeEndIndex: 0,
+  });
+
+  const commitFilters = useCallback(() => {
+    const next = {
+      dayMode,
+      selectedWeekdayDays,
+      selectedWeekendDays,
+      specificDate,
+      selectedDepot,
+      selectedZones,
+      selectedStatuses,
+      selectedPassengerTypes,
+      selectedVehicleTypes,
+      intervalMinutes,
+      timeStartIndex,
+      timeEndIndex,
+    };
+    const prev = committedFiltersRef.current;
+    const changed = Object.keys(next).some(
+      (k) => JSON.stringify(next[k as keyof typeof next]) !== JSON.stringify(prev[k as keyof typeof prev]),
+    );
+    if (changed) {
+      committedFiltersRef.current = next;
+      setCommittedFilterVersion((v) => v + 1);
+    }
+  }, [dayMode, selectedWeekdayDays, selectedWeekendDays, specificDate, selectedDepot, selectedZones, selectedStatuses, selectedPassengerTypes, selectedVehicleTypes, intervalMinutes, timeStartIndex, timeEndIndex]);
+
+  useEffect(() => {
+    if (!filterBarOpen) commitFilters();
+  }, [filterBarOpen, commitFilters]);
 
   const readonlyView = mode === 'readonly';
   const detectedOS = useMemo(() => {
@@ -294,32 +339,51 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       (d) => d.depot_address && routeAddresses.has(d.depot_address.toLowerCase()),
     );
   }, [ready]);
+
+  // Committed filter snapshot — expensive computations read from this, not live state.
+  // Only updates when FilterBar closes (or when panel is already closed).
+  const cf = committedFiltersRef.current;
+  const _cfv = committedFilterVersion; // read so useMemo deps track it
+  const committedDayIds = useMemo(
+    () => [...cf.selectedWeekdayDays, ...cf.selectedWeekendDays].sort((a, b) => a - b),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [_cfv],
+  );
+  const committedRangeStartClock = allTimeBlocks[cf.timeStartIndex]
+    ? formatMinutesToClock(allTimeBlocks[cf.timeStartIndex].minutes)
+    : null;
+  const committedRangeEndClock = allTimeBlocks[cf.timeEndIndex]
+    ? formatMinutesToClock(allTimeBlocks[cf.timeEndIndex].minutes)
+    : null;
+
   const depotFilteredRouteIds = useMemo(() => {
-    if (selectedDepot === 'all' || !ready) return undefined;
-    const depot = ready.state.depots.find((d) => d.depot_id === selectedDepot);
+    if (cf.selectedDepot === 'all' || !ready) return undefined;
+    const depot = ready.state.depots.find((d) => d.depot_id === cf.selectedDepot);
     if (!depot?.depot_address) return undefined;
     const addr = depot.depot_address.toLowerCase();
     return ready.state.routes
       .filter((r) => r.depot_address?.toLowerCase() === addr)
       .map((r) => r.route_id);
-  }, [selectedDepot, ready]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_cfv, ready]);
   const metricsOptions = useMemo(
     () => ({
-      selectedDays: dayMode === 'dow' ? selectedDayIds : undefined,
-      specificDate: dayMode === 'specific' && specificDate ? specificDate : undefined,
+      selectedDays: cf.dayMode === 'dow' ? committedDayIds : undefined,
+      specificDate: cf.dayMode === 'specific' && cf.specificDate ? cf.specificDate : undefined,
       selectedRouteIds: depotFilteredRouteIds,
-      selectedZones: selectedZones.length > 0 ? selectedZones : undefined,
-      selectedStatuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
-      selectedPassengerTypes: selectedPassengerTypes.length > 0 ? selectedPassengerTypes : undefined,
-      selectedVehicleTypeIds: selectedVehicleTypes.length > 0 ? selectedVehicleTypes : undefined,
+      selectedZones: cf.selectedZones.length > 0 ? cf.selectedZones : undefined,
+      selectedStatuses: cf.selectedStatuses.length > 0 ? cf.selectedStatuses : undefined,
+      selectedPassengerTypes: cf.selectedPassengerTypes.length > 0 ? cf.selectedPassengerTypes : undefined,
+      selectedVehicleTypeIds: cf.selectedVehicleTypes.length > 0 ? cf.selectedVehicleTypes : undefined,
     }),
-    [dayMode, selectedDayIds, specificDate, depotFilteredRouteIds, selectedZones, selectedStatuses, selectedPassengerTypes, selectedVehicleTypes],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [_cfv, committedDayIds, depotFilteredRouteIds],
   );
   const filteredRoutes = useMemo(() => {
     if (!ready) return [];
     const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;
-    const zoneSet = selectedZones.length > 0 ? new Set(selectedZones) : null;
-    const vtSet = selectedVehicleTypes.length > 0 ? new Set(selectedVehicleTypes) : null;
+    const zoneSet = cf.selectedZones.length > 0 ? new Set(cf.selectedZones) : null;
+    const vtSet = cf.selectedVehicleTypes.length > 0 ? new Set(cf.selectedVehicleTypes) : null;
     return ready.state.routes.filter((route) => {
       if (depotRouteIdSet && !depotRouteIdSet.has(route.route_id)) return false;
       if (zoneSet && (!route.zone || !zoneSet.has(route.zone))) return false;
@@ -337,13 +401,13 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       }
       return true;
     });
-  }, [ready, metricsOptions, depotFilteredRouteIds, selectedZones, selectedVehicleTypes]);
+  }, [ready, metricsOptions, depotFilteredRouteIds, _cfv]);
   const filteredTrips = useMemo(() => {
     if (!ready) return [];
     const depotRouteIdSet = depotFilteredRouteIds ? new Set(depotFilteredRouteIds) : null;
-    const zoneSet = selectedZones.length > 0 ? new Set(selectedZones) : null;
-    const statusSet = selectedStatuses.length > 0 ? new Set(selectedStatuses) : null;
-    const ptSet = selectedPassengerTypes.length > 0 ? new Set(selectedPassengerTypes) : null;
+    const zoneSet = cf.selectedZones.length > 0 ? new Set(cf.selectedZones) : null;
+    const statusSet = cf.selectedStatuses.length > 0 ? new Set(cf.selectedStatuses) : null;
+    const ptSet = cf.selectedPassengerTypes.length > 0 ? new Set(cf.selectedPassengerTypes) : null;
     return ready.state.trips.filter((trip) => {
       if (depotRouteIdSet && !depotRouteIdSet.has(trip.route_id)) return false;
       if (zoneSet && (!trip.zone || !zoneSet.has(trip.zone))) return false;
@@ -351,18 +415,19 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
       if (ptSet && !ptSet.has(trip.passenger_type)) return false;
       return true;
     });
-  }, [ready, depotFilteredRouteIds, selectedZones, selectedStatuses, selectedPassengerTypes]);
+  }, [ready, depotFilteredRouteIds, _cfv]);
   const metrics = useMemo(
     () =>
       ready
         ? computeClearcutMetrics(ready.state, {
             ...metricsOptions,
-            timeRangeStart: rangeStartClock,
-            timeRangeEnd: rangeEndClock,
-            blockSizeMinutes: intervalMinutes,
+            timeRangeStart: committedRangeStartClock,
+            timeRangeEnd: committedRangeEndClock,
+            blockSizeMinutes: cf.intervalMinutes,
           })
         : null,
-    [rangeEndClock, rangeStartClock, ready, metricsOptions, intervalMinutes],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ready, metricsOptions, _cfv],
   );
   const fullDayMetrics = useMemo(
     () =>
@@ -371,10 +436,11 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             ...metricsOptions,
             timeRangeStart: null,
             timeRangeEnd: null,
-            blockSizeMinutes: intervalMinutes,
+            blockSizeMinutes: cf.intervalMinutes,
           })
         : null,
-    [ready, metricsOptions, intervalMinutes],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ready, metricsOptions, _cfv],
   );
   const hasTrips = ready ? ready.state.session.trip_count > 0 : false;
   const hasData = ready ? hasTrips || ready.state.session.route_count > 0 || ready.state.new_routes.length > 0 : false;
@@ -892,6 +958,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
             statusSummary={selectedStatuses.length > 0 ? selectedStatuses.join(', ') : undefined}
             passengerTypeSummary={selectedPassengerTypes.length > 0 ? selectedPassengerTypes.join(', ') : undefined}
             vehicleTypeSummary={selectedVehicleTypes.length > 0 ? availableVehicleTypes.filter((vt) => selectedVehicleTypes.includes(vt.id)).map((vt) => vt.name).join(', ') : undefined}
+            onExpandedChange={setFilterBarOpen}
           >
             {/* Filter controls — vertical stacked layout */}
             <div className="space-y-3">
@@ -1219,19 +1286,19 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           onVehicleTypesChange={onVehicleTypesChange}
         />
       )}
-      {tab === 'demand' && <DemandTab metrics={metrics} intervalMinutes={intervalMinutes} />}
+      {tab === 'demand' && <DemandTab metrics={metrics} intervalMinutes={cf.intervalMinutes} />}
       {tab === 'performance' && (
         <PerformanceTab
           metrics={metrics}
-          intervalMinutes={intervalMinutes}
+          intervalMinutes={cf.intervalMinutes}
           routes={filteredRoutes}
           trips={filteredTrips}
           sessionState={ready?.state ?? null}
           metricsOptions={{
             ...metricsOptions,
-            timeRangeStart: rangeStartClock,
-            timeRangeEnd: rangeEndClock,
-            blockSizeMinutes: intervalMinutes,
+            timeRangeStart: committedRangeStartClock,
+            timeRangeEnd: committedRangeEndClock,
+            blockSizeMinutes: cf.intervalMinutes,
           }}
         />
       )}
@@ -1257,7 +1324,7 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
           newRoutes={ready.state.new_routes}
           selectedDays={selectedDayIds}
           readonlyView={readonlyView}
-          intervalMinutes={intervalMinutes}
+          intervalMinutes={cf.intervalMinutes}
           onOptimizationChange={onOptimizationChange}
           onNewRoutesChange={onNewRoutesChange}
           depots={ready.state.depots}
