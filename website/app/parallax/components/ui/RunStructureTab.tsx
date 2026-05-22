@@ -1,7 +1,7 @@
 'use client';
 
 import { Redo2, Undo2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/parallax/components/shadcn/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/parallax/components/shadcn/tabs';
@@ -100,6 +100,8 @@ export default function RunStructureTab({
   const [highlightFilter, setHighlightFilter] = useState<{ routeName: string; days: ServiceDay[] } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ownPersistRef = useRef(0);
+  const localNewRoutesRef = useRef(localNewRoutes);
+  localNewRoutesRef.current = localNewRoutes;
 
   // ── Undo/Redo: new routes ──────────────────────────────────────────
   const { pushState: pushNewRouteState, undo: undoNewRoute, redo: redoNewRoute, clearHistory: clearNewRouteHistory, canUndo: canNewRouteUndo, canRedo: canNewRouteRedo } = useUndoRedo<NewRouteRow[]>();
@@ -169,6 +171,9 @@ export default function RunStructureTab({
     [readonlyView, onNewRoutesChange, onNewRoutesDelta],
   );
 
+  const persistNewRoutesRef = useRef(persistNewRoutes);
+  persistNewRoutesRef.current = persistNewRoutes;
+
   // Debounced save for bids
   const persistBidResult = useCallback(
     (result: BidResult) => {
@@ -181,12 +186,15 @@ export default function RunStructureTab({
     [readonlyView, onBidResultChange],
   );
 
-  function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[], immediate?: boolean) {
-    const prev = localNewRoutes;
-    pushNewRouteState(prev);
-    setLocalNewRoutes(nextNewRoutes);
-    persistNewRoutes(prev, nextNewRoutes, immediate);
-  }
+  const updateLocalNewRoutes = useCallback(
+    (nextNewRoutes: NewRouteRow[], immediate?: boolean) => {
+      const prev = localNewRoutesRef.current;
+      pushNewRouteState(prev);
+      setLocalNewRoutes(nextNewRoutes);
+      persistNewRoutesRef.current(prev, nextNewRoutes, immediate);
+    },
+    [pushNewRouteState],
+  );
 
   // ── Consolidated undo/redo ─────────────────────────────────────────
 
@@ -195,8 +203,9 @@ export default function RunStructureTab({
 
   function handleUndo() {
     if (subTab === 'runeditor') {
-      const previous = undoNewRoute(localNewRoutes);
-      if (previous) { setLocalNewRoutes(previous); persistNewRoutes(localNewRoutes, previous); }
+      const current = localNewRoutesRef.current;
+      const previous = undoNewRoute(current);
+      if (previous) { setLocalNewRoutes(previous); persistNewRoutesRef.current(current, previous); }
     } else if (subTab === 'bids' && bidResult) {
       const previous = undoBid(bidResult);
       if (previous) { setBidResult(previous); persistBidResult(previous); }
@@ -205,8 +214,9 @@ export default function RunStructureTab({
 
   function handleRedo() {
     if (subTab === 'runeditor') {
-      const next = redoNewRoute(localNewRoutes);
-      if (next) { setLocalNewRoutes(next); persistNewRoutes(localNewRoutes, next); }
+      const current = localNewRoutesRef.current;
+      const next = redoNewRoute(current);
+      if (next) { setLocalNewRoutes(next); persistNewRoutesRef.current(current, next); }
     } else if (subTab === 'bids' && bidResult) {
       const next = redoBid(bidResult);
       if (next) { setBidResult(next); persistBidResult(next); }
@@ -263,6 +273,8 @@ export default function RunStructureTab({
     }
     return result;
   }, [localNewRoutes, newRouteDayFilter, depotFilter, selectedVehicleTypes, selectedZones]);
+
+  const deferredFilteredNewRoutes = useDeferredValue(filteredNewRoutes);
 
   // ── Vehicle counts by block ───────────────────────────────────────
 
@@ -378,7 +390,7 @@ export default function RunStructureTab({
   const { newRouteVehiclesByBlockFullDay, nrOnBreakByBlockFullDay } = useMemo(() => {
     const counts = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
     const breaks = new Array(fullDayMetrics.blocks.length).fill(0) as number[];
-    for (const newRoute of filteredNewRoutes) {
+    for (const newRoute of deferredFilteredNewRoutes) {
       const routeDays = parseServiceDays(newRoute.service_days);
       const matchesDays = selectedDays.length === 0 || routeDays.some((d) => selectedDaySet.has(SERVICE_DAY_TO_DOW[d]));
       if (!matchesDays) continue;
@@ -401,7 +413,7 @@ export default function RunStructureTab({
       }
     }
     return { newRouteVehiclesByBlockFullDay: counts, nrOnBreakByBlockFullDay: breaks };
-  }, [filteredNewRoutes, fullDayMetrics.blocks, selectedDays.length, selectedDaySet]);
+  }, [deferredFilteredNewRoutes, fullDayMetrics.blocks, selectedDays.length, selectedDaySet]);
 
   const newRouteVehiclesByBlock = useMemo(() => {
     return metrics.blocks.map((viewBlock) => {
@@ -440,23 +452,23 @@ export default function RunStructureTab({
 
   const newRouteStats = useMemo(() => {
     let totalServiceHours = 0;
-    for (const newRoute of filteredNewRoutes) {
+    for (const newRoute of deferredFilteredNewRoutes) {
       totalServiceHours += Number(newRoute.platform_hours) || 0;
     }
     const maxVehicles = Math.max(...newRouteVehiclesByBlockFullDay, 0);
     const productivity = totalServiceHours > 0
       ? Math.round((avgDailyTrips / totalServiceHours) * 100) / 100
       : 0;
-    const { fte: estFTE, pt: estPT } = estimateFtePtCounts(filteredNewRoutes);
+    const { fte: estFTE, pt: estPT } = estimateFtePtCounts(deferredFilteredNewRoutes);
     return {
-      count: filteredNewRoutes.length,
+      count: deferredFilteredNewRoutes.length,
       totalServiceHours: Math.round(totalServiceHours * 10) / 10,
       maxVehicles,
       productivity,
       estFTE,
       estPT,
     };
-  }, [filteredNewRoutes, newRouteVehiclesByBlockFullDay, avgDailyTrips]);
+  }, [deferredFilteredNewRoutes, newRouteVehiclesByBlockFullDay, avgDailyTrips]);
 
   // ── Copy functions ────────────────────────────────────────────────
 
@@ -592,7 +604,7 @@ export default function RunStructureTab({
     }
 
     const copiedNewRoutes: NewRouteRow[] = rawNewRoutes.map(({ _originalName, ...rest }) => rest);
-    updateLocalNewRoutes([...localNewRoutes, ...copiedNewRoutes], true);
+    updateLocalNewRoutes([...localNewRoutesRef.current, ...copiedNewRoutes], true);
     showToast(`Day copied to ${copyDaysSelection.join(', ')}`);
   }
 
@@ -664,7 +676,7 @@ export default function RunStructureTab({
     copiedNewRoute.platform_hours = String(svcHrs);
     copiedNewRoute.pay_hours = String(svcHrs);
 
-    updateLocalNewRoutes([...localNewRoutes, copiedNewRoute], true);
+    updateLocalNewRoutes([...localNewRoutesRef.current, copiedNewRoute], true);
     showToast(`Route copied to ${copyDaysSelection.join(', ')}`);
   }
 

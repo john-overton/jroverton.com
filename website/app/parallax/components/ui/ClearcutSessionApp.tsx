@@ -451,15 +451,22 @@ export default function ClearcutSessionApp({ token, mode }: Props) {
     return depot?.depot_name ?? selectedDepot;
   }, [selectedDepot, ready?.state.depots]);
 
+  const newRouteZoneKey = useMemo(() => {
+    if (!ready) return '';
+    const zones = new Set<string>();
+    for (const nr of ready.state.new_routes) { if (nr.route_area) zones.add(nr.route_area); }
+    return [...zones].sort().join('\0');
+  }, [ready?.state.new_routes]);
+
   const availableZones = useMemo(() => {
     if (!ready) return [];
     if (summary) return summary.zones;
     const zones = new Set<string>();
     for (const t of ready.state.trips) { if (t.zone) zones.add(t.zone); }
     for (const r of ready.state.routes) { if (r.zone) zones.add(r.zone); }
-    for (const nr of ready.state.new_routes) { if (nr.route_area) zones.add(nr.route_area); }
+    for (const part of newRouteZoneKey.split('\0')) { if (part) zones.add(part); }
     return [...zones].sort();
-  }, [ready?.state.trips, ready?.state.routes, ready?.state.new_routes, summary]);
+  }, [ready?.state.trips, ready?.state.routes, newRouteZoneKey, summary]);
 
   const availableStatuses = useMemo(() => {
     if (!ready) return [];

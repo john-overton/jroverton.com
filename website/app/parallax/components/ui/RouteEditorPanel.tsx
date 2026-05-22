@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy, Download, Plus, SquareSplitHorizontal, Trash2, X } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/app/parallax/components/shadcn/button';
 import { ComboboxInput } from '@/app/parallax/components/shadcn/combobox-input';
@@ -445,6 +445,8 @@ export default function RouteEditorPanel({
   const lastEditedNewRouteIdRef = useRef<string | null>(null);
   const localNewRoutesRef = useRef(localNewRoutes);
   localNewRoutesRef.current = localNewRoutes;
+  const onUpdateLocalNewRoutesRef = useRef(onUpdateLocalNewRoutes);
+  onUpdateLocalNewRoutesRef.current = onUpdateLocalNewRoutes;
 
   // Cleanup sort-freeze timer on unmount
   useEffect(() => {
@@ -454,10 +456,11 @@ export default function RouteEditorPanel({
   }, []);
 
   // ── Split overlap detection ──────────────────────────────────────
+  const deferredLocalNewRoutes = useDeferredValue(localNewRoutes);
   const splitOverlapIds = useMemo(() => {
     const overlapping = new Set<string>();
     const groups = new Map<string, NewRouteRow[]>();
-    for (const newRoute of localNewRoutes) {
+    for (const newRoute of deferredLocalNewRoutes) {
       if (newRoute.split_number === 0) continue;
       const parsed = parseSplitName(newRoute.new_route_name);
       const key = parsed ? parsed.baseName.toLowerCase() : newRoute.new_route_name.toLowerCase();
@@ -480,7 +483,7 @@ export default function RouteEditorPanel({
       }
     }
     return overlapping;
-  }, [localNewRoutes]);
+  }, [deferredLocalNewRoutes]);
 
   // ── Sorted new routes for display ──────────────────────────────────────
 
@@ -545,10 +548,15 @@ export default function RouteEditorPanel({
 
   // ── Actions ──────────────────────────────────────────────────────
 
-  function updateLocalNewRoutes(nextNewRoutes: NewRouteRow[], immediate?: boolean) {
-    const withSplits = applySplitDetection(nextNewRoutes);
-    onUpdateLocalNewRoutes(withSplits, immediate);
-  }
+  const updateLocalNewRoutes = useCallback(
+    (nextNewRoutes: NewRouteRow[], immediate?: boolean, fieldChanged?: string) => {
+      const withSplits = fieldChanged && fieldChanged !== 'new_route_name'
+        ? nextNewRoutes
+        : applySplitDetection(nextNewRoutes);
+      onUpdateLocalNewRoutesRef.current(withSplits, immediate);
+    },
+    [],
+  );
 
   function addNewRoute() {
     if (draftNewRoute) return;
@@ -723,6 +731,7 @@ export default function RouteEditorPanel({
         return next;
       }),
       immediate,
+      field,
     );
   }, [updateLocalNewRoutes]);
 
