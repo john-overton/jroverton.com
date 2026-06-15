@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Open Glades</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+<style>
+  :root{ --indigo:#1a2a45; --snow:#f7eedd; --snow-shadow:#a9c2d6; --glow:#ee8866; --glow-2:#f4b67a; --gold:#ffce5c; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{ min-height:100dvh; background:var(--indigo); color:var(--snow); font-family:"VT323", monospace; overflow-x:hidden; position:relative; }
+  #scene{ position:fixed; inset:0; width:100vw; height:100dvh; display:block; image-rendering:pixelated; image-rendering:crisp-edges; z-index:0; }
+  .vignette{ position:fixed; inset:0; z-index:1; pointer-events:none;
+    background: linear-gradient(to bottom, rgba(16,24,42,.62) 0%, rgba(16,24,42,0) 32%),
+                linear-gradient(to top, rgba(16,24,42,.7) 0%, rgba(16,24,42,0) 30%); }
+  .wrap{ position:relative; z-index:2; min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:clamp(1.4rem,4vh,2.6rem) 1rem clamp(1.2rem,3vh,2rem); }
+  .masthead{ text-align:center; }
+  .eyebrow{ font-family:"Press Start 2P", monospace; font-size:clamp(.42rem,2.2vw,.6rem); letter-spacing:.22em; color:var(--glow-2); text-transform:uppercase; margin-bottom:1.1rem; text-shadow:2px 2px 0 rgba(16,24,42,.85); }
+  h1.wordmark{ font-family:"Press Start 2P", monospace; font-weight:400; line-height:1.18; font-size:clamp(1.35rem,7vw,3.2rem); color:var(--snow); letter-spacing:.02em; text-shadow:3px 3px 0 var(--indigo), 4px 4px 0 rgba(0,0,0,.35); }
+  h1.wordmark .o{ color:var(--gold); }
+  .motto{ margin-top:1rem; font-family:"VT323", monospace; font-size:clamp(1.05rem,3.6vw,1.5rem); color:var(--snow-shadow); letter-spacing:.04em; font-style:italic; text-shadow:2px 2px 0 rgba(16,24,42,.7); }
+  .bottom{ width:100%; display:flex; flex-direction:column; align-items:center; gap:1rem; }
+  .products{ width:100%; max-width:880px; display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(.7rem,2vw,1.2rem); }
+  .card{ --edge:var(--snow); position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:.55rem; padding:1rem 1rem 1.05rem; text-decoration:none; color:var(--snow); background:rgba(20,32,56,.74); border:3px solid var(--edge); border-radius:0; box-shadow:6px 6px 0 rgba(13,20,38,.85); backdrop-filter:blur(2px); transition:transform .12s steps(2), box-shadow .12s steps(2), background .12s; cursor:pointer; }
+  .card:hover, .card:focus-visible{ transform:translate(-2px,-2px); box-shadow:9px 9px 0 rgba(13,20,38,.9); background:rgba(33,53,90,.84); outline:none; }
+  .card:focus-visible{ --edge:var(--gold); }
+  .card .textcol{ display:flex; flex-direction:column; gap:.3rem; }
+  .card .icon{ width:34px; height:34px; image-rendering:pixelated; shape-rendering:crispEdges; }
+  .card .pname{ font-family:"Press Start 2P", monospace; font-size:.62rem; line-height:1.35; color:var(--snow); }
+  .card .ptag{ font-family:"VT323", monospace; font-size:1.02rem; line-height:1.12; color:var(--snow-shadow); }
+  .card .badge{ margin-top:.15rem; font-family:"Press Start 2P", monospace; font-size:.36rem; letter-spacing:.18em; text-transform:uppercase; color:var(--indigo); background:var(--glow-2); padding:.28rem .4rem; }
+  .footnote{ font-family:"VT323", monospace; font-size:1rem; color:var(--snow-shadow); letter-spacing:.05em; text-shadow:1px 1px 0 rgba(16,24,42,.7); text-align:center; }
+  .footnote .dot{ color:var(--glow); padding:0 .35rem; }
+  @media (max-width:620px){ .products{ grid-template-columns:1fr; max-width:360px; } .card{ flex-direction:row; align-items:center; } .card .icon{ width:40px; height:40px; flex:0 0 auto; } .card .textcol{ display:flex; flex-direction:column; gap:.3rem; } .card .badge{ display:none; } }
+  @media (prefers-reduced-motion:reduce){ .card{ transition:none; } }
+</style>
+</head>
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <main class="wrap">
+    <header class="masthead">
+      <p class="eyebrow">An independent software studio</p>
+      <h1 class="wordmark"><span class="o">O</span>PEN GLADES</h1>
+      <p class="motto">inveniam viam aut faciam</p>
+    </header>
+    <div class="bottom">
+      <section class="products" aria-label="Products">
+        <a class="card" href="#sprout-track">
+          <svg class="icon" viewBox="0 0 7 7" aria-hidden="true"><rect x="3" y="3" width="1" height="4" fill="#3a7d44"/><rect x="1" y="3" width="1" height="1" fill="#6fbf73"/><rect x="2" y="2" width="1" height="1" fill="#6fbf73"/><rect x="1" y="2" width="1" height="1" fill="#8fd98a"/><rect x="4" y="2" width="1" height="1" fill="#6fbf73"/><rect x="5" y="1" width="1" height="1" fill="#6fbf73"/><rect x="5" y="2" width="1" height="1" fill="#8fd98a"/></svg>
+          <div class="textcol"><span class="pname">Sprout Track</span><span class="ptag">Baby &amp; family tracking, self-hosted.</span></div>
+          <span class="badge">placeholder</span>
+        </a>
+        <a class="card" href="#astryk">
+          <svg class="icon" viewBox="0 0 7 7" aria-hidden="true"><rect x="3" y="0" width="1" height="7" fill="#ffce5c"/><rect x="0" y="3" width="7" height="1" fill="#ffce5c"/><rect x="1" y="1" width="1" height="1" fill="#ffe49a"/><rect x="5" y="1" width="1" height="1" fill="#ffe49a"/><rect x="1" y="5" width="1" height="1" fill="#ffe49a"/><rect x="5" y="5" width="1" height="1" fill="#ffe49a"/><rect x="3" y="3" width="1" height="1" fill="#fff"/></svg>
+          <div class="textcol"><span class="pname">Astryk</span><span class="ptag">Collaborative workspaces, in real time.</span></div>
+          <span class="badge">placeholder</span>
+        </a>
+        <a class="card" href="#parallax">
+          <svg class="icon" viewBox="0 0 7 7" aria-hidden="true"><rect x="0" y="6" width="7" height="1" fill="#4a90d9"/><rect x="1" y="5" width="5" height="1" fill="#5fa8e8"/><rect x="2" y="4" width="3" height="1" fill="#74c0fc"/><rect x="3" y="3" width="1" height="1" fill="#a8d8ff"/><rect x="3" y="1" width="1" height="1" fill="#ffce5c"/></svg>
+          <div class="textcol"><span class="pname">Parallax</span><span class="ptag">Demand-response transit, made clear.</span></div>
+          <span class="badge">placeholder</span>
+        </a>
+      </section>
+      <p class="footnote">Built in the open<span class="dot">&#9670;</span>one skier, three trails</p>
+    </div>
+  </main>
+
+<script>
+(function(){
+  "use strict";
+  const canvas=document.getElementById("scene"), ctx=canvas.getContext("2d");
+  const reduceMotion=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const PIXEL=4; let W=0,H=0;
+
+  function hexToRgb(h){h=h.replace('#','');return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+  function lerpCol(a,b,t){const A=hexToRgb(a),B=hexToRgb(b);return `rgb(${Math.round(A[0]+(B[0]-A[0])*t)},${Math.round(A[1]+(B[1]-A[1])*t)},${Math.round(A[2]+(B[2]-A[2])*t)})`;}
+  function hexA(h,a){const c=hexToRgb(h);return `rgba(${c[0]},${c[1]},${c[2]},${a})`;}
+  function px(x,y,w,h,col){ctx.fillStyle=col;ctx.fillRect(x|0,y|0,w|0,h|0);}
+  function dot(x,y,col){ctx.fillStyle=col;ctx.fillRect(x|0,y|0,1,1);}
+  function line(x0,y0,x1,y1,col){x0|=0;y0|=0;x1|=0;y1|=0;let dx=Math.abs(x1-x0),dy=Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,err=dx-dy;ctx.fillStyle=col;while(true){ctx.fillRect(x0,y0,1,1);if(x0===x1&&y0===y1)break;let e2=2*err;if(e2>-dy){err-=dy;x0+=sx;}if(e2<dx){err+=dx;y0+=sy;}}}
+  function prand(s){let v=(s>>>0)||1;return ()=>{v=(v*1664525+1013904223)>>>0;return v/4294967296;};}
+
+  let E0=0,E1=0;
+  function edge(x){return E0+(E1-E0)*(x/W)+Math.sin(x/26+0.6)*2.2+Math.sin(x/11+2.0)*1.0;}
+
+  function makeRidge(tileW,base,amp,harmonics){const a=new Float32Array(tileW);for(let x=0;x<tileW;x++){let y=base;for(const h of harmonics)y+=Math.sin((x/tileW)*Math.PI*2*h.f+h.p)*amp*h.a;a[x]=y;}return a;}
+
+  // ---- bake a detailed, shaded mountain range to an offscreen tile ----
+  function bakeRange(ridge, pal, opt){
+    const tileH=Math.ceil(E1)+6;
+    const c=document.createElement('canvas'); c.width=W; c.height=tileH;
+    const g=c.getContext('2d');
+    function gp(x,y,col){g.fillStyle=col;g.fillRect(x,y,1,1);}
+    for(let x=0;x<W;x++){
+      const top=Math.round(ridge[x]);
+      const nxt=Math.round(ridge[(x+1)%W]);
+      const slope=nxt-top;                 // >0 descends right => sunlit (sun upper-right)
+      const lit = slope>0;
+      // smooth per-column noise for couloirs / snow depth
+      const gully=0.5+0.32*Math.sin(x*0.07+opt.seed)+0.18*Math.sin(x*0.19+opt.seed*1.7);
+      const span=(tileH-top);
+      const capDepth=Math.max(2,Math.round(span*0.12));
+      const snowLine=Math.round(span*(opt.snowFrac));
+      for(let y=top;y<tileH;y++){
+        const d=y-top;
+        // snow vs rock: snow near top, in couloirs (high gully) snow reaches deeper
+        const localSnow=snowLine*(0.55+gully*0.9);
+        let isSnow = d<capDepth || d<localSnow;
+        // rock texture speckle
+        const spk=Math.sin(x*1.7+opt.seed)+Math.sin(y*1.3)+Math.sin((x+y)*0.6);
+        let col;
+        if(isSnow){
+          col = lit? pal.snowLit : pal.snowSh;
+          if(spk>1.7) col = lit? pal.snowHi : pal.snowLit;     // sparkle
+          if(spk<-1.8 && !lit) col = pal.snowSh2;              // shadow pockets
+        } else {
+          col = lit? pal.rockLit : pal.rockSh;
+          if(spk>1.4) col = pal.rockHi;
+          if(spk<-1.4) col = pal.rockSh2;
+        }
+        if(d<1) col = lit? pal.rim : pal.shadowRim;            // sunlit / shaded ridge crest
+        gp(x,y,col);
+      }
+    }
+    return c;
+  }
+
+  let tFar,tMid,tNear, trees=[], moguls=[], snow=[], streaks=[], trailL=[], trailR=[];
+  let camX=0, SPAN=0;
+
+  function buildWorld(){
+    E0=Math.round(H*0.30); E1=Math.round(H*0.60);
+    const far=makeRidge(W,Math.round(H*0.19),Math.round(H*0.055),[{f:2,a:1,p:.4},{f:5,a:.5,p:1.2},{f:9,a:.3,p:2.1},{f:14,a:.16,p:.7}]);
+    const mid=makeRidge(W,Math.round(H*0.265),Math.round(H*0.085),[{f:1,a:1,p:1.1},{f:3,a:.62,p:.3},{f:6,a:.36,p:2.4},{f:11,a:.2,p:1.6}]);
+    const nr =makeRidge(W,Math.round(H*0.345),Math.round(H*0.11),[{f:1,a:1,p:2.2},{f:2,a:.7,p:.6},{f:5,a:.4,p:1.3},{f:9,a:.22,p:2.7}]);
+
+    tFar=bakeRange(far,{ // hazy, distant, low contrast, snow-dominant
+      rim:"#dbe6f1",shadowRim:"#b7c8db",snowLit:"#cfdcec",snowHi:"#e2ebf5",snowSh:"#bccde0",snowSh2:"#adc0d6",
+      rockLit:"#a9b8cb",rockHi:"#b9c6d6",rockSh:"#93a4bb",rockSh2:"#869ab2"
+    },{seed:11,snowFrac:0.7});
+    tMid=bakeRange(mid,{
+      rim:"#f1f6fc",shadowRim:"#a9bdd6",snowLit:"#e0eaf6",snowHi:"#f4f9ff",snowSh:"#b3c7df",snowSh2:"#9fb6d2",
+      rockLit:"#7c8ca6",rockHi:"#8d9cb4",rockSh:"#5f6e8a",rockSh2:"#515f7b"
+    },{seed:23,snowFrac:0.58});
+    tNear=bakeRange(nr,{
+      rim:"#ffffff",shadowRim:"#9db1cc",snowLit:"#ecf3fb",snowHi:"#ffffff",snowSh:"#bccfe6",snowSh2:"#a6bcd8",
+      rockLit:"#54627e",rockHi:"#64728e",rockSh:"#3a4661",rockSh2:"#2e394f"
+    },{seed:37,snowFrac:0.5});
+
+    SPAN=W+60; const sd={s:7}; const R=()=>{sd.s=(sd.s*1103515245+12345)&0x7fffffff;return sd.s/0x7fffffff;};
+    trees=[]; const tc=Math.max(14,Math.round(W/16));
+    for(let i=0;i<tc;i++) trees.push({wx:R()*SPAN, below:6+R()*Math.max(12,H*0.34), scale:1.6+R()*2.3, seed:(R()*1e9)|0});
+    moguls=[]; const mc=Math.max(16,Math.round(W/12));
+    for(let i=0;i<mc;i++) moguls.push({wx:R()*SPAN, below:5+R()*Math.max(14,H*0.4), w:2+Math.round(R()*3)});
+    snow=[]; const n=Math.round((W*H)/1100);
+    for(let i=0;i<n;i++) snow.push({x:Math.random()*W,y:Math.random()*H,s:.5+Math.random()*.9});
+    streaks=[]; const ns=Math.round((W*H)/3500);
+    for(let i=0;i<ns;i++) streaks.push({x:Math.random()*W,y:H*0.4+Math.random()*H*0.6,len:3+Math.round(Math.random()*4)});
+    trailL=[]; trailR=[];
+  }
+
+  function resize(){
+    const vw=window.innerWidth,vh=window.innerHeight;
+    W=Math.ceil(vw/PIXEL); H=Math.ceil(vh/PIXEL);
+    canvas.width=W; canvas.height=H; canvas.style.width=vw+"px"; canvas.style.height=vh+"px";
+    ctx.imageSmoothingEnabled=false; buildWorld();
+    if(reduceMotion) render(0,0.016);
+  }
+
+  function drawSky(){
+    const hy=Math.round(H*0.34), bands=16;
+    for(let i=0;i<bands;i++){ const t=i/(bands-1);
+      let col=t<0.6?lerpCol("#1a2a45","#3d5a80",t/0.6):lerpCol("#3d5a80","#ee8866",(t-0.6)/0.4);
+      const y0=Math.round((i/bands)*hy),y1=Math.round(((i+1)/bands)*hy); px(0,y0,W,y1-y0,col);
+    }
+  }
+  function drawSun(time){
+    const cx=Math.round(W*0.80),cy=Math.round(H*0.13),r=5+(reduceMotion?0:Math.sin(time/1400)*0.6);
+    px(cx-r-2,cy-1,(r+2)*2,3,hexA("#ffd9a0",.16)); px(cx-1,cy-r-2,3,(r+2)*2,hexA("#ffd9a0",.16));
+    for(let yy=-r;yy<=r;yy++){const sp=Math.round(Math.sqrt(Math.max(0,r*r-yy*yy)));px(cx-sp,cy+yy,sp*2+1,1,"#ffd9a0");}
+  }
+  function drawTile(c,off){ const o=((Math.round(off)%W)+W)%W; ctx.drawImage(c,-o,0); ctx.drawImage(c,W-o,0); }
+
+  function drawSlope(){
+    for(let sx=0;sx<W;sx++){ const e=Math.round(edge(sx)); px(sx,e,1,2,"#f2e8d6"); px(sx,e+2,1,H-(e+2),"#ece1cd"); }
+    const phase=((camX*0.6)%18+18)%18;
+    for(let band=0;band<6;band++){ for(let sx=0;sx<W;sx++){ const e=edge(sx); const yy=Math.round(e+14+band*Math.max(10,H*0.09)-phase); if(yy>e+4&&yy<H) dot(sx,yy,(sx%6<3)?hexA("#c6d2e2",.5):hexA("#b3c3d6",.3)); } }
+  }
+
+  // ---- detailed snow-laden fir ----
+  const PINE={dark:"#1d3b30",mid:"#2c5742",lite:"#3a6e53",snow:"#eef4f8",snowSh:"#cdd9e2",trunk:"#3a2c22"};
+  function drawPine(x,baseY,scale,seed){
+    const R=prand(seed); x=Math.round(x); baseY=Math.round(baseY);
+    const lean=(R()*2-1)*0.5;
+    const totalH=Math.round(9.6*scale), baseHalf=Math.max(2,Math.round(3.4*scale));
+    const layers=5, step=totalH/(layers+0.5);
+    // trunk + snow mound
+    px(x,baseY-1,1,2,PINE.trunk);
+    px(x-Math.round(scale)-1,baseY,(Math.round(scale)+1)*2+1,1,hexA("#ffffff",.85));
+    px(x-Math.round(scale),baseY-1,Math.round(scale)*2+1,1,hexA("#dfeaf2",.7));
+    for(let j=0;j<layers;j++){
+      const f=j/(layers-1);                       // 0 bottom .. 1 top
+      const cx=x+Math.round(lean*f*totalH*0.12);
+      const half=Math.max(1,Math.round(baseHalf*(1-f*0.7)));
+      const topY=Math.round(baseY-step*(j+1));
+      const skirtH=Math.max(2,Math.round(step)+1);
+      for(let row=0;row<skirtH;row++){
+        const rr=row/skirtH, sp=Math.max(0,Math.round(half*(0.25+0.95*rr)));
+        // shadow-green base row
+        px(cx-sp,topY+row,sp*2+1,1,PINE.dark);
+        // lit (sun, right) overlay
+        if(sp>0) px(cx+1,topY+row,sp,1,PINE.mid);
+        if(sp>1 && rr>0.4) px(cx+Math.max(1,sp-1),topY+row,1,1,PINE.lite);
+      }
+      // ragged drooping branch tips on the skirt's bottom edge
+      const by=topY+skirtH;
+      for(let k=-half;k<=half;k++){ if(R()<0.45) px(cx+k,by,1,1,(k>=0?PINE.mid:PINE.dark)); }
+      // snow load on the skirt's shoulder (top), heavier toward sun side
+      for(let k=-Math.round(half*0.85);k<=Math.round(half*0.85);k++){
+        const pr=k>=0?0.72:0.42; if(R()<pr) px(cx+k,topY,1,1,(k>=0?PINE.snow:PINE.snowSh));
+      }
+    }
+    // crown tip + snow
+    const tx=x+Math.round(lean*totalH*0.12), ty=Math.round(baseY-step*layers-1);
+    px(tx,ty,1,2,PINE.dark); px(tx,ty,1,1,PINE.snow);
+  }
+  function drawTrees(skierX){
+    for(const tr of trees){ let sx=((((tr.wx-camX)%SPAN)+SPAN)%SPAN); if(sx>W+30) continue;
+      if(Math.abs(sx-skierX)<20 && tr.below>6) continue;   // keep a clear lane around the skier
+      const baseY=edge(sx)+tr.below; drawPine(sx,baseY,tr.scale,tr.seed); }
+  }
+  function drawMoguls(){
+    for(const m of moguls){ let sx=((((m.wx-camX)%SPAN)+SPAN)%SPAN); if(sx>W+6) continue; const y=edge(sx)+m.below; px(sx-m.w,y,m.w*2,1,hexA("#c6d2e2",.55)); px(sx-m.w+1,y-1,m.w*2-2,1,"#ffffff"); }
+  }
+  function drawTrail(){
+    function paint(list){ for(const p of list){ const sx=p.wx-camX; if(sx<-4||sx>W+4) continue; dot(sx,edge(sx)+p.below,hexA("#b3c3d6",Math.max(0,p.life))); } }
+    paint(trailL); paint(trailR);
+  }
+
+  // ---- detailed skier: helmet, amber goggles, teal+orange kit ----
+  const SK={ jacket:"#1f8a9c",jacketSh:"#156575",accent:"#ee6c4d",accentHi:"#ff8a66",trim:"#eef3f5",
+    pants:"#2b3550",pantsHi:"#3c4a6e",boot:"#161c2e",glove:"#1b2236",
+    helmet:"#e7eef4",helmetHi:"#ffffff",helmetSh:"#b7c5d3",skin:"#f0c9a0",skinSh:"#d8a87f",
+    strap:"#161b29",lens:"#ffcf5c",lensHi:"#fff3c4",glint:"#ffffff",
+    ski:"#ffce5c",skiEdge:"#c9972f",pole:"#d6a93f",basket:"#b98f31" }; 
+  function drawSkier(time,sx,sy,l){
+    const below=sy-edge(sx), t=Math.round(l*1.3);
+    if(!reduceMotion){
+      trailL.push({wx:sx+camX-5,below:below+10,life:1}); trailR.push({wx:sx+camX+7,below:below+13,life:1});
+      if(trailL.length>60)trailL.shift(); if(trailR.length>60)trailR.shift();
+      for(const a of trailL)a.life-=0.018; for(const a of trailR)a.life-=0.018;
+    }
+    // contact shadow
+    px(sx-6,sy+18,17,1,hexA("#9fb2c8",.4));
+    // SKIS (two clean parallel skis, down-right, upturned tips)
+    line(sx-7,sy+10,sx+7,sy+13,SK.skiEdge); line(sx-7,sy+9,sx+7,sy+12,SK.ski);
+    px(sx+7,sy+11,2,1,SK.ski); px(sx+8,sy+10,1,1,SK.ski);
+    line(sx-4,sy+14,sx+9,sy+17,SK.skiEdge); line(sx-4,sy+13,sx+9,sy+16,SK.ski);
+    px(sx+9,sy+15,2,1,SK.ski); px(sx+10,sy+14,1,1,SK.ski);
+    // spray off back ski
+    if(!reduceMotion){ const c=2+Math.round(Math.abs(l)*5); for(let i=0;i<c;i++) px(sx-6-(Math.random()*4|0),sy+2-(Math.random()*6|0),1,1,"#ffffff"); }
+    // BOOTS
+    px(sx-3,sy+8,3,2,SK.boot); px(sx+1,sy+10,3,2,SK.boot);
+    // LEGS (tuck)
+    px(sx-3,sy+4,3,4,SK.pants); px(sx,sy+5,4,4,SK.pants); px(sx-3,sy+4,3,1,SK.pantsHi);
+    // JACKET (two-tone, leaning forward)
+    px(sx-2+t,sy-3,6,7,SK.jacket);
+    px(sx+2+t,sy-3,2,6,SK.accent); px(sx+2+t,sy-3,2,1,SK.accentHi);   // orange shoulder/arm panel
+    px(sx+t,sy-3,1,7,SK.trim);                                        // white zip
+    px(sx-2+t,sy+3,6,1,SK.jacketSh);                                  // hem shadow
+    // BACK arm + pole (trailing)
+    px(sx-3+t,sy-1,2,2,SK.jacket); px(sx-4+t,sy+1,1,1,SK.glove);
+    line(sx-4+t,sy+1,sx-9,sy+6,SK.pole); px(sx-9,sy+6,1,1,SK.basket);
+    // FRONT arm + pole (reaching down-hill)
+    px(sx+4+t,sy-1,2,2,SK.accent); px(sx+6+t,sy+1,1,1,SK.glove);
+    line(sx+6+t,sy+1,sx+11,sy+7,SK.pole); px(sx+11,sy+7,1,1,SK.basket);
+    // HEAD
+    const hx=sx+2+t, hy=sy-10;
+    px(hx,hy+1,5,4,SK.helmet); px(hx,hy,5,1,SK.helmet); px(hx+1,hy-1,3,1,SK.helmet); // dome
+    px(hx+1,hy-1,2,1,SK.helmetHi); px(hx,hy+1,1,4,SK.helmetSh);                       // hi/shadow
+    px(hx+1,hy+5,3,2,SK.skin); px(hx+1,hy+6,1,1,SK.skinSh);                           // face/chin
+    // goggles (signature)
+    px(hx+1,hy+4,5,1,SK.strap);                                                       // strap across
+    px(hx+2,hy+4,4,2,SK.strap);                                                       // goggle frame
+    px(hx+2,hy+5,4,1,SK.lens);                                                        // amber lens
+    px(hx+2,hy+5,1,1,SK.lensHi); px(hx+3+(l>0?1:0),hy+5,1,1,SK.glint);                // lens shading + moving glint
+  }
+  function drawStreaks(){ if(reduceMotion)return; for(const s of streaks){ ctx.fillStyle=hexA("#ffffff",.2); for(let i=0;i<s.len;i++) ctx.fillRect((s.x-i)|0,(s.y-Math.round(i*0.5))|0,1,1);} }
+  function drawSnow(dt){ for(const f of snow){ if(!reduceMotion){ f.y+=f.s*dt*30; f.x-=f.s*dt*10; if(f.y>H){f.y=-2;f.x=Math.random()*W;} if(f.x<0)f.x+=W; } dot(f.x,f.y,hexA("#ffffff",.85)); } }
+
+  function render(time,dt){
+    ctx.clearRect(0,0,W,H);
+    const ax=Math.round(W*0.40), carve=reduceMotion?0:Math.sin(time/640), dirn=reduceMotion?0.25:Math.cos(time/640);
+    const sx=Math.round(ax+carve*Math.max(10,W*0.10)), sy=Math.round(edge(ax+carve*Math.max(10,W*0.10))+22+Math.sin(time/640+1)*3);
+    drawSky(); drawSun(time);
+    drawTile(tFar,camX*0.10); drawTile(tMid,camX*0.22); drawTile(tNear,camX*0.40);
+    drawSlope(); drawTrees(sx); drawMoguls(); drawTrail();
+    drawSkier(time,sx,sy,dirn);
+    drawStreaks(); drawSnow(dt);
+  }
+  function stepStreaks(dt){ if(reduceMotion)return; for(const s of streaks){ s.x-=dt*150; s.y-=dt*60; if(s.x<-6||s.y<H*0.3){ s.x=W+Math.random()*20; s.y=H*0.45+Math.random()*H*0.55; } } }
+
+  let last=0;
+  function frame(t){ const dt=Math.min(0.05,(t-last)/1000||0.016); last=t; if(!reduceMotion){camX+=dt*60; stepStreaks(dt);} render(t,dt); requestAnimationFrame(frame); }
+  window.addEventListener("resize",resize,{passive:true}); resize();
+  if(reduceMotion) render(0,0.016); else requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

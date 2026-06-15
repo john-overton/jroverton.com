@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Open Glades — An independent software studio</title>
+  <meta name="description" content="Open Glades is an independent software studio building purposeful products — Sprout Track, Astryk, and Parallax. Inveniam viam aut faciam: we find a way, or make one." />
+  <link rel="canonical" href="https://openglades.com/" />
+  <meta name="theme-color" content="#0a1020" />
+  <meta name="robots" content="index, follow" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Open Glades" />
+  <meta property="og:title" content="Open Glades — An independent software studio" />
+  <meta property="og:description" content="An independent software studio building purposeful products: Sprout Track, Astryk, and Parallax." />
+  <meta property="og:url" content="https://openglades.com/" />
+  <meta property="og:image" content="https://openglades.com/assets/img/og-cover.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Open Glades — An independent software studio" />
+  <meta name="twitter:description" content="An independent software studio building purposeful products: Sprout Track, Astryk, and Parallax." />
+  <meta name="twitter:image" content="https://openglades.com/assets/img/og-cover.png" />
+
+  <!-- Icons / manifest -->
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="/assets/img/icon-192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+
+  <!-- Self-hosted fonts -->
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/vt323-400-latin.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/silkscreen-700-latin.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/pressstart2p-400-latin.woff2" crossorigin />
+
+  <!-- Critical: keep the dark backdrop before CSS loads (no flash of white) -->
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0a1020; }
+    body { color: #f7eedd; font-family: 'VT323', monospace; }
+  </style>
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://openglades.com/#org",
+        "name": "Open Glades",
+        "legalName": "Open Glades, LLC",
+        "url": "https://openglades.com/",
+        "logo": "https://openglades.com/assets/img/icon-512.png",
+        "slogan": "Inveniam viam aut faciam",
+        "description": "An independent software studio building purposeful products: Sprout Track, Astryk, and Parallax.",
+        "sameAs": [
+          "https://sprout-track.com",
+          "https://astryk.com",
+          "https://jroverton.com/parallax"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://openglades.com/#website",
+        "url": "https://openglades.com/",
+        "name": "Open Glades",
+        "publisher": { "@id": "https://openglades.com/#org" }
+      }
+    ]
+  }
+  </script>
+</head>
+
+<body>
+  <div class="og-root">
+    <canvas id="og-canvas" class="og-canvas" aria-hidden="true"></canvas>
+    <div class="og-vignette" aria-hidden="true"></div>
+
+    <!-- skier speech bubbles -->
+    <div id="og-bubble-a" class="og-bubble og-bubble--a" aria-hidden="true">
+      <div class="og-bubble-body"><span data-bt></span><div class="og-bubble-tail"></div></div>
+    </div>
+    <div id="og-bubble-b" class="og-bubble og-bubble--b" aria-hidden="true">
+      <div class="og-bubble-body"><span data-bt></span><div class="og-bubble-tail"></div></div>
+    </div>
+
+    <main class="og-main">
+      <header class="og-header">
+        <p class="og-eyebrow">An independent software studio</p>
+        <h1 class="og-title"><span class="og-cap">O</span>PEN <span class="og-cap">G</span>LADES</h1>
+        <div class="og-tagline-row">
+          <p class="og-tagline">inveniam viam aut faciam</p>
+          <button id="og-scene-btn" class="og-scene-btn" type="button" aria-label="Open scene panel" style="display:inline-flex;"><span class="og-diamond">&#9670;</span> SCENE</button>
+        </div>
+      </header>
+
+      <div class="og-lower">
+        <!-- Desktop / crawlable product grid (real links, the SEO baseline) -->
+        <section class="og-products" aria-label="Products">
+          <a class="og-product" href="https://sprout-track.com" target="_blank" rel="noopener">
+            <span class="og-product-icon"><img src="/assets/img/sprout.png" alt="Sprout Track logo" width="54" height="54" /></span>
+            <span class="og-product-text">
+              <span class="og-product-name">Sprout Track</span>
+              <span class="og-product-tag">Baby &amp; family tracking, self-hosted.</span>
+            </span>
+          </a>
+          <a class="og-product" href="https://astryk.com" target="_blank" rel="noopener">
+            <span class="og-product-icon"><img src="/assets/img/astryk.png" alt="Astryk logo" width="54" height="54" /></span>
+            <span class="og-product-text">
+              <span class="og-product-name">Astryk</span>
+              <span class="og-product-tag">Collaborative workspaces, in real time.</span>
+            </span>
+          </a>
+          <a class="og-product" href="https://jroverton.com/parallax" target="_blank" rel="noopener">
+            <span class="og-product-icon og-product-icon--light"><img src="/assets/img/parallax.svg" alt="Parallax logo" width="54" height="54" /></span>
+            <span class="og-product-text">
+              <span class="og-product-name">Parallax</span>
+              <span class="og-product-tag">Demand-response transit, made clear.</span>
+            </span>
+          </a>
+        </section>
+
+        <!-- Mobile icon row + tap-to-reveal card (JS enhancement) -->
+        <div class="og-products-mobile" aria-label="Products">
+          <div id="og-card" class="og-card" hidden>
+            <button id="og-card-close" class="og-x og-card-close" type="button" aria-label="Close">&times;</button>
+            <span id="og-card-name" class="og-card-name"></span>
+            <span id="og-card-tag" class="og-card-tag"></span>
+            <a id="og-card-link" class="og-card-link" href="#" target="_blank" rel="noopener">VISIT SITE <span>&#8594;</span></a>
+          </div>
+          <div class="og-taps">
+            <button class="og-tap" type="button" data-card="sprout" aria-label="Sprout Track"><img src="/assets/img/sprout.png" alt="" /></button>
+            <button class="og-tap" type="button" data-card="astryk" aria-label="Astryk"><img src="/assets/img/astryk.png" alt="" /></button>
+            <button class="og-tap og-tap--light" type="button" data-card="parallax" aria-label="Parallax"><img src="/assets/img/parallax.svg" alt="" /></button>
+          </div>
+        </div>
+
+        <div class="og-footer-row">
+          <p class="og-footer-text">Built with a purpose, your glade conquered together.</p>
+          <button id="og-contact-btn" class="og-yellow-btn" type="button">CONTACT</button>
+        </div>
+        <p class="og-copy">&copy; OPEN GLADES, LLC 2026</p>
+      </div>
+    </main>
+
+    <!-- Scene panel -->
+    <div id="og-panel" class="og-panel" style="display:none;">
+      <div class="og-panel-head">
+        <span class="og-panel-title">SCENE</span>
+        <button id="og-panel-close" class="og-x og-panel-close" type="button" aria-label="Close scene panel">&times;</button>
+      </div>
+      <div class="og-panel-row">
+        <span class="og-panel-label">TIME OF DAY</span>
+        <span id="og-hour-label" class="og-hour"></span>
+      </div>
+      <input id="og-time" class="og-range" type="range" min="0" max="1" step="0.002" aria-label="Time of day" />
+      <button id="og-pause" class="og-pausebtn" type="button" aria-pressed="false">&#9208; PAUSE TIME</button>
+      <div class="og-mood-heading">MOOD</div>
+      <div class="og-mood-grid">
+        <button class="og-mood is-active" type="button" data-mood="Serene">Serene</button>
+        <button class="og-mood" type="button" data-mood="Vivid">Vivid</button>
+        <button class="og-mood" type="button" data-mood="Moody">Moody</button>
+        <button class="og-mood" type="button" data-mood="Dreamy">Dreamy</button>
+      </div>
+    </div>
+
+    <!-- Contact modal -->
+    <div id="og-contact" class="og-overlay" hidden>
+      <div id="og-contact-dialog" class="og-dialog" role="dialog" aria-modal="true" aria-label="Contact">
+        <button class="og-x og-dialog-close" type="button" data-contact-close aria-label="Close">&times;</button>
+        <div class="og-dialog-head">
+          <span class="og-dialog-icon">&#9670;</span>
+          <span class="og-dialog-title">Get in touch</span>
+        </div>
+
+        <div id="og-contact-pending">
+          <p class="og-form-intro">Tell us about your glade &mdash; we&rsquo;ll be in touch.</p>
+          <form id="og-contact-form" class="og-form" novalidate>
+            <div class="og-form-row">
+              <label class="og-field">NAME<input name="name" required /></label>
+              <label class="og-field">COMPANY<input name="company" /></label>
+            </div>
+            <div class="og-form-row">
+              <label class="og-field">PHONE<input name="phone" type="tel" /></label>
+              <label class="og-field">EMAIL<input name="email" type="email" required /></label>
+            </div>
+            <label class="og-field">MESSAGE<textarea name="message" rows="4"></textarea></label>
+            <div class="og-honeypot" aria-hidden="true">
+              <label>Leave this field empty<input name="website" tabindex="-1" autocomplete="off" /></label>
+            </div>
+            <p id="og-contact-error" class="og-error" hidden>Something went wrong sending your message. Please try again, or email hello@openglades.com.</p>
+            <button id="og-contact-submit" class="og-submit" type="submit">SEND MESSAGE</button>
+          </form>
+        </div>
+
+        <div id="og-contact-sent" class="og-sent" hidden>
+          <div class="og-check">&#10003;</div>
+          <span class="og-sent-title">Message sent!</span>
+          <span class="og-sent-text">Thanks for reaching out &mdash; we&rsquo;ll get back to you soon.</span>
+          <button class="og-done" type="button" data-contact-close>DONE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <noscript>
+    <style>.og-canvas, .og-scene-btn, .og-products-mobile { display: none !important; }</style>
+  </noscript>
+
+  <script src="/config.js"></script>
+  <script src="/assets/js/scene.js"></script>
+  <script src="/assets/js/app.js"></script>
+</body>
+</html>

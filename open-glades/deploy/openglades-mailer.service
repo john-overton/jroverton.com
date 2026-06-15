@@ -1,0 +1,29 @@
+# systemd unit for the Open Glades contact mailer.
+# Install: sudo cp openglades-mailer.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now openglades-mailer
+#
+# Edit WorkingDirectory / User to match your server. The service reads config.json
+# from its WorkingDirectory.
+
+[Unit]
+Description=Open Glades contact mailer (SendGrid)
+After=network.target
+
+[Service]
+Type=simple
+# >>> EDIT THESE <<<
+User=www-data
+WorkingDirectory=/srv/jroverton.com/open-glades/server
+ExecStart=/usr/bin/node mailer.mjs
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=3
+# hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/jroverton.com/open-glades/server
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+{
+  "name": "open-glades-mailer",
+  "version": "1.0.0",
+  "description": "Tiny SendGrid-backed contact endpoint for openglades.com",
+  "private": true,
+  "type": "module",
+  "main": "mailer.mjs",
+  "scripts": {
+    "start": "node mailer.mjs",
+    "dev": "node dev-server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@sendgrid/mail": "^8.1.3"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "port": 8787,
+  "host": "127.0.0.1",
+  "sendgridApiKey": "SG.xxxxxxxxxxxxxxxxxxxxxx",
+  "contactTo": "hello@openglades.com",
+  "contactFrom": "website@openglades.com",
+  "contactFromName": "Open Glades Website",
+  "subjectPrefix": "[Open Glades] Contact",
+  "allowedOrigins": ["https://openglades.com", "https://www.openglades.com"]
+}
