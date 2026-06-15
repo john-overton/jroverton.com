@@ -87,6 +87,14 @@
     const px = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x | 0, y | 0, w | 0, h | 0); };
     const dot = (x, y, col) => { ctx.fillStyle = col; ctx.fillRect(x | 0, y | 0, 1, 1); };
     const disc = (cx, cy, rad, col) => { rad = Math.round(rad); ctx.fillStyle = col; for (let yy = -rad; yy <= rad; yy++) { const sp = Math.round(Math.sqrt(Math.max(0, rad * rad - yy * yy))); ctx.fillRect(cx - sp, cy + yy, sp * 2 + 1, 1); } };
+    // A soft radial halo of `col`, fixed to its body (sun/moon), fading to transparent.
+    const haloGradient = (cx, cy, hr, col, a0) => {
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, hr);
+      g.addColorStop(0, hexA(col, a0));
+      g.addColorStop(0.4, hexA(col, a0 * 0.35));
+      g.addColorStop(1, hexA(col, 0));
+      ctx.fillStyle = g; ctx.fillRect(cx - hr, cy - hr, hr * 2, hr * 2);
+    };
     const line = (x0, y0, x1, y1, col) => { x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0; let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx - dy; ctx.fillStyle = col; while (true) { ctx.fillRect(x0, y0, 1, 1); if (x0 === x1 && y0 === y1) break; let e2 = 2 * err; if (e2 > -dy) { err -= dy; x0 += sx; } if (e2 < dx) { err += dx; y0 += sy; } } };
     const prand = (s) => { let v = (s >>> 0) || 1; return () => { v = (v * 1664525 + 1013904223) >>> 0; return v / 4294967296; }; };
     const lerp = (a, b, t) => lerpHex(a, b, t);
@@ -96,17 +104,22 @@
     // --- celestial bodies: sun + moon ride the same arc 12h apart, so one rises on
     // one side as the other sets on the opposite side. h is the body's local hour (0..24).
     const MOON_COL = '#e3e9f6', MOON_GLOW = '#aab6d8';
-    const bodyAlt = (h) => Math.sin((h - 6) / 12 * Math.PI);          // >0 means above horizon (6h..18h)
+    // Continuous elliptical orbit over the full 24h (no clamping), so position never
+    // jumps — even below the horizon. a = 0 at the eastern horizon (06:00), pi/2 at the
+    // zenith (12:00), pi at the western horizon (18:00), -pi/2 at the nadir (00:00).
     const bodyPos = (h) => {
-      const alt = bodyAlt(h);
-      const tx = Math.max(0, Math.min(1, (h - 6) / 12));             // 0 at the rising horizon, 1 at the setting one
-      return { x: 0.12 + 0.76 * tx, y: 0.5 - alt * 0.42, alt: alt }; // arc: high at zenith, at horizon when alt~0
+      const a = (h - 6) / 12 * Math.PI;
+      const alt = Math.sin(a);                       // >0 = above horizon
+      return { x: 0.5 - Math.cos(a) * 0.38, y: 0.5 - alt * 0.42, alt: alt };
     };
-    const lightPos = () => {
+    // Shared light state: both bodies, the gradient centre (altitude-blended toward the
+    // higher one) and sunFrac (1 = full sun .. 0 = full moon), which drives the sky-glow
+    // size + the god rays so night gets dark as the moon takes over.
+    const celestialState = () => {
       const h = dayHour * 24;
       const s = bodyPos(h), m = bodyPos((h + 12) % 24);
-      const ws = Math.max(0, s.alt) + 1e-4, wm = Math.max(0, m.alt) + 1e-4; // blend toward whichever is higher
-      return { x: (s.x * ws + m.x * wm) / (ws + wm), y: (s.y * ws + m.y * wm) / (ws + wm) };
+      const ws = Math.max(0, s.alt) + 1e-4, wm = Math.max(0, m.alt) + 1e-4;
+      return { s: s, m: m, sunFrac: ws / (ws + wm), cx: (s.x * ws + m.x * wm) / (ws + wm), cy: (s.y * ws + m.y * wm) / (ws + wm) };
     };
 
     const KITA = { jacket: '#1f8a9c', jacketSh: '#156575', accent: '#2b3550', accentHi: '#3c4a6e', pants: '#2b3550', pantsHi: '#3c4a6e', boot: '#141a2c', glove: '#1b2236', helmet: '#e7eef4', helmetHi: '#ffffff', helmetSh: '#b7c5d3', skin: '#f0c9a0', skinSh: '#d8a87f', strap: '#161b29', lens: '#7fd0e0', lensHi: '#d8f4fb', trim: '#eef3f5', ski: '#ffce5c', skiEdge: '#c9972f', pole: '#cbb48a', basket: '#9c8a63' };
@@ -311,34 +324,53 @@
     function setPaused(p) { paused = !!p; return paused; }
     function drawTile(c, off) { if (!c) return; const o = ((Math.round(off) % W) + W) % W; ctx.drawImage(c, -o, 0); ctx.drawImage(c, W - o, 0); }
 
-    // Sky: a large oval gradient radiating from the active light source (sun by day,
-    // moon by night, blended through twilight). Drawn over the whole canvas; the
-    // mountains/slope paint on top, so only the sky above the ridgelines shows.
+    // Sky: a background gradient stretched along the sun -> moon axis. Lightest at the
+    // sun, darkest at the moon; because both endpoints move continuously there is no
+    // centre to "jump" — the whole gradient just rotates as the bodies arc across.
+    // Each body's own glow is a fixed radial halo drawn in drawCelestial.
     function drawSky() {
-      const L = lightPos();
-      const lx = L.x * W, ly = L.y * H;
-      const inner = lerp(PAL.sun, PAL.skyHor, 0.45);     // bright halo right at the source
-      const R = Math.max(W, H) * 1.25;
-      ctx.save();
-      ctx.translate(lx, ly);
-      ctx.scale(1, 0.66);                                // squash vertically -> wide oval
-      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
-      g.addColorStop(0.0, inner);
-      g.addColorStop(0.16, PAL.skyHor);
-      g.addColorStop(0.46, PAL.skyMid);
-      g.addColorStop(1.0, PAL.skyTop);
+      const st = celestialState();
+      const light = lerp(PAL.skyHor, PAL.sun, 0.22); // bright, slightly sun-tinted
+      const g = ctx.createLinearGradient(st.s.x * W, st.s.y * H, st.m.x * W, st.m.y * H);
+      g.addColorStop(0.0, light);     // at the sun
+      g.addColorStop(0.5, PAL.skyMid);
+      g.addColorStop(1.0, PAL.skyTop); // darkest, at the moon
       ctx.fillStyle = g;
-      ctx.fillRect(-3 * W, -3 * H, 6 * W, 6 * H);
+      ctx.fillRect(0, 0, W, H);
+    }
+    // Shimmering crepuscular rays fanning from the sun. Drawn before the mountains so
+    // the lower rays are clipped by the ridgeline; additive blend so they read as light.
+    function drawSunRays(cx, cy, r, time, sunFrac) {
+      if (sunFrac <= 0.03) return;
+      const rays = 14, maxLen = Math.max(W, H) * 0.24, col = lerp(PAL.sun, '#ffffff', 0.4);
+      const rot = reduceMotion ? 0 : time * 0.04;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < rays; i++) {
+        const ang = (i / rays) * Math.PI * 2 + rot;
+        const sh = reduceMotion ? 0.6 : (0.5 + 0.5 * Math.sin(time * 2.2 + i * 1.7)); // shimmer
+        const a = 0.08 * sh * sunFrac;
+        if (a <= 0.004) continue;
+        const len = maxLen * (0.45 + 0.55 * sh), halfW = r * (0.22 + 0.12 * sh);
+        const dx = Math.cos(ang), dy = Math.sin(ang), pxp = -dy, pyp = dx;
+        ctx.fillStyle = hexA(col, a);
+        ctx.beginPath();
+        ctx.moveTo(cx + pxp * halfW, cy + pyp * halfW);
+        ctx.lineTo(cx - pxp * halfW, cy - pyp * halfW);
+        ctx.lineTo(cx + dx * len, cy + dy * len);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
     }
     function drawCelestial(time) {
       const wob = reduceMotion ? 0 : Math.sin(time * 0.7) * 0.4;
-      const h = dayHour * 24;
-      const s = bodyPos(h), m = bodyPos((h + 12) % 24);
+      const st = celestialState();
+      const s = st.s, m = st.m;
       // moon first (so an overlapping sun glow sits on top at the crossover)
       if (m.alt > -0.12) {
-        const cx = Math.round(W * m.x), cy = Math.round(H * m.y), r = 10 + wob, glowR = r * 2.6;
-        for (let k = 6; k >= 1; k--) disc(cx, cy, r + (glowR - r) * (k / 6), hexA(MOON_GLOW, 0.05));
+        const cx = Math.round(W * m.x), cy = Math.round(H * m.y), r = 10 + wob;
+        haloGradient(cx, cy, r * 3.2, MOON_GLOW, 0.30); // fixed, small, dim halo
         disc(cx, cy, r, MOON_COL);
         // faint shaded limb (lower-right) for a touch of sphere volume
         disc(cx + Math.round(r * 0.24), cy + Math.round(r * 0.24), Math.round(r * 0.82), hexA('#c2cbe2', 0.30));
@@ -355,9 +387,10 @@
         crater(0.42, -0.16, 0.10);
       }
       if (s.alt > -0.12) {
-        const cx = Math.round(W * s.x), cy = Math.round(H * s.y), r = (PAL.sunR || 6) * 2 + wob, glowR = r * 3.0;
-        for (let k = 6; k >= 1; k--) disc(cx, cy, r + (glowR - r) * (k / 6), hexA(PAL.sun, 0.06));
-        disc(cx, cy, r, PAL.sun);
+        const cx = Math.round(W * s.x), cy = Math.round(H * s.y), r = (PAL.sunR || 6) * 2 + wob;
+        drawSunRays(cx, cy, r, time, st.sunFrac);
+        haloGradient(cx, cy, r * 4, PAL.sun, 0.55); // fixed bright halo
+        disc(cx, cy, r, lerp(PAL.sun, '#ffffff', 0.5)); // ~50% whiter disc
       }
     }
     function drawSlope() {
