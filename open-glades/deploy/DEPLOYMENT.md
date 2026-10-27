@@ -110,7 +110,11 @@ sudo crontab -u www-data -e
 #   */2 * * * *   /srv/jroverton.com/open-glades/fairweather/scripts/cron.sh alerts   >/dev/null
 #   */15 * * * *  /srv/jroverton.com/open-glades/fairweather/scripts/cron.sh rain     >/dev/null
 #   17 3 * * *    /srv/jroverton.com/open-glades/fairweather/scripts/cron.sh cleanup  >/dev/null
+#   */5 * * * *   /srv/jroverton.com/open-glades/fairweather/scripts/cron.sh radar    >/dev/null
 ```
+
+The `radar` job keeps a disk cache of radar tiles in `fairweather/data/tiles` (about 50 to 100 MB, pruned
+to the last 25 h) and pre-fetches the default view so phones load radar quickly.
 
 nginx (next step) proxies `/fairweather` to `127.0.0.1:3100` and returns 404 for
 `/fairweather/api/cron/` so only the local crontab can trigger jobs.
