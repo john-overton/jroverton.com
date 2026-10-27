@@ -1,0 +1,30 @@
+# systemd unit for Fairweather (openglades.com/fairweather), a Next.js app.
+# Install: sudo cp openglades-fairweather.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now openglades-fairweather
+#
+# Build first (npm ci && npm run build). Next.js reads .env.local from WorkingDirectory.
+# Listens on 127.0.0.1:3100 (see "start" in package.json); nginx proxies /fairweather to it.
+
+[Unit]
+Description=Fairweather weather app (Next.js) for openglades.com/fairweather
+After=network.target
+
+[Service]
+Type=simple
+# >>> EDIT THESE <<<
+User=www-data
+WorkingDirectory=/srv/jroverton.com/open-glades/fairweather
+ExecStart=/usr/bin/npm start
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=3
+# hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# SQLite database and Next's runtime cache
+ReadWritePaths=/srv/jroverton.com/open-glades/fairweather/data /srv/jroverton.com/open-glades/fairweather/.next
+
+[Install]
+WantedBy=multi-user.target

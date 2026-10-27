@@ -1,14 +1,16 @@
 # Open Glades — Deployment
 
 The Open Glades site (`openglades.com`) is a **static** site served by nginx straight
-from this repo, plus one tiny Node service that relays the contact form through SendGrid.
+from this repo, plus one tiny Node service that relays the contact form through SendGrid,
+and **Fairweather** (`openglades.com/fairweather`), a small standalone Next.js app.
 It is completely independent of the Next.js app in `website/`.
 
 ```
 open-glades/
-  site/      ← static files, this is the nginx root
-  server/    ← contact mailer (Node + SendGrid)
-  deploy/    ← nginx config, systemd unit, this doc
+  site/         ← static files, this is the nginx root
+  server/       ← contact mailer (Node + SendGrid)
+  fairweather/  ← Fairweather weather PWA (Next.js, own SQLite, own systemd service)
+  deploy/       ← nginx config, systemd units, this doc
 ```
 
 Paths below assume the repo is checked out at `/srv/jroverton.com`. **Change the paths**
@@ -68,7 +70,52 @@ sudo systemctl enable --now openglades-mailer
 curl -s http://127.0.0.1:8787/api/health        # -> {"ok":true,"dryRun":false}
 ```
 
-## 4. nginx
+## 4. Fairweather (openglades.com/fairweather)
+
+A Next.js app with its own SQLite database (push subscriptions only) and a server crontab.
+Needs Node 20 to 25 (better-sqlite3 has no Node 26 build yet).
+
+```sh
+cd /srv/jroverton.com/open-glades/fairweather
+npm ci
+cp env.sample .env.local
+sudo nano .env.local           # fill in the values below
+npx web-push generate-vapid-keys   # paste into FAIRWEATHER_VAPID_PUBLIC_KEY / _PRIVATE_KEY
+openssl rand -hex 32               # paste into FAIRWEATHER_CRON_SECRET
+npm run build                      # NEXT_PUBLIC_* values are baked in here; rebuild if they change
+sudo install -d -o www-data -g www-data data .next
+sudo chown -R www-data:www-data .next
+```
+
+`.env.local` keys (see `env.sample`):
+
+| key | meaning |
+|-----|---------|
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | Mapbox public token for the Radar page; add `openglades.com` to its URL restrictions |
+| `NEXT_PUBLIC_MAPBOX_STYLE_LIGHT` / `NEXT_PUBLIC_MAPBOX_STYLE_DARK` | Mapbox style URLs for the radar's Day and Night basemaps (blank = stock light-v11 / dark-v11) |
+| `FAIRWEATHER_VAPID_PUBLIC_KEY` / `FAIRWEATHER_VAPID_PRIVATE_KEY` | Web Push keys. Generate once; changing them invalidates every subscription |
+| `FAIRWEATHER_VAPID_SUBJECT` | `mailto:` contact sent to push services |
+| `FAIRWEATHER_CRON_SECRET` | shared secret between the crontab and the app |
+| `AIRNOW_API_KEY` (optional) | EPA AirNow; falls back to CAMS air quality without it |
+
+Install + start the service, then the crontab:
+
+```sh
+sudo cp /srv/jroverton.com/open-glades/deploy/openglades-fairweather.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now openglades-fairweather
+curl -s http://127.0.0.1:3100/fairweather/api/radar/manifest | head -c 200   # -> {"latestObs":...}
+
+sudo crontab -u www-data -e
+#   */2 * * * *   /srv/jroverton.com/open-glades/fairweather/scripts/cron.sh alerts   >/dev/null
+#   */15 * * * *  /srv/jroverton.com/open-glades/fairweather/scripts/cron.sh rain     >/dev/null
+#   17 3 * * *    /srv/jroverton.com/open-glades/fairweather/scripts/cron.sh cleanup  >/dev/null
+```
+
+nginx (next step) proxies `/fairweather` to `127.0.0.1:3100` and returns 404 for
+`/fairweather/api/cron/` so only the local crontab can trigger jobs.
+
+## 5. nginx
 
 ```sh
 sudo cp /srv/jroverton.com/open-glades/deploy/nginx-openglades.conf /etc/nginx/sites-available/openglades
@@ -77,7 +124,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 5. HTTPS
+## 6. HTTPS
 
 ```sh
 sudo certbot --nginx -d openglades.com -d www.openglades.com
@@ -85,11 +132,13 @@ sudo certbot --nginx -d openglades.com -d www.openglades.com
 
 Certbot adds the `:443` listeners and a http→https redirect automatically.
 
-## 6. Verify
+## 7. Verify
 
 ```sh
 curl -I https://openglades.com                  # 200, Cache-Control: no-cache
 curl -I https://openglades.com/assets/css/styles.css   # 200, long cache
+curl -I https://openglades.com/fairweather       # 200, the weather app
+curl -s 'https://openglades.com/fairweather/api/forecast?lat=39.10&lon=-94.58' | head -c 200
 curl -s -X POST https://openglades.com/api/contact \
   -H 'Content-Type: application/json' -H 'Origin: https://openglades.com' \
   -d '{"name":"Test","email":"test@example.com","message":"hello"}'   # {"ok":true}
@@ -108,6 +157,9 @@ cd /srv/jroverton.com && sudo git pull
 
 - Static changes (HTML/CSS/JS/assets) are live immediately (html is sent `no-cache`).
 - Only if `open-glades/server/` changed: `sudo systemctl restart openglades-mailer`.
+- Only if `open-glades/fairweather/` changed:
+  `cd open-glades/fairweather && npm ci && npm run build && sudo systemctl restart openglades-fairweather`.
+  (Unlike the static site, a `git pull` alone does not update Fairweather.)
 
 ### Optional: auto-deploy
 

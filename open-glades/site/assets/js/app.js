@@ -13,7 +13,8 @@
   var CARD_MAP = {
     sprout: { name: 'Sprout Track', tag: 'Baby & family tracking, self-hosted.', url: 'https://sprout-track.com' },
     astryk: { name: 'Astryk', tag: 'Collaborative workspaces, in real time.', url: 'https://astryk.com' },
-    parallax: { name: 'Parallax', tag: 'Demand-response transit, made clear.', url: 'https://jroverton.com/parallax' }
+    parallax: { name: 'Parallax', tag: 'Demand-response transit, made clear.', url: 'https://jroverton.com/parallax' },
+    fairweather: { name: 'Fairweather', tag: 'Ad-free local weather and radar.', url: '/fairweather', cta: 'OPEN APP' }
   };
 
   function fmtHour(h) {
@@ -104,6 +105,10 @@
       cardName.textContent = data.name;
       cardTag.textContent = data.tag;
       cardLink.href = data.url;
+      // Same-site apps open in place; external sites in a new tab
+      var local = data.url.charAt(0) === '/';
+      cardLink.target = local ? '_self' : '_blank';
+      cardLink.firstChild.nodeValue = (data.cta || 'VISIT SITE') + ' ';
       card.hidden = false;
     }
     $$('.og-tap').forEach(function (btn) {

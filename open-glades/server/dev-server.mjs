@@ -71,7 +71,19 @@ async function serveStatic(req, res) {
   }
 }
 
+// Fairweather (open-glades/fairweather) runs as its own Next.js app on :3100; mirror nginx locally
+const FAIRWEATHER = { host: '127.0.0.1', port: Number(process.env.FAIRWEATHER_PORT || 3100) };
+function proxyFairweather(req, res) {
+  const upstream = http.request(
+    { host: FAIRWEATHER.host, port: FAIRWEATHER.port, method: req.method, path: req.url, headers: req.headers },
+    (up) => { res.writeHead(up.statusCode || 502, up.headers); up.pipe(res); }
+  );
+  upstream.on('error', () => { res.writeHead(502, { 'Content-Type': 'text/plain' }); res.end('Fairweather is not running. Start it with: cd ../fairweather && npm run dev'); });
+  req.pipe(upstream);
+}
+
 http.createServer((req, res) => {
+  if (req.url === '/fairweather' || req.url.startsWith('/fairweather/') || req.url.startsWith('/fairweather?') || req.url.startsWith('/fairweather#')) return proxyFairweather(req, res);
   if (req.url.startsWith('/api/')) return proxyApi(req, res);
   return serveStatic(req, res);
 }).listen(PORT, () => {
