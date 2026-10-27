@@ -3,7 +3,7 @@
 #          sudo systemctl daemon-reload && sudo systemctl enable --now openglades-fairweather
 #
 # Build first (npm ci && npm run build). Next.js reads .env.local from WorkingDirectory.
-# Listens on 127.0.0.1:3100 (see "start" in package.json); nginx proxies /fairweather to it.
+# Listens on 127.0.0.1:3100; nginx proxies /fairweather to it.
 
 [Unit]
 Description=Fairweather weather app (Next.js) for openglades.com/fairweather
@@ -14,8 +14,10 @@ Type=simple
 # >>> EDIT THESE <<<
 User=www-data
 WorkingDirectory=/srv/jroverton.com/open-glades/fairweather
-ExecStart=/usr/bin/npm start
+# Run next directly (not via npm): npm wants a writable $HOME, which ProtectSystem=strict denies
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -p 3100 -H 127.0.0.1
 Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
 Restart=on-failure
 RestartSec=3
 # hardening
