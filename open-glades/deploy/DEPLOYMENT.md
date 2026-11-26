@@ -80,6 +80,27 @@ Install, configure, cron, and update steps are in that repo's
 The Open Glades nginx config (next step) already proxies `/fairweather` to `127.0.0.1:3100` and
 returns 404 for `/fairweather/api/cron/` so only the local crontab can trigger jobs.
 
+## 4b. HN Reader (openglades.com/hn)
+
+The reader itself is static (`site/hn/`) and needs nothing. Its **reader view** (the "read"
+links, which show an article in the reader's own colours and text size) needs the small
+extraction service in `open-glades/hn-reader/`:
+
+```sh
+cd /srv/jroverton.com/open-glades/hn-reader
+npm ci
+sudo cp /srv/jroverton.com/open-glades/deploy/openglades-hn-reader.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now openglades-hn-reader
+curl -s http://127.0.0.1:8788/hn/api/health        # -> {"ok":true,...}
+```
+
+The nginx config (next step) proxies `/hn/api/` to `127.0.0.1:8788`. The service only accepts a
+Hacker News item id and fetches that story's link; it refuses private and loopback addresses.
+Local testing: `node reader.mjs --dev`, then open `http://localhost:8788/hn/`.
+After changing `hn-reader/`: `npm ci` if dependencies changed, then
+`sudo systemctl restart openglades-hn-reader`.
+
 ## 5. nginx
 
 ```sh

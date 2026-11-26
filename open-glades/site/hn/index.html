@@ -139,6 +139,24 @@
   .prose pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; overflow-x: auto; font-size: 0.88rem; line-height: 1.45; }
   .prose code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 
+  /* reader view: an article from another site, in our colours and type */
+  .article { margin-top: 12px; }
+  .article h2, .article h3, .article h4, .article h5, .article h6 { line-height: 1.3; margin: 1.5em 0 0.5em; }
+  .article h2 { font-size: 1.3rem; }
+  .article h3 { font-size: 1.15rem; }
+  .article h4, .article h5, .article h6 { font-size: 1rem; }
+  .article img { display: block; max-width: 100%; height: auto; margin: 1em 0; border-radius: 4px; }
+  .article figure { margin: 1em 0; }
+  .article figcaption { color: var(--muted); font-size: 0.85rem; }
+  .article blockquote { margin: 1em 0; padding-left: 12px; border-left: 3px solid var(--accent); color: var(--quote); }
+  .article ul, .article ol { padding-left: 1.4em; }
+  .article li { margin: 0.3em 0; }
+  .article table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: 0.85rem; }
+  .article th, .article td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; vertical-align: top; }
+  .article hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
+  .article :not(pre) > code { background: var(--code-bg); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
+  .read-fail .btn { display: inline-block; margin-top: 8px; padding: 6px 14px; border: 1.5px solid var(--border); border-radius: 4px; color: var(--text); font-weight: 600; text-decoration: none; }
+
   .comment { padding-top: 14px; }
   .c-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.9rem; color: var(--muted); margin-bottom: 4px; }
   .c-toggle { width: 1.5rem; height: 1.5rem; padding: 0; line-height: 1; font-size: 1rem; flex: none; }
@@ -298,18 +316,37 @@
 
   function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
 
-  // HN comment/story text is HTML. Rebuild it from an allowlist instead of trusting it.
-  const ALLOWED = new Set(['P', 'I', 'EM', 'B', 'STRONG', 'PRE', 'CODE', 'A', 'BR']);
-  const DROPPED = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'TEMPLATE']);
-  function copyClean(src, dst) {
+  // Comment text and extracted articles are untrusted HTML. Rebuild them from an allowlist
+  // of tags (no attributes survive except vetted link and image URLs) instead of trusting them.
+  const COMMENT_TAGS = new Set(['P', 'I', 'EM', 'B', 'STRONG', 'PRE', 'CODE', 'A', 'BR']);
+  const ARTICLE_TAGS = new Set([...COMMENT_TAGS, 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE',
+    'IMG', 'FIGURE', 'FIGCAPTION', 'HR', 'SUP', 'SUB', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD',
+    'DL', 'DT', 'DD', 'S', 'DEL', 'U', 'SMALL', 'MARK', 'KBD']);
+  const DROPPED = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'TEMPLATE', 'SVG', 'MATH', 'NOSCRIPT',
+    'FORM', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'AUDIO', 'VIDEO', 'CANVAS', 'LINK', 'META', 'HEAD', 'TITLE']);
+  function absUrl(value, base) {
+    try {
+      const u = base ? new URL(value, base) : new URL(value);
+      return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : null;
+    } catch (e) { return null; }
+  }
+  function copyClean(src, dst, allowed, base) {
     for (const n of src.childNodes) {
       if (n.nodeType === Node.TEXT_NODE) { dst.append(n.textContent); continue; }
-      if (n.nodeType !== Node.ELEMENT_NODE || DROPPED.has(n.tagName)) continue;
+      if (n.nodeType !== Node.ELEMENT_NODE) continue;
+      let tag = n.tagName.toUpperCase();
+      if (DROPPED.has(tag)) continue;
+      if (tag === 'H1') tag = 'H2';   // the page already has its own h1
       let target = dst;
-      if (ALLOWED.has(n.tagName)) {
-        target = document.createElement(n.tagName);
-        if (n.tagName === 'A') {
-          const href = safeUrl(n.getAttribute('href'));
+      if (allowed.has(tag)) {
+        if (tag === 'IMG') {
+          const src = absUrl(n.getAttribute('src') || '', base);
+          if (src) dst.append(h('img', { src, alt: n.getAttribute('alt') || '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' }));
+          continue;
+        }
+        target = document.createElement(tag);
+        if (tag === 'A') {
+          const href = absUrl(n.getAttribute('href') || '', base);
           if (href) {
             const m = href.match(/^https?:\/\/news\.ycombinator\.com\/item\?id=(\d+)/i);
             target.setAttribute('href', m ? '#/item/' + m[1] : href);
@@ -318,13 +355,13 @@
         }
         dst.append(target);
       }
-      copyClean(n, target);
+      copyClean(n, target, allowed, base);
     }
   }
   function prose(html) {
     const box = h('div', { class: 'prose' });
     if (!html) return box;
-    copyClean(new DOMParser().parseFromString(html, 'text/html').body, box);
+    copyClean(new DOMParser().parseFromString(html, 'text/html').body, box, COMMENT_TAGS);
     // HN leaves the first paragraph bare; wrap it so every paragraph is a <p>.
     const lead = [];
     for (const n of box.childNodes) { if (n.nodeName === 'P' || n.nodeName === 'PRE') break; lead.push(n); }
@@ -334,6 +371,69 @@
       else if (p.textContent.trimStart().startsWith('>')) p.classList.add('quote');
     }
     return box;
+  }
+
+  function articleBody(html, base) {
+    const box = h('div', { class: 'prose article' });
+    copyClean(new DOMParser().parseFromString(html, 'text/html').body, box, ARTICLE_TAGS, base);
+    for (const el of box.querySelectorAll('p, li, figure, h2, h3, h4, h5, h6, blockquote')) {
+      if (!el.textContent.trim() && !el.querySelector('img')) el.remove();
+    }
+    return box;
+  }
+
+  // ---------- which links open in the reader view ----------
+  // Most story links are articles and open in the reader view. These are the exceptions that
+  // open the original site as usual: things that are not articles, sites that refuse the
+  // reader, and anything the reader has already failed on (remembered in localStorage).
+  const SKIP_HOSTS = [
+    // social, video, audio, app stores, documents
+    'twitter.com', 'x.com', 'bsky.app', 'threads.net', 'instagram.com', 'facebook.com', 'tiktok.com', 'linkedin.com',
+    'reddit.com', 'youtube.com', 'youtu.be', 'vimeo.com', 'twitch.tv', 'open.spotify.com', 'soundcloud.com',
+    'apps.apple.com', 'play.google.com', 'docs.google.com', 'drive.google.com', 'news.ycombinator.com',
+    // sites that turn the reader away (login walls or automated-request blocks)
+    'nytimes.com', 'wsj.com', 'ft.com', 'economist.com', 'reuters.com', 'bloomberg.com', 'apnews.com',
+    'theguardian.com', 'medium.com', 'phoronix.com', 'upi.com', 'smithsonianmag.com', 'dl.acm.org',
+  ];
+  const SKIP_EXT = /\.(pdf|png|jpe?g|gif|webp|avif|svg|mp4|webm|mov|mp3|wav|ogg|flac|zip|gz|tgz|tar|7z|dmg|exe|apk|iso|csv|json|xml|epub|pptx?|docx?|xlsx?)$/i;
+  const SKIP_TITLE = /\[(pdf|video|audio|slides)\]/i;
+  const GITHUB_SKIP = /^\/[^/]+\/[^/]+\/(issues|pulls?|discussions|commits?|compare|actions|releases|tags|wiki)(\/|$)/;
+  const SKIP_KEY = 'hn-reader-skip';
+  const HOST_MEMORY_MS = 7 * 86400 * 1000;
+  let skipMemo = { hosts: {}, ids: [] };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SKIP_KEY) || 'null');
+    if (saved && saved.hosts && Array.isArray(saved.ids)) skipMemo = saved;
+  } catch (e) {}
+
+  function hostMatches(host, name) { return host === name || host.endsWith('.' + name); }
+  function opensInReader(id, rawUrl, title) {
+    const url = safeUrl(rawUrl);
+    if (!url) return false;
+    let u;
+    try { u = new URL(url); } catch (e) { return false; }
+    const host = u.hostname.replace(/^www\./, '');
+    if (SKIP_HOSTS.some((name) => hostMatches(host, name))) return false;
+    if (SKIP_EXT.test(u.pathname) || SKIP_TITLE.test(title || '')) return false;
+    if (host === 'github.com' && GITHUB_SKIP.test(u.pathname)) return false;
+    if (skipMemo.ids.includes(id)) return false;
+    const learned = skipMemo.hosts[host];
+    if (learned && Date.now() - learned < HOST_MEMORY_MS) return false;
+    return true;
+  }
+  // Called when the reader fails. A refusal is the site's doing, so skip the whole site for a
+  // week; anything else definite is about that one page. Temporary trouble is not remembered.
+  function rememberFailure(id, rawUrl, code) {
+    if (code === 'upstream_401' || code === 'upstream_403') {
+      skipMemo.hosts[domain(rawUrl)] = Date.now();
+    } else if (['no_article', 'not_html', 'no_url', 'too_large', 'upstream_404', 'upstream_410', 'blocked_address', 'bad_url'].includes(code)) {
+      if (!skipMemo.ids.includes(id)) skipMemo.ids.push(id);
+      if (skipMemo.ids.length > 400) skipMemo.ids.splice(0, skipMemo.ids.length - 400);
+    } else {
+      return;
+    }
+    for (const host in skipMemo.hosts) if (Date.now() - skipMemo.hosts[host] > HOST_MEMORY_MS) delete skipMemo.hosts[host];
+    try { localStorage.setItem(SKIP_KEY, JSON.stringify(skipMemo)); } catch (e) {}
   }
 
   function status(msg, retry) {
@@ -353,11 +453,13 @@
     if (it.type !== 'job') {
       metaEl.append(' · ', h('a', { href: self }, it.descendants ? plural(it.descendants, 'comment') : 'discuss'));
     }
+    const reader = opensInReader(it.id, it.url, it.title);
+    if (reader) metaEl.append(' · ', h('a', { href: url, rel: 'noopener noreferrer', title: 'Open the original site' }, 'original'));
     return h('li', { class: 'story' },
       h('span', { class: 'rank' }, rank + '.'),
       h('div', { class: 'story-main' },
-        h('a', { class: 'title', href: url || self, rel: url && 'noopener noreferrer' }, it.title || '(untitled)'),
-        url && h('span', { class: 'site' }, '(' + domain(url) + ')'),
+        h('a', { class: 'title', href: reader ? '#/read/' + it.id : (url || self), rel: url && !reader && 'noopener noreferrer' }, it.title || '(untitled)'),
+        url && h('span', { class: 'site', title: reader ? 'Opens in the reader view' : 'Opens the original site' }, '(' + domain(url) + (reader ? '' : ' \u2197') + ')'),
         metaEl));
   }
 
@@ -461,6 +563,7 @@
     if (tok !== token) return;
 
     const url = safeUrl(fb.url);
+    const reader = opensInReader(id, fb.url, fb.title);
     const isComment = fb.type === 'comment' || (!fb.title && fb.parent);
     const title = fb.title || (isComment ? 'Comment by ' + (tree.author || fb.by || 'unknown') : '(untitled)');
     document.title = title + ' · HN Reader';
@@ -474,11 +577,12 @@
     if (fb.type !== 'job') meta.push(plural(total, 'comment'));
     const metaEl = h('div', { class: 'meta' }, meta.join(' · '), ' · ',
       h('a', { href: HN_ITEM + id, rel: 'noopener noreferrer' }, 'view on HN'));
+    if (reader) metaEl.append(' · ', h('a', { href: url, rel: 'noopener noreferrer', title: 'Open the original site' }, 'original'));
     if (isComment && fb.parent) metaEl.append(' · ', h('a', { href: '#/item/' + fb.parent }, 'parent'));
 
     const head = h('div', { class: 'item-head' },
-      h('h1', null, url ? h('a', { href: url, rel: 'noopener noreferrer' }, title) : title),
-      url && h('div', { class: 'meta' }, domain(url)),
+      h('h1', null, url ? h('a', { href: reader ? '#/read/' + id : url, rel: !reader && 'noopener noreferrer' }, title) : title),
+      url && h('div', { class: 'meta' }, domain(url) + (reader ? '' : ' \u2197')),
       metaEl,
       (tree.text || fb.text) && Object.assign(prose(tree.text || fb.text), { className: 'prose item-text' }));
 
@@ -487,10 +591,79 @@
     if (!tree.children.length && fb.type !== 'job') main.append(status('No comments yet.'));
   }
 
+  // ---------- reader view ----------
+  const articleCache = new Map();   // id -> Promise<article>
+  const READ_ERRORS = {
+    no_article: 'There was no article text to pull out of this page. It may be a video, an app, or a page that needs JavaScript.',
+    not_html: 'This link is not a web page (it may be a PDF, image or video).',
+    no_url: 'This story has no outside link to read.',
+    too_large: 'This page is too large to convert.',
+    timeout: 'The site took too long to answer.',
+    rate_limited: 'Too many articles requested at once. Give it a minute.',
+    busy: 'The reader is busy right now. Try again in a moment.',
+    upstream_401: 'The site wants a login for this page.',
+    upstream_403: 'The site refused to hand this page to the reader.',
+    upstream_404: 'The site says this page no longer exists.',
+    upstream_429: 'The site is rate limiting requests right now.',
+  };
+  function getArticle(id) {
+    if (!articleCache.has(id)) {
+      const p = fetch('api/read?id=' + id).then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data || data.error) throw new Error((data && data.error) || 'unavailable');
+        return data;
+      });
+      p.catch(() => articleCache.delete(id));
+      articleCache.set(id, p);
+    }
+    return articleCache.get(id);
+  }
+
+  async function renderRead(id, tok, fresh) {
+    document.title = 'HN Reader';
+    main.replaceChildren(status('Fetching article…'));
+    const story = '#/item/' + id;
+    let art;
+    try {
+      art = await getArticle(id);
+    } catch (e) {
+      const it = await fbItem(id).catch(() => null);
+      if (tok !== token) return;
+      const orig = it && safeUrl(it.url);
+      if (orig) rememberFailure(id, orig, e.message);
+      // Fall back to how the link normally works: go to the site itself. Only on a fresh tap,
+      // so coming Back to this page never bounces you out again.
+      const forward = orig && fresh;
+      main.replaceChildren(h('div', { class: 'item-head read-fail' },
+        h('h1', null, (it && it.title) || 'Article'),
+        h('p', null, READ_ERRORS[e.message] || 'The reader could not load this article.'),
+        forward && h('p', { class: 'meta' }, 'Opening the original site instead…'),
+        orig && h('a', { class: 'btn', href: orig, rel: 'noopener noreferrer' }, 'Open the original site'), ' ',
+        h('a', { class: 'btn', href: story }, 'Comments')));
+      if (forward) location.replace(orig);
+      return;
+    }
+    if (tok !== token) return;
+    document.title = (art.title || 'Article') + ' · HN Reader';
+    const meta = [domain(art.url)];
+    if (art.byline) meta.push(art.byline);
+    if (art.words) meta.push(Math.max(1, Math.round(art.words / 230)) + ' min read');
+    main.replaceChildren(
+      h('div', { class: 'item-head' },
+        h('h1', null, art.title || 'Article'),
+        h('div', { class: 'meta' }, meta.filter(Boolean).join(' · ')),
+        h('div', { class: 'meta' },
+          h('a', { href: art.url, rel: 'noopener noreferrer' }, 'original site'), ' · ',
+          h('a', { href: story }, 'comments'))),
+      articleBody(art.content, art.url));
+  }
+
   // ---------- routing ----------
   function parseRoute() {
     const parts = location.hash.replace(/^#\/?/, '').split('/');
-    if (parts[0] === 'item' && /^\d+$/.test(parts[1] || '')) return { view: 'item', id: Number(parts[1]), key: 'item/' + parts[1] };
+    if ((parts[0] === 'item' || parts[0] === 'read') && /^\d+$/.test(parts[1] || '')) {
+      return { view: parts[0], id: Number(parts[1]), key: parts[0] + '/' + parts[1] };
+    }
     const feed = FEEDS[parts[0]] ? parts[0] : 'top';
     return { view: 'feed', feed, key: feed };
   }
@@ -498,7 +671,8 @@
   async function route() {
     if (currentKey) scrollPos.set(currentKey, window.scrollY);
     const r = parseRoute();
-    const restore = linkNav ? 0 : (scrollPos.get(r.key) || 0);
+    const fresh = linkNav;
+    const restore = fresh ? 0 : (scrollPos.get(r.key) || 0);
     linkNav = false;
     currentKey = r.key;
     const tok = ++token;
@@ -509,6 +683,7 @@
     window.scrollTo(0, 0);
     try {
       if (r.view === 'item') await renderItem(r.id, tok);
+      else if (r.view === 'read') await renderRead(r.id, tok, fresh);
       else await renderFeed(r.feed, tok);
       if (tok === token) window.scrollTo(0, restore);
     } catch (e) {

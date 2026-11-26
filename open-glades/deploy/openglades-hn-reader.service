@@ -1,0 +1,35 @@
+# systemd unit for the HN Reader article-extraction service (openglades.com/hn reader view).
+# Install: cd <WorkingDirectory> && npm ci
+#          sudo cp openglades-hn-reader.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now openglades-hn-reader
+#
+# Edit WorkingDirectory / User to match your server. Listens on 127.0.0.1:8788;
+# nginx proxies /hn/api/ to it (see nginx-openglades.conf).
+
+[Unit]
+Description=Open Glades HN Reader (article extraction)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# >>> EDIT THESE <<<
+User=www-data
+WorkingDirectory=/srv/jroverton.com/open-glades/hn-reader
+ExecStart=/usr/bin/node --max-old-space-size=256 reader.mjs
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=3
+MemoryMax=700M
+# hardening: it needs outbound network and nothing else
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

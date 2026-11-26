@@ -1,0 +1,19 @@
+{
+  "name": "open-glades-hn-reader",
+  "version": "1.0.0",
+  "description": "Article extraction endpoint for the HN Reader at openglades.com/hn",
+  "private": true,
+  "type": "module",
+  "main": "reader.mjs",
+  "scripts": {
+    "start": "node reader.mjs",
+    "dev": "node reader.mjs --dev"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "jsdom": "^31.0.1"
+  }
+}
