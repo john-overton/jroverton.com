@@ -423,6 +423,25 @@
       P(5, 11, 5, 1, K.helmet); P(5, 12, 5, 1, K.strap); P(6, 12, 3, 1, K.lens); P(5, 13, 5, 2, K.skin); P(9, 14, 2, 2, K.scarf);
       P(8, 16, 2, 2, K.glove); lineP(P, 20, 16, 27, 12, K.pole);
     }, OUT);
+    if (!K.board && !K.style) {
+      const sitSide = function (flip) {                 // a skier sat sideways across the run, skis out in front
+        const c = mk(24, 19, function (P0) {
+          const P = function (x, y, w, h, col) { P0(flip ? 24 - x - w : x, y, w, h, col); };
+          for (let x = 8; x < 22; x++) { P(x, 15, 1, 1, K.ski); P(x, 17, 1, 1, K.ski); }
+          P(21, 15, 1, 1, K.skiEdge); P(21, 17, 1, 1, K.skiEdge); P(21, 14, 1, 1, K.ski);
+          lineP(P, 1, 17, 7, 17, K.pole); P(1, 16, 1, 1, K.pole);   // poles laid down behind
+          P(6, 1, 3, 1, K.helmetHi); P(5, 2, 5, 2, K.helmet); if (K.pom) P(7, 0, 1, 1, K.pom);
+          P(5, 4, 5, 1, K.strap); P(8, 4, 2, 1, K.lens); P(9, 4, 1, 1, K.lensHi);
+          P(6, 5, 4, 1, K.skin); P(6, 5, 1, 1, K.skinSh);
+          P(5, 6, 5, 1, K.scarf); P(4, 7, 1, 2, K.scarfSh);
+          P(5, 7, 5, 6, K.jacket); P(5, 7, 1, 6, K.jacketSh); P(6, 9, 4, 1, K.accent);
+          P(8, 8, 2, 4, K.jacketSh); P(9, 12, 2, 1, K.glove);
+          P(9, 11, 6, 2, K.pants); P(9, 12, 6, 1, K.pantsSh); P(14, 11, 2, 4, K.pantsSh); P(14, 14, 3, 2, K.boot);
+        }, OUT);
+        c.ax = flip ? 16 : 8; c.ay = 15; return c;
+      };
+      o.sitR = sitSide(false); o.sitL = sitSide(true);
+    }
     if (K.board) {
       o.crash = mk(30, 22, function (P) {               // boarder down: board flipped up beside them
         P(3, 15, 13, 2, K.ski); P(3, 15, 1, 2, K.skiEdge); P(15, 15, 1, 2, K.skiEdge);
@@ -521,12 +540,15 @@
         const y = y0 + 12 + R() * 60, x = pisteC(y, pk) + (R() - 0.5) * pisteHW(y, pk);
         m.objs.push({ t: 'kick', x: Math.round(x), y: Math.round(y), spr: SPR.kick, ground: true });
         m.clear.push([x - 14, y - 34, x + 14, y + 135]);
-      } else if (y0 > 320 && roll > 0.86) {               // a boarder or two, sat down in the middle of the run
-        const sy = y0 + 20 + R() * 80, sxm = pisteC(sy, pk) + (R() - 0.5) * pisteHW(sy, pk) * 0.5, two = R() < 0.42;
+      } else if (y0 > 320 && roll > 0.85) {               // someone sat down on the run: a skier or a boarder, alone or a pair
+        const sy = y0 + 20 + R() * 80, shw = pisteHW(sy, pk), edge = R() < 0.45, side = R() < 0.5 ? -1 : 1;
+        const sxm = pisteC(sy, pk) + (edge ? side * Math.max(6, shw - 9 - R() * 7) : (R() - 0.5) * shw * 0.5), two = R() < 0.42;
         for (let e = 0; e < (two ? 2 : 1); e++) {
-          m.objs.push({ t: 'sitter', x: Math.round(sxm + e * (11 + R() * 5)), y: Math.round(sy + e * (R() * 6 - 3)), r: 3.5, h: 10, spr: BOARDERS[Math.floor(R() * BOARDERS.length)].sit, sh: SPR.shS, msg: 'SORRY, DUDE!', hop: 'BOARDER HOP' });
+          const boarder = R() < 0.5, kitS = (boarder ? BOARDERS : NPCS)[Math.floor(R() * NPCS.length)], left = R() < 0.5;
+          m.objs.push({ t: 'sitter', x: Math.round(sxm + e * (12 + R() * 5) * (edge ? -side : 1)), y: Math.round(sy + e * (R() * 6 - 3)), r: 3.5, h: 10,
+            spr: boarder ? kitS.sit : (left ? kitS.sitL : kitS.sitR), sh: SPR.shS, msg: boarder ? 'SORRY, DUDE!' : 'SORRY!', hop: boarder ? 'BOARDER HOP' : 'SKIER HOP' });
         }
-        m.clear.push([sxm - 12, sy - 12, sxm + 28, sy + 12]);
+        m.clear.push([sxm - 30, sy - 12, sxm + 30, sy + 12]);
       } else if (y0 > 200 && roll < 0.5) {
         const iy = y0 + 30 + R() * 70, hw = pisteHW(iy, pk);
         if (hw > 52) {
@@ -777,6 +799,7 @@
   const NPC_COL = [['#8e5bd0', '#6a3fa6'], ['#3fa56a', '#2c7a4c'], ['#e8c53a', '#b99522'], ['#e06aa8', '#b24782'], ['#3d7fd6', '#2a5aa3'], ['#d9534f', '#a83a37'], ['#f1f1f1', '#c9d0dc'], ['#2b3550', '#1b2236'], ['#ff9a3c', '#c9701f'], ['#58c7c2', '#3a9490']];
   const NPC_PANTS = [['#2b3550', '#1b2236'], ['#465689', '#35426c'], ['#5a4a86', '#443867'], ['#3a3a3a', '#242424'], ['#7a5539', '#573a26']];
   const BOARDERS = [], ntracks = [];
+  let npcId = 0;
   function buildNpcs() {
     const out = [];
     for (let i = 0; i < 10; i++) {
@@ -790,7 +813,7 @@
   function newNpc(k, x, y, vt, o) {
     const board = o && o.board !== undefined ? !!o.board : Math.random() < 0.36;
     const ki = o && o.kit !== undefined ? o.kit : Math.floor(Math.random() * NPCS.length);
-    const n = { t: 'npc', k: k, x: x, y: y, v: vt, vt: vt, th: 0, off: (Math.random() * 2 - 1) * 0.7, ph: Math.random() * 6.28, rate: 1.1 + Math.random() * 1.5, amp: 0.2 + Math.random() * 0.45, spr: (board ? BOARDERS : NPCS)[ki], state: 'ski', timer: 0, inv: 0, lx: x, ly: y };
+    const n = { t: 'npc', k: k, x: x, y: y, v: vt, vt: vt, th: 0, off: (Math.random() * 2 - 1) * 0.7, ph: Math.random() * 6.28, rate: 1.1 + Math.random() * 1.5, amp: 0.2 + Math.random() * 0.45, spr: (board ? BOARDERS : NPCS)[ki], state: 'ski', timer: 0, inv: 0, lx: x, ly: y, z: 0, vz: 0, id: ++npcId, skill: 0.86 + Math.random() * 0.14 };
     if (board) { n.rate *= 0.75; n.amp = Math.min(0.75, n.amp * 1.5); }   // boarders carve wider, slower arcs
     if (o) for (const key in o) n[key] = o[key];
     n.board = board ? 1 : 0;
@@ -816,20 +839,40 @@
       const ya = n.y + 30, hw = Math.max(10, pisteHW(ya, n.k) - 8);
       const tx = pisteC(ya, n.k) + clamp(n.off + Math.sin(n.ph) * n.amp, -0.92, 0.92) * hw;
       let th = clamp((tx - n.x) / 28, -0.95, 0.95);
-      for (let j = 0; j < vis.length; j++) {             // steer round trees and rocks
-        const o = vis[j]; if (!o.r) continue;
-        const dy = o.y - n.y; if (dy < 2 || dy > 40) continue;
-        const dx = o.x - n.x; if (Math.abs(dx) < (o.wr || o.r) + 7) { th = dx >= 0 ? -1.05 : 1.05; break; }
+      // Look down the hill: steer round whatever is in the way. Each rider only notices most obstacles
+      // (how many depends on their skill), so now and then one clips a tree or a sitter and goes down.
+      let steered = false, hit = false;
+      for (let j = 0; j < vis.length; j++) {
+        const o = vis[j], dy = o.y - n.y, dx = o.x - n.x;
+        if (o.t === 'kick') {                             // take the jump if it is in the way
+          if (n.z <= 0 && dy >= 0 && dy < n.v * dt + 0.6 && Math.abs(dx) < 10) { n.vz = 52 + n.v * 0.45; n.z = 0.01; }
+          continue;
+        }
+        if (!o.r) continue;
+        if (n.inv <= 0 && n.z < o.h && dx * dx + dy * dy < (o.r + 1.5) * (o.r + 1.5)) { hit = true; break; }
+        if (steered || dy < 2 || dy > 40) continue;
+        if (Math.abs(dx) < (o.wr || o.r) + 7 && hash(o.x, o.y, n.id) < n.skill) { th = dx >= 0 ? -1.05 : 1.05; steered = true; }
       }
+      if (hit) { n.state = 'fall'; n.timer = 1.7; n.z = 0; n.vz = 0; continue; }
+      for (let j = 0; j < npcs.length; j++) {             // other riders: keep clear of anyone below, crash if it gets too close
+        const m = npcs[j]; if (m === n || m.state === 'wait') continue;
+        const dy = m.y - n.y, dx = m.x - n.x;
+        if (m.state === 'ski' && j < i && n.inv <= 0 && m.inv <= 0 && n.z < 6 && m.z < 6 && dx * dx + dy * dy * 1.4 < 22) {
+          n.state = m.state = 'fall'; n.timer = 1.7; m.timer = 1.4 + Math.random() * 0.6; n.z = m.z = 0; hit = true; break;
+        }
+        if (!steered && dy > 2 && dy < 46 && Math.abs(dx) < 11) { th = dx >= 0 ? -1.05 : 1.05; steered = true; }
+      }
+      if (hit) continue;
       const pdy = s.y - n.y, pdx = s.x - n.x;             // and round the player, when coming up from behind
       if (pdy > 2 && pdy < 50 && Math.abs(pdx) < 13) th = pdx >= 0 ? -1.05 : 1.05;
+      if (n.z > 0) { n.vz -= G * dt; n.z += n.vz * dt; if (n.z <= 0) { n.z = 0; n.vz = 0; } th = n.th; }   // no steering in the air
       n.th += (th - n.th) * Math.min(1, 4.5 * dt);
       n.x += Math.sin(n.th) * n.v * dt; n.y += Math.cos(n.th) * n.v * dt;
-      if (Math.abs(n.x - n.lx) + Math.abs(n.y - n.ly) > 1.5) {   // everyone leaves tracks: two for skis, one for a board
+      if (n.z <= 0 && Math.abs(n.x - n.lx) + Math.abs(n.y - n.ly) > 1.5) {   // everyone leaves tracks: two for skis, one for a board
         n.lx = n.x; n.ly = n.y; ntracks.push({ x: n.x, y: n.y, c: Math.cos(n.th), n: Math.sin(n.th), b: n.board });
         if (ntracks.length > 2600) ntracks.splice(0, 400);
       }
-      if (!s.hold && n.inv <= 0 && s.inv <= 0 && s.z < 10 && (s.state === 'ski' || s.state === 'air') && pdx * pdx + pdy * pdy * 1.6 < 34) {
+      if (!s.hold && n.inv <= 0 && n.z < 8 && s.inv <= 0 && s.z < 10 && (s.state === 'ski' || s.state === 'air') && pdx * pdx + pdy * pdy * 1.6 < 34) {
         n.state = 'fall'; n.timer = 1.7; fall(Math.random() < 0.5 ? 'SORRY!' : 'ON YOUR LEFT!');
       }
       if (n.y < camY - 170 || n.y > camY + H + 260 || Math.abs(n.x - s.x) > W + 260) npcs.splice(i, 1);
@@ -855,7 +898,7 @@
         if (npcs.length >= (playing ? 14 : 11)) break;
         const q = c.riders[r];
         npcs.push(playing
-          ? newNpc(0, -16 + r * 8, -30 + Math.random() * 4, 55 + Math.random() * 70, { kit: q.kit, board: q.board, v: 14 })
+          ? newNpc(0, -16 + r * 8, -30 + Math.random() * 4, 55 + Math.random() * 70, { kit: q.kit, board: q.board, v: 14, inv: 1.2 })
           : newNpc(0, -34 + Math.random() * 68, -22 + Math.random() * 30, 55 + Math.random() * 70, { kit: q.kit, board: q.board, state: 'wait', timer: 0.4 + Math.random() * 6, th: [HALF, -HALF, 0.7, -0.7][Math.floor(Math.random() * 4)] }));
       }
       c.y -= LIFT_N * LIFT_GAP; loadChair(c);
@@ -1040,7 +1083,7 @@
     const x = Math.round(n.x - cx), y = Math.round(n.y - cy);
     if (y < -30 || y > H + 30) return;
     if (n.state === 'fall') { ctx.drawImage(n.spr.crash, x - 15, y - 17); return; }
-    ctx.drawImage(n.spr.dir[clamp(Math.round(n.th / HALF * 4), -4, 4) + 4], x - 15, y - 24);
+    ctx.drawImage((n.z > 0 ? n.spr.air : n.spr.dir)[clamp(Math.round(n.th / HALF * 4), -4, 4) + 4], x - 15, y - 24 - Math.round(n.z));
   }
   function drawPistes(cx, cy) {
     const k0 = Math.round((cx + W / 2) / PISTE_P), m = ((cx % 3) + 3) % 3;
