@@ -2,7 +2,7 @@
 // always opens, even offline. Network first, so deploys show up immediately.
 // Only same-origin files under /hn/ are handled; API calls go straight to the network.
 const CACHE = 'hn-reader-v1';
-const SHELL = ['./', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+const SHELL = ['./', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
