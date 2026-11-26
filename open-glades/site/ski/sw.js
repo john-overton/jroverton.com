@@ -1,7 +1,7 @@
 // Glade Run service worker: keeps the game available so the installed app always opens,
 // even offline. Network first, so deploys show up immediately. Leaderboard calls
 // (/ski/api/) go straight to the network; offline, the game keeps scores on the device.
-const CACHE = 'glade-run-v3';
+const CACHE = 'glade-run-v4';
 const SHELL = ['./', 'game.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   '/assets/fonts/fonts.css', '/assets/fonts/vt323-400-latin.woff2', '/assets/fonts/pressstart2p-400-latin.woff2'];
 

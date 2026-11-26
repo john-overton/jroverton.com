@@ -610,7 +610,8 @@
   const MAX_FALLS = 3, G = 260;
 
   // launched from the iPhone/iPad home screen: the page styles lower the HUD clear of the status bar blur
-  if (window.navigator.standalone === true) document.documentElement.classList.add('ios-app');
+  const IOS_APP = window.navigator.standalone === true;
+  if (IOS_APP) document.documentElement.classList.add('ios-app');
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     SCALE = clamp(Math.round(Math.sqrt(w * h) / 330), 2, 6);
@@ -621,13 +622,16 @@
     for (let i = 0; i < Math.round(W * H / 2600); i++) flakes.push({ x: Math.random() * W, y: Math.random() * H, v: 14 + Math.random() * 22, w: Math.random() * 6.28, big: Math.random() < 0.25 });
   }
 
+  // How far down the screen the skier sits. In the installed iPhone app the score panels are pushed down
+  // clear of the status bar, so the skier moves down by the same amount to stay clear of them.
+  function skierRow() { return Math.round(H * 0.3 + (IOS_APP ? 50 / SCALE : 0)); }
   function resetWorld() {
     seed = Math.floor(Math.random() * 1e9) | 0;
     chunks = new Map(); majors = new Map(); pz0 = vnoise(0, 0, seed + 33);
     tracks.length = 0; parts.length = 0; smoke.length = 0;
     s.x = 0; s.y = 0; s.th = HALF * 0.999; s.v = 0; s.z = 0; s.vz = 0; s.state = 'idle'; s.timer = 0; s.inv = 0; s.hops = [];
     run.t = 0; run.score = 0; run.falls = 0; run.clean = 0; run.bestClean = 0; run.jumps = 0; run.bigAir = 0; run.items = 0; run.top = 0; run.token = null;
-    look = 0; camX = s.x - W / 2; camY = s.y - H * 0.3;
+    look = 0; camX = s.x - W / 2; camY = s.y - skierRow();
     npcs.length = 0; npcT = 0;                           // the crowd just off the lift, setting off one by one
     for (let i = 0; i < 9; i++) {
       const side = i % 2 ? 1 : -1, x = side * (13 + Math.random() * 62), y = -24 + Math.random() * 46;
@@ -651,6 +655,7 @@
     $('h-score').textContent = Math.floor(run.score).toLocaleString('en-US');
     const m = mult(); const hm = $('h-mult'); hm.textContent = 'x' + m; hm.className = 'm' + m;
     if (m > lastMult && mode === 'play') pop('CLEAN RUN  x' + m, 'gold'); lastMult = m;
+    syncEdge();
     $('h-clean').textContent = fmtTime(run.clean);
     const sp = $('h-speed'); sp.textContent = Math.round(s.v * 0.36) + ' km/h'; sp.className = s.v > 105 ? 'hot' : '';
     $('h-time').textContent = fmtTime(run.t);
@@ -668,6 +673,7 @@
   }
   function jump() {
     if (mode !== 'play' || s.state !== 'ski') return;
+    if (s.hold) { s.hold = false; s.th = 0; document.body.classList.remove('holding'); return; }   // the first press just sets you off
     launch(86, 'hop');
   }
   function land() {
@@ -761,7 +767,7 @@
   }
   function updateNpcs(dt) {
     npcT -= dt;
-    if (npcT <= 0) { npcT = 0.45 + Math.random() * 0.5; if (npcs.length < (s.piste ? 8 : 4) && run.t > 2) spawnNpc(); }
+    if (npcT <= 0) { npcT = 0.45 + Math.random() * 0.5; if (npcs.length < (s.piste ? 8 : 4) && run.t > 2 && !s.hold) spawnNpc(); }
     for (let i = npcs.length - 1; i >= 0; i--) {
       const n = npcs[i];
       if (n.inv > 0) n.inv -= dt;
@@ -780,7 +786,7 @@
       if (pdy > 2 && pdy < 50 && Math.abs(pdx) < 13) th = pdx >= 0 ? -1.05 : 1.05;
       n.th += (th - n.th) * Math.min(1, 4.5 * dt);
       n.x += Math.sin(n.th) * n.v * dt; n.y += Math.cos(n.th) * n.v * dt;
-      if (n.inv <= 0 && s.inv <= 0 && s.z < 10 && (s.state === 'ski' || s.state === 'air') && pdx * pdx + pdy * pdy * 1.6 < 34) {
+      if (!s.hold && n.inv <= 0 && s.inv <= 0 && s.z < 10 && (s.state === 'ski' || s.state === 'air') && pdx * pdx + pdy * pdy * 1.6 < 34) {
         n.state = 'fall'; n.timer = 1.7; fall(Math.random() < 0.5 ? 'SORRY!' : 'ON YOUR LEFT!');
       }
       if (n.y < camY - 170 || n.y > camY + H + 260 || Math.abs(n.x - s.x) > W + 260) npcs.splice(i, 1);
@@ -790,6 +796,12 @@
   function update(dt) {
     gather();
     if (mode !== 'play') return;
+    if (s.hold) {                                          // waiting at the top: the clock starts with your first move
+      if (keys.left || keys.right || keys.down || stick.on || useMouse) { s.hold = false; if (!stick.on && !useMouse && !keys.left && !keys.right) s.th = 0; }
+      document.body.classList.toggle('holding', s.hold);
+      updateNpcs(dt);
+      if (s.hold) return;
+    }
     run.t += dt;
     updateNpcs(dt);
     if (s.inv > 0) s.inv -= dt;
@@ -859,7 +871,7 @@
     }
     const tx = Math.sin(s.th) * (s.state === 'idle' ? 0 : Math.min(W * 0.16, 44));
     look += (tx - look) * Math.min(1, 2.2 * dt);
-    camX = s.x - W / 2 + look; camY = s.y - H * (H > W ? 0.26 : 0.3);
+    camX = s.x - W / 2 + look; camY = s.y - skierRow();
   }
 
   // ---- time of day: the run slides from afternoon through alpenglow into night ---------------
@@ -867,6 +879,18 @@
   function tintAt(t) {
     for (let i = 1; i < SKYKEYS.length; i++) if (t < SKYKEYS[i][0]) { const a = SKYKEYS[i - 1], b = SKYKEYS[i]; return mix(a[1], b[1], smooth((t - a[0]) / (b[0] - a[0]))); }
     return SKYKEYS[SKYKEYS.length - 1][1];
+  }
+
+  // iOS 26 leaves a strip along the bottom of a home-screen app that it will not let the page paint into
+  // (a WebKit regression: the paintable area is short by the status bar's height). The strip shows the
+  // page background, so keep that matched to the snow, the time of day and any dimming card on top.
+  let edgeCol = '';
+  function syncEdge() {
+    let c = hexRgb(C.snow);
+    if (run.t > 40) { const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(tintAt(run.t)); if (m) c = [c[0] * m[1] / 255, c[1] * m[2] / 255, c[2] * m[3] / 255]; }
+    if (mode !== 'play') c = [c[0] * 0.58 + 10 * 0.42, c[1] * 0.58 + 16 * 0.42, c[2] * 0.58 + 32 * 0.42];   // under a card's veil
+    const col = 'rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ')';
+    if (col !== edgeCol) { edgeCol = col; document.documentElement.style.background = col; document.body.style.background = col; }
   }
 
   // ---- drawing ----------------------------------------------------------------------------
@@ -1055,15 +1079,15 @@
   }
 
   // ---- screens --------------------------------------------------------------------------------
-  function show(id) { ['menu', 'over', 'paused'].forEach(function (k) { $(k).hidden = k !== id; }); document.body.className = 'mode-' + mode; }
+  function show(id) { ['menu', 'over', 'paused'].forEach(function (k) { $(k).hidden = k !== id; }); document.body.className = 'mode-' + mode; syncEdge(); }
   function startRun() {
     resetWorld(); SK = buildSkier(KITS[kit]);
-    mode = 'play'; s.state = 'ski'; s.th = 0; s.v = 18; lastMult = 1; run.started = Date.now();
+    mode = 'play'; s.state = 'ski'; s.th = HALF * 0.999; s.v = 0; s.hold = true; lastMult = 1; run.started = Date.now();   // standing at the top until you steer
     useMouse = false; show(null); hud(true);
     fetch(API + '/run', { method: 'POST' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.token) run.token = j.token; }).catch(function () { });
   }
   function gameOver() {
-    mode = 'over'; if (run.clean > run.bestClean) run.bestClean = run.clean;
+    mode = 'over'; document.body.classList.remove('holding'); if (run.clean > run.bestClean) run.bestClean = run.clean;
     $('o-score').textContent = Math.floor(run.score).toLocaleString('en-US');
     $('o-time').textContent = fmtTime(run.t);
     $('o-dist').textContent = Math.floor(s.y / 10).toLocaleString('en-US') + ' m';
