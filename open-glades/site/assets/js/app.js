@@ -13,7 +13,6 @@
   var CARD_MAP = {
     sprout: { name: 'Sprout Track', tag: 'Baby & family tracking, self-hosted.', url: 'https://sprout-track.com' },
     astryk: { name: 'Astryk', tag: 'Collaborative workspaces, in real time.', url: 'https://astryk.com' },
-    parallax: { name: 'Parallax', tag: 'Demand-response transit, made clear.', url: 'https://jroverton.com/parallax' },
     fairweather: { name: 'Fairweather', tag: 'Ad-free local weather and radar.', url: '/fairweather', cta: 'OPEN APP' }
   };
 
