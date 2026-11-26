@@ -13,7 +13,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Glade Run" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/vt323-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/pressstart2p-400-latin.woff2" crossorigin />
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
@@ -25,12 +25,9 @@
     body { touch-action: none; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
     #ski-canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; touch-action: none; }
     .ps { font-family: 'Press Start 2P', monospace; }
-    /* Installed app on iOS 26+ draws a blur ("scroll edge effect") over the top of the page, smearing the HUD.
-       WebKit skips it when it finds an opaque fixed element at the very top edge to take a colour from, and
-       colours the status bar to match. Same fix as Fairweather; the strip must stay hit-testable to be found. */
-    #edge { display: none; position: fixed; top: 0; left: 0; right: 0; height: calc(env(safe-area-inset-top, 0px) + 6px); background: #0b1121; z-index: 5; }
-    html.ios-app #edge { display: block; }
-    html.ios-app { --edge: 6px; background: #0b1121; }
+    /* Installed iPhone app: iOS blurs whatever sits under the status bar, so the score panels and the pause
+       button start below that zone. */
+    html.ios-app { --edge: 50px; }
 
     /* HUD */
     #hud { position: fixed; left: 0; top: 0; width: 100%; height: var(--app-h, 100%); pointer-events: none; padding: calc(var(--edge, 0px) + max(10px, env(safe-area-inset-top))) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
@@ -148,7 +145,6 @@
   </style>
 </head>
 <body class="mode-menu">
-  <div id="edge" aria-hidden="true"></div>
   <canvas id="ski-canvas" aria-label="Glade Run game"></canvas>
   <div id="pops" aria-hidden="true"></div>
 

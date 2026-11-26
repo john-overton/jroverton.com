@@ -609,18 +609,10 @@
   let brakeBtn = false;
   const MAX_FALLS = 3, G = 260;
 
-  const IOS_APP = window.navigator.standalone === true;   // launched from the iPhone/iPad home screen
-  if (IOS_APP) document.documentElement.classList.add('ios-app');
+  // launched from the iPhone/iPad home screen: the page styles lower the HUD clear of the status bar blur
+  if (window.navigator.standalone === true) document.documentElement.classList.add('ios-app');
   function resize() {
-    let w = window.innerWidth, h = window.innerHeight;
-    if (IOS_APP) {
-      // The installed iOS app can report a viewport shorter than the screen, which left a bare strip at the
-      // bottom. It always fills the display, so take the size from the screen (which iOS never rotates).
-      const lo = Math.min(screen.width, screen.height), hi = Math.max(screen.width, screen.height);
-      const land = window.matchMedia('(orientation: landscape)').matches;
-      w = Math.max(w, land ? hi : lo); h = Math.max(h, land ? lo : hi);
-    }
-    document.documentElement.style.setProperty('--app-h', h + 'px');
+    const w = window.innerWidth, h = window.innerHeight;
     SCALE = clamp(Math.round(Math.sqrt(w * h) / 330), 2, 6);
     W = Math.ceil(w / SCALE); H = Math.ceil(h / SCALE);
     cv.width = W; cv.height = H; cv.style.width = (W * SCALE) + 'px'; cv.style.height = (H * SCALE) + 'px';
@@ -1235,7 +1227,6 @@
     }
   })();
   let rz = 0;
-  window.addEventListener('orientationchange', function () { setTimeout(function () { resize(); camX = s.x - W / 2 + look; }, 250); });
   window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { resize(); camX = s.x - W / 2 + look; }, 120); });
   show('menu'); hud(true); loadBoard();
   window.GLADE = { art: function () { return { SPR: SPR, TILE: TILE, build: buildSkier, KITS: KITS }; }, npcs: npcs, stick: stick, s: s, run: run, keys: keys, start: startRun, vis: vis, mode: function () { return mode; } };   // handy for testing
