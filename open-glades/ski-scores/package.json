@@ -1,0 +1,8 @@
+{
+  "name": "openglades-ski-scores",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Leaderboard service for the Glade Run mini game at openglades.com/ski",
+  "type": "module",
+  "scripts": { "start": "node scores.mjs", "dev": "node scores.mjs --dev" }
+}

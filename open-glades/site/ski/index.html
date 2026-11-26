@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>Glade Run — Open Glades</title>
+  <meta name="description" content="Glade Run: a cozy pixel-art downhill ski game from Open Glades. Thread the trees, hop the logs, drop the cliffs." />
+  <link rel="canonical" href="https://openglades.com/ski/" />
+  <meta name="theme-color" content="#0a1020" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/vt323-400-latin.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/pressstart2p-400-latin.woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <style>
+    :root { --ink: #0b1121; --cream: #f7eedd; --gold: #ffce5c; --mute: #aebfd2; --navy: #16233e; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe8f4; color: var(--cream); font-family: 'VT323', monospace; }
+    body { touch-action: none; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
+    #ski-canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; touch-action: none; }
+    .ps { font-family: 'Press Start 2P', monospace; }
+
+    /* HUD */
+    #hud { position: fixed; inset: 0; pointer-events: none; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .hud-box { background: rgba(11,17,33,.82); border: 2px solid rgba(247,238,221,.7); box-shadow: 3px 3px 0 rgba(8,12,24,.35); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .hud-row { display: flex; align-items: center; gap: 10px; font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: .06em; color: var(--mute); white-space: nowrap; }
+    .hud-row b { color: var(--cream); font-weight: 400; }
+    #h-score { font-size: 15px; color: var(--cream); min-width: 4ch; }
+    #h-mult { font-size: 11px; color: var(--mute); }
+    #h-mult.m2 { color: #9fe0c0; } #h-mult.m3 { color: #7fd0e0; } #h-mult.m4 { color: var(--gold); } #h-mult.m5 { color: #ff9a6b; }
+    .hud-right { align-items: flex-end; }
+    #h-speed { color: var(--mute); } #h-speed.hot { color: var(--gold); }
+    .over-head { display: flex; align-items: flex-end; gap: 14px; }
+    #mug { width: 78px; height: 96px; flex: none; image-rendering: pixelated; image-rendering: crisp-edges; margin: -18px 0 -4px; }
+    #h-falls { display: flex; gap: 4px; }
+    #h-falls i { width: 14px; height: 12px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 6' shape-rendering='crispEdges'%3E%3Cpath fill='%23ee6c4d' d='M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z'/%3E%3C/svg%3E") center / contain no-repeat; image-rendering: pixelated; }
+    #h-falls i.off { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 6' shape-rendering='crispEdges'%3E%3Cpath fill='%23f7eedd' d='M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z'/%3E%3C/svg%3E"); opacity: .22; }
+    body:not(.mode-play):not(.mode-pause) #hud { opacity: .0; }
+    #hud { transition: opacity .2s; }
+
+    #btn-pause { pointer-events: auto; position: fixed; left: 50%; top: max(10px, env(safe-area-inset-top)); transform: translateX(-50%); }
+    .chip { font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .08em; color: var(--cream); background: rgba(11,17,33,.82); border: 2px solid rgba(247,238,221,.6); padding: 8px 10px; cursor: pointer; text-decoration: none; }
+    .chip:hover { border-color: var(--gold); }
+    body:not(.mode-play) #btn-pause { display: none; }
+
+    /* touch controls: a thumb stick and glass buttons */
+    #touch { display: none; position: fixed; inset: 0; pointer-events: none; }
+    @media (pointer: coarse) { body.mode-play #touch { display: block; } }
+    .glass { pointer-events: auto; touch-action: none; -webkit-tap-highlight-color: transparent; border-radius: 50%; color: var(--cream);
+      background: linear-gradient(160deg, rgba(255,255,255,.34), rgba(120,150,200,.16) 45%, rgba(22,35,62,.3));
+      -webkit-backdrop-filter: blur(9px) saturate(1.4); backdrop-filter: blur(9px) saturate(1.4);
+      border: 1.5px solid rgba(255,255,255,.7);
+      box-shadow: inset 0 1.5px 0 rgba(255,255,255,.75), inset 0 -10px 18px rgba(22,35,62,.18), 0 8px 22px rgba(22,35,62,.3); }
+    #stick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: max(26px, env(safe-area-inset-bottom)); width: 132px; height: 132px; display: grid; place-items: center; }
+    #stick::before { content: ''; position: absolute; inset: 14px; border-radius: 50%; border: 1.5px dashed rgba(22,35,62,.3); }
+    #stick .tick { position: absolute; font-family: 'Press Start 2P', monospace; font-size: 8px; color: rgba(22,35,62,.6); }
+    #stick .t-d { bottom: 5px; } #stick .t-l { left: 6px; } #stick .t-r { right: 6px; } #stick .t-u { top: 5px; font-size: 6px; letter-spacing: .06em; }
+    #knob { width: 56px; height: 56px; border-radius: 50%; pointer-events: none; transition: transform .12s ease-out;
+      background: radial-gradient(circle at 35% 28%, #fff, #ffe7a8 28%, var(--gold) 62%, #d9a53a);
+      border: 2px solid var(--navy); box-shadow: 0 5px 10px rgba(22,35,62,.4), inset 0 -3px 0 rgba(160,110,20,.35); }
+    #stick.on #knob { transition: none; }
+    #stick.on { border-color: #fff; }
+    .gbtn { position: absolute; display: grid; place-items: center; padding: 0; font-family: 'Press Start 2P', monospace; letter-spacing: .04em; color: var(--navy); text-shadow: 0 1px 0 rgba(255,255,255,.6); }
+    .gbtn:active { transform: scale(.94); background: linear-gradient(160deg, rgba(255,206,92,.75), rgba(255,206,92,.4)); }
+    #btn-jump { right: max(18px, env(safe-area-inset-right)); bottom: max(30px, env(safe-area-inset-bottom)); width: 96px; height: 96px; font-size: 12px; }
+    #btn-brake { right: max(108px, calc(env(safe-area-inset-right) + 90px)); bottom: max(118px, calc(env(safe-area-inset-bottom) + 88px)); width: 64px; height: 64px; font-size: 7px; }
+    /* left-handed layout: stick on the right, buttons on the left */
+    html.swap #stick { left: auto; right: max(18px, env(safe-area-inset-right)); }
+    html.swap #btn-jump { right: auto; left: max(18px, env(safe-area-inset-left)); }
+    html.swap #btn-brake { right: auto; left: max(108px, calc(env(safe-area-inset-left) + 90px)); }
+    .swap-row { display: none; align-items: center; gap: 10px; margin-top: 14px; }
+    .swap-row > span { font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .1em; color: var(--mute); }
+    .seg { display: inline-flex; border: 2px solid rgba(247,238,221,.5); }
+    .seg button { font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .06em; color: var(--mute); background: transparent; border: 0; padding: 10px 11px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { color: var(--navy); background: var(--gold); }
+    @media (pointer: coarse) { .swap-row { display: flex; } }
+    @media (pointer: coarse) {
+      #btn-pause { border-radius: 999px; color: var(--navy); background: linear-gradient(160deg, rgba(255,255,255,.4), rgba(120,150,200,.2)); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); border: 1.5px solid rgba(255,255,255,.7); box-shadow: inset 0 1.5px 0 rgba(255,255,255,.75), 0 4px 12px rgba(22,35,62,.25); padding: 9px 13px; }
+    }
+
+    /* floating score popups */
+    #pops { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    .pop { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: .04em;
+      color: var(--cream); text-shadow: 1px 1px 0 #0b1121, -1px 1px 0 #0b1121, 1px -1px 0 #0b1121, -1px -1px 0 #0b1121, 0 2px 0 #0b1121; animation: rise 1.15s steps(14) forwards; }
+    .pop.gold { color: var(--gold); font-size: 10px; } .pop.bad { color: #ff9a8a; font-size: 11px; } .pop.dim { color: #cfe3f1; font-size: 8px; }
+    @keyframes rise { 0% { opacity: 0; margin-top: 8px; } 12% { opacity: 1; margin-top: 0; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -34px; } }
+
+    /* cards */
+    .veil { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(10,16,32,.42); overflow: auto; touch-action: pan-y; }
+    .veil[hidden] { display: none; }
+    .card { width: min(100%, 520px); max-height: 100%; overflow: auto; background: rgba(11,17,33,.95); border: 2px solid rgba(247,238,221,.75); box-shadow: 6px 6px 0 rgba(8,12,24,.5); padding: 20px 20px 18px; -webkit-user-select: text; user-select: text; }
+    .card h1 { margin: 0; font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: clamp(20px, 6vw, 28px); letter-spacing: .04em; color: var(--cream); text-shadow: 3px 3px 0 #1f8a9c; }
+    .card h1 span { color: var(--gold); }
+    .sub { margin: 10px 0 0; font-size: 20px; line-height: 1.1; color: var(--mute); }
+    .how { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 19px; line-height: 1.1; color: #dbe6f2; }
+    .how kbd { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--navy); background: var(--cream); padding: 3px 5px; margin-right: 2px; box-shadow: 0 2px 0 #9aa7ba; }
+    .how .touch { display: none; } @media (pointer: coarse) { .how .touch { display: block; } .how .desk { display: none; } }
+    .kits { display: flex; align-items: stretch; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .kits-tag { flex-basis: 100%; font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .1em; color: var(--mute); }
+    .kit { width: 62px; padding: 0 0 6px; background: #dfe8f4; border: 2px solid rgba(247,238,221,.4); cursor: pointer; display: flex; flex-direction: column; align-items: center; overflow: hidden; }
+    .kit canvas { width: 60px; height: 60px; image-rendering: pixelated; image-rendering: crisp-edges; margin: -6px 0 3px; }
+    .kit span { font-family: 'Press Start 2P', monospace; font-size: 7px; letter-spacing: .02em; color: var(--navy); }
+    .kit[aria-pressed="true"] { border-color: var(--gold); background: #fff3cf; box-shadow: 0 0 0 2px var(--gold); }
+    @media (max-width: 420px) { .kit { width: 58px; } }
+    .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+    .btn { font-family: 'Press Start 2P', monospace; font-size: 11px; letter-spacing: .06em; color: var(--navy); background: var(--gold); border: 2px solid var(--navy); box-shadow: 3px 3px 0 rgba(8,12,24,.6); padding: 12px 16px; cursor: pointer; }
+    .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 rgba(8,12,24,.7); }
+    .btn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 rgba(8,12,24,.5); }
+    .btn[disabled] { opacity: .5; cursor: default; }
+    .link { font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .08em; color: var(--mute); text-decoration: none; }
+    .link:hover { color: var(--gold); }
+
+    .board-tag { margin: 18px 0 8px; font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .12em; color: var(--gold); }
+    .board { margin: 0; padding: 0; list-style: none; font-size: 20px; line-height: 1.12; }
+    .board li { display: grid; grid-template-columns: 2.2ch 4ch 1fr 5ch 7ch; gap: 8px; padding: 1px 4px; color: #dbe6f2; }
+    .board li:nth-child(odd) { background: rgba(247,238,221,.05); }
+    .board li.me { color: var(--navy); background: var(--gold); }
+    .board li.empty { display: block; color: var(--mute); background: none; }
+    .board .c0 { color: var(--mute); text-align: right; } .board li.me .c0 { color: var(--navy); }
+    .board .c1 { letter-spacing: .08em; } .board .c2, .board .c3, .board .c4 { text-align: right; }
+    .board .c3, .board .c4 { color: var(--mute); } .board li.me .c3, .board li.me .c4 { color: var(--navy); }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+    .stat { border: 2px solid rgba(247,238,221,.18); padding: 8px 8px 6px; }
+    .stat span { display: block; font-family: 'Press Start 2P', monospace; font-size: 7px; letter-spacing: .08em; color: var(--mute); }
+    .stat b { display: block; margin-top: 6px; font-weight: 400; font-size: 24px; line-height: 1; color: var(--cream); }
+    .big { margin-top: 12px; font-family: 'Press Start 2P', monospace; font-size: clamp(22px, 7vw, 30px); color: var(--gold); }
+    .big small { display: block; margin-bottom: 8px; font-size: 8px; letter-spacing: .12em; color: var(--mute); }
+    #o-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    #o-form label { font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .1em; color: var(--mute); }
+    #o-name { width: 5.2ch; font-family: 'Press Start 2P', monospace; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; text-align: center; color: var(--cream); background: #0a1020; border: 2px solid rgba(247,238,221,.6); padding: 9px 4px 8px 8px; -webkit-user-select: text; user-select: text; }
+    #o-name:focus { outline: none; border-color: var(--gold); }
+    #o-msg { flex-basis: 100%; min-height: 1em; font-size: 18px; color: #ff9a8a; }
+    #o-saved { margin-top: 14px; font-size: 20px; color: #9fe0c0; }
+    @media (max-width: 420px) { .card { padding: 16px 14px 14px; } .board { font-size: 18px; } .hud-row { font-size: 8px; } #h-score { font-size: 13px; } }
+  </style>
+</head>
+<body class="mode-menu">
+  <canvas id="ski-canvas" aria-label="Glade Run game"></canvas>
+  <div id="pops" aria-hidden="true"></div>
+
+  <div id="hud" aria-hidden="true">
+    <div class="hud-box">
+      <div class="hud-row"><b id="h-score">0</b><span id="h-mult">x1</span></div>
+      <div class="hud-row">CLEAN <b id="h-clean">0:00</b></div>
+      <div class="hud-row"><b id="h-speed">0 km/h</b></div>
+    </div>
+    <div class="hud-box hud-right">
+      <div class="hud-row"><b id="h-time">0:00</b><b id="h-dist">0 m</b></div>
+      <div class="hud-row"><span id="h-falls"><i></i><i></i><i></i></span></div>
+    </div>
+  </div>
+  <button id="btn-pause" class="chip" type="button" aria-label="Pause">II PAUSE</button>
+  <div id="touch">
+    <div id="stick" class="glass" role="application" aria-label="Steering stick">
+      <span class="tick t-u">BRAKE</span><span class="tick t-l">&#9664;</span><span class="tick t-r">&#9654;</span><span class="tick t-d">&#9660;</span>
+      <div id="knob"></div>
+    </div>
+    <button id="btn-brake" class="glass gbtn" type="button" aria-label="Brake">BRAKE</button>
+    <button id="btn-jump" class="glass gbtn" type="button" aria-label="Jump">JUMP</button>
+  </div>
+
+  <!-- start -->
+  <div id="menu" class="veil">
+    <div class="card">
+      <h1>GLADE <span>RUN</span></h1>
+      <p class="sub">Thread the trees. Hop the logs. Drop the cliffs. Three falls and it&rsquo;s cocoa time.</p>
+      <ul class="how">
+        <li class="desk"><kbd>&larr;</kbd><kbd>&rarr;</kbd> steer &nbsp; <kbd>&darr;</kbd> point it &nbsp; <kbd>&uarr;</kbd> brake &nbsp; <kbd>SPACE</kbd> jump</li>
+        <li class="desk">Or steer toward the mouse and click to jump.</li>
+        <li class="touch">Push the stick the way you want to go: down to point it, sideways to traverse. JUMP hops, BRAKE stops.</li>
+        <li>Big pines hide tree wells. Kickers and cliffs are free air.</li>
+        <li>Groomed runs are faster and busier: dodge the other skiers. Speed earns points.</li>
+        <li>Grab lost gloves, phones and poles for points. A heart gives a life back.</li>
+        <li>Every 12 seconds without a fall raises your multiplier, up to x5.</li>
+      </ul>
+      <div class="kits" role="group" aria-label="Choose your skier">
+        <span class="kits-tag">SKIER</span>
+        <button class="kit" type="button" data-kit="A" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Warren</span></button>
+        <button class="kit" type="button" data-kit="B" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Aspen</span></button>
+        <button class="kit" type="button" data-kit="santa" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Santa</span></button>
+        <button class="kit" type="button" data-kit="snowman" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Frosty</span></button>
+        <button class="kit" type="button" data-kit="sasquatch" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Squatch</span></button>
+      </div>
+      <div class="swap-row">
+        <span>STICK</span>
+        <div class="seg" role="group" aria-label="Thumb stick side">
+          <button type="button" data-side="left" aria-pressed="false">LEFT</button>
+          <button type="button" data-side="right" aria-pressed="true">RIGHT</button>
+        </div>
+      </div>
+      <div class="row">
+        <button id="btn-start" class="btn" type="button">DROP IN</button>
+        <a class="link" href="/">&larr; OPEN GLADES</a>
+      </div>
+      <div class="board-tag" data-board-tag>TOP RUNS</div>
+      <ol class="board" data-board></ol>
+    </div>
+  </div>
+
+  <!-- paused -->
+  <div id="paused" class="veil" hidden>
+    <div class="card" style="width:auto;text-align:center;">
+      <h1>PAUSED</h1>
+      <div class="swap-row" style="justify-content:center;">
+        <span>STICK</span>
+        <div class="seg" role="group" aria-label="Thumb stick side">
+          <button type="button" data-side="left" aria-pressed="false">LEFT</button>
+          <button type="button" data-side="right" aria-pressed="true">RIGHT</button>
+        </div>
+      </div>
+      <div class="row" style="justify-content:center;">
+        <button id="btn-resume" class="btn" type="button">KEEP SKIING</button>
+        <a class="link" href="/">&larr; OPEN GLADES</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- run over -->
+  <div id="over" class="veil" hidden>
+    <div class="card">
+      <div class="over-head"><canvas id="mug" width="26" height="32" aria-hidden="true"></canvas><h1>COCOA <span>TIME</span></h1></div>
+      <div class="big"><small>SCORE</small><span id="o-score">0</span></div>
+      <div class="stats">
+        <div class="stat"><span>TIME ON SLOPE</span><b id="o-time">0:00</b></div>
+        <div class="stat"><span>DISTANCE</span><b id="o-dist">0 m</b></div>
+        <div class="stat"><span>LONGEST CLEAN</span><b id="o-clean">0:00</b></div>
+        <div class="stat"><span>TOP SPEED</span><b id="o-speed">0 km/h</b></div>
+        <div class="stat"><span>JUMPS / BEST AIR</span><b id="o-jumps">0</b></div>
+        <div class="stat"><span>ITEMS FOUND</span><b id="o-items">0</b></div>
+      </div>
+      <form id="o-form" autocomplete="off">
+        <label for="o-name">INITIALS</label>
+        <input id="o-name" name="initials" maxlength="3" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-describedby="o-msg" />
+        <button id="o-save" class="btn" type="submit">SAVE SCORE</button>
+        <div id="o-msg" role="status"></div>
+      </form>
+      <div id="o-saved" role="status" hidden></div>
+      <div class="kits" role="group" aria-label="Choose your skier">
+        <span class="kits-tag">SKIER</span>
+        <button class="kit" type="button" data-kit="A" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Warren</span></button>
+        <button class="kit" type="button" data-kit="B" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Aspen</span></button>
+        <button class="kit" type="button" data-kit="santa" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Santa</span></button>
+        <button class="kit" type="button" data-kit="snowman" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Frosty</span></button>
+        <button class="kit" type="button" data-kit="sasquatch" aria-pressed="false"><canvas width="30" height="30" aria-hidden="true"></canvas><span>Squatch</span></button>
+      </div>
+      <div class="row">
+        <button id="btn-again" class="btn" type="button">SKI AGAIN</button>
+        <a class="link" href="/">&larr; OPEN GLADES</a>
+      </div>
+      <div class="board-tag" data-board-tag>TOP RUNS</div>
+      <ol class="board" data-board></ol>
+    </div>
+  </div>
+
+  <script src="/ski/game.js"></script>
+</body>
+</html>

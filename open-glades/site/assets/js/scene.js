@@ -1,6 +1,7 @@
 /*
  * Open Glades — pixel-art skiing scene.
- * Ported verbatim from the concept (DCLogic Component.runScene) to a framework-free module.
+ * Everything is drawn in code on a low-resolution canvas: baked, recolourable mountain layers,
+ * a chairlift, a cabin, weather, and two rigged skiers.
  * Exposes window.OG.scene.start(opts) -> { applyScene(hour01, mood) }.
  */
 (function () {
@@ -122,8 +123,8 @@
       return { s: s, m: m, sunFrac: ws / (ws + wm), cx: (s.x * ws + m.x * wm) / (ws + wm), cy: (s.y * ws + m.y * wm) / (ws + wm) };
     };
 
-    const KITA = { jacket: '#1f8a9c', jacketSh: '#156575', accent: '#2b3550', accentHi: '#3c4a6e', pants: '#2b3550', pantsHi: '#3c4a6e', boot: '#141a2c', glove: '#1b2236', helmet: '#e7eef4', helmetHi: '#ffffff', helmetSh: '#b7c5d3', skin: '#f0c9a0', skinSh: '#d8a87f', strap: '#161b29', lens: '#7fd0e0', lensHi: '#d8f4fb', trim: '#eef3f5', ski: '#ffce5c', skiEdge: '#c9972f', pole: '#cbb48a', basket: '#9c8a63' };
-    const KITB = { jacket: '#ee6c4d', jacketSh: '#c2542a', accent: '#ffce5c', accentHi: '#ffe49a', pants: '#27314c', pantsHi: '#38456a', boot: '#141a2c', glove: '#2a1d18', helmet: '#2a3550', helmetHi: '#46557a', helmetSh: '#1c2438', skin: '#e8bd92', skinSh: '#cf9a6f', strap: '#161b29', lens: '#ffcf5c', lensHi: '#fff3c4', trim: '#fff1d8', ski: '#7fd0e0', skiEdge: '#3f8ea0', pole: '#cbb48a', basket: '#9c8a63' };
+    const KITA = { jacket: '#1f8a9c', jacketSh: '#156575', accent: '#2b3550', accentHi: '#3c4a6e', pants: '#465689', pantsHi: '#6274ad', pantsSh: '#35426c', boot: '#141a2c', bootHi: '#2c3554', scarf: '#ffce5c', scarfSh: '#d9a53a', glove: '#1b2236', helmet: '#e7eef4', helmetHi: '#ffffff', helmetSh: '#b7c5d3', skin: '#f0c9a0', skinSh: '#d8a87f', strap: '#161b29', lens: '#7fd0e0', lensHi: '#d8f4fb', trim: '#eef3f5', ski: '#ffce5c', skiEdge: '#c9972f', pole: '#cbb48a', basket: '#9c8a63' };
+    const KITB = { jacket: '#ee6c4d', jacketSh: '#c2542a', accent: '#ffce5c', accentHi: '#ffe49a', pants: '#5a4a86', pantsHi: '#7a69ab', pantsSh: '#443867', boot: '#141a2c', bootHi: '#2c3554', scarf: '#7fd0e0', scarfSh: '#4fa3b5', pom: '#fff6e6', glove: '#2a1d18', helmet: '#3d7a5c', helmetHi: '#f4e9cf', helmetSh: '#2a5942', skin: '#e8bd92', skinSh: '#cf9a6f', strap: '#161b29', lens: '#ffcf5c', lensHi: '#fff3c4', trim: '#fff1d8', ski: '#7fd0e0', skiEdge: '#3f8ea0', pole: '#cbb48a', basket: '#9c8a63' };
 
     const CHATS = ['Oh wow, tight squeeze!', 'We got this!', 'Woo hoo!', 'This is so much fun!', 'Watch that tree!', 'Drop in!', 'Powder day!', 'Stay with me!', 'Nice line!', 'Send it!', 'Easy does it...', 'Yeah! Shred it!', 'Almost there!', 'Follow my tracks!', 'Whoa—rock!', 'Keep your edges!', 'Let’s gooo!', 'Pizza! Pizza!', 'French fries!', 'That was sick!', 'Tree well—go left!', 'Catch me!', 'Smooth turns!', 'Knees bent!', 'Loser buys lunch!', 'Bluebird up here!', 'No fall zone!', 'Trust your skis!', 'Glade life!', 'Right behind you!'];
     const INTRO_A = 'Wow, this is an intimidating looking glade.';
@@ -142,22 +143,168 @@
       bakedHour = dayHour; bakedMood = curMood;
       render(0, 0.016, reduceMotion ? 999 : 0.0);
     }
+    // ---- background life: stars, clouds, mist, spindrift, chairlift, cabin -------
+    function drawStars(time) {
+      if (nightAmt < 0.04) return;
+      for (const s of stars) {
+        const tw = reduceMotion ? 0.8 : 0.5 + 0.5 * Math.sin(time * s.tw + s.ph);
+        const a = nightAmt * (0.35 + 0.65 * tw);
+        dot(s.x, s.y, hexA('#eef2ff', a));
+        if (s.big) { const b = hexA('#eef2ff', a * 0.45); dot(s.x - 1, s.y, b); dot(s.x + 1, s.y, b); dot(s.x, s.y - 1, b); dot(s.x, s.y + 1, b); }
+      }
+    }
+    function drawClouds(time) {
+      const body = lerp(lerp(PAL.skyHor, '#ffffff', 0.6), PAL.skyMid, 0.2 + 0.5 * nightAmt);
+      const under = lerp(body, PAL.skyMid, 0.45);
+      const span = W + 240, t = reduceMotion ? 0 : time;
+      for (const c of clouds) {
+        const x0 = Math.round((((c.x - t * c.sp - camX * 0.03) % span) + span) % span) - 120;
+        if (x0 > W + 10 || x0 + c.w < -30) continue;
+        // darker copy two pixels lower first, so every puff gets a shaded underside
+        for (let pass = 0; pass < 2; pass++) {
+          ctx.fillStyle = pass === 0 ? under : body;
+          const oy = pass === 0 ? 2 : 0;
+          for (const p of c.puffs) {
+            for (let yy = -p.r; yy <= 0; yy++) { const sp = Math.round(Math.sqrt(p.r * p.r - yy * yy)); ctx.fillRect(x0 + p.dx - sp, c.y + yy + oy, sp * 2 + 1, 1); }
+          }
+          ctx.fillRect(x0 - 4, c.y + 1 + oy, Math.round(c.w) + 10, 2);
+        }
+      }
+    }
+    // A slow band of valley mist: two soft steps, with a rolling top edge.
+    function drawMist(time, y0, thick, alpha, speed, ph) {
+      const t = reduceMotion ? 0 : time, c1 = hexA(PAL.skyHor, alpha * 0.5), c2 = hexA(PAL.skyHor, alpha);
+      for (let x = 0; x < W; x += 2) {
+        const top = y0 + Math.sin((x + t * speed) / 37 + ph) * 3 + Math.sin((x - t * speed * 0.6) / 13 + ph * 2) * 1.5;
+        ctx.fillStyle = c1; ctx.fillRect(x, top | 0, 2, thick);
+        ctx.fillStyle = c2; ctx.fillRect(x, (top | 0) + 3, 2, thick - 5);
+      }
+    }
+    // Spindrift: snow blowing off the highest summits.
+    function drawPlumes(time, L, off) {
+      const o = wrapX(Math.round(off)), t = reduceMotion ? 0 : time, a0 = 0.75 - 0.4 * nightAmt;
+      for (const p of L.peaks) {
+        const sx = wrapX(p.x - o);
+        for (let k = 0; k < 2; k++) {
+          const bx = sx + k * W; if (bx > W + 40) continue;
+          for (let i = 0; i < 16; i++) {
+            const xx = bx - 1 - i * 1.7, yy = p.y - 1 - i * 0.22 + Math.sin(t * 2.4 + i * 0.55 + p.x) * (0.4 + i * 0.09);
+            px(xx, yy, 2, 1, hexA('#ffffff', a0 * (1 - i / 16)));
+          }
+        }
+      }
+    }
+    function drawLift(time, off) {
+      const o = wrapX(Math.round(off)), t = reduceMotion ? 0 : time;
+      const steel = lerp('#2b3347', PAL.skyHor, 0.22), steelLt = lerp('#55607a', PAL.skyHor, 0.25);
+      const dx = LIFT.xb - LIFT.xt, dy = LIFT.yb - LIFT.yt, CABLE = 11;
+      const gy = (xu) => LIFT.yt + (xu - LIFT.xt) / dx * dy;                 // ground line under the cable
+      const riders = ['#ee6c4d', '#1f8a9c', '#ffce5c', '#8e6fd0', '#e8eef4'];
+      for (const sh of [-o - W, -o, W - o]) {
+        if (LIFT.xb + sh < -12 || LIFT.xt + sh > W + 12) continue;
+        line(LIFT.xt + sh, LIFT.yt - CABLE, LIFT.xb + sh, LIFT.yb - CABLE, steel);
+        // chairs: uphill ones carry riders, downhill ones come back empty a pixel further back
+        const n = Math.floor(dx / 26);
+        for (let i = 0; i < n; i++) {
+          const up = ((i * 26 + t * 7) % dx + dx) % dx, dn = ((i * 26 + 13 - t * 7) % dx + dx) % dx;
+          const ux = LIFT.xb - up, uy = Math.round(gy(ux)) - CABLE, x1 = Math.round(ux + sh);
+          const ddx = LIFT.xt + dn, ddy = Math.round(gy(ddx)) - CABLE, x2 = Math.round(ddx + sh);
+          px(x2, ddy + 1, 1, 3, steelLt); px(x2 - 1, ddy + 4, 3, 1, steelLt);
+          px(x1, uy + 1, 1, 4, steel); px(x1 - 1, uy + 3, 1, 2, steel); px(x1 - 1, uy + 5, 4, 1, steel);
+          if (hash1(i, 5) > 0.3) { px(x1, uy + 3, 2, 2, riders[i % riders.length]); px(x1, uy + 2, 2, 1, '#f0c9a0'); }
+        }
+        for (let k = 0; k <= 6; k++) {
+          const xu = LIFT.xt + (dx * k) / 6, x = Math.round(xu + sh), topY = Math.round(gy(xu)) - CABLE;
+          const base = Math.max(Math.round(gy(xu)), Math.round(rg2[wrapX(Math.round(xu))]));
+          px(x, topY, 1, base - topY + 1, steel); px(x - 3, topY, 7, 1, steel); px(x - 3, topY + 1, 1, 1, steel); px(x + 3, topY + 1, 1, 1, steel);
+          if (nightAmt > 0.2) dot(x, topY - 1, hexA('#ffd27a', nightAmt));
+        }
+        // top station hut
+        const hx = LIFT.xt + sh - 5, hy = LIFT.yt - 8;
+        px(hx, hy + 2, 10, 6, steel); px(hx - 1, hy, 12, 2, lerp('#f4f8fc', PAL.skyHor, 0.2)); px(hx + 6, hy + 4, 2, 2, hexA('#ffd27a', 0.5 + 0.5 * nightAmt));
+      }
+    }
+    function drawCabin(time, off) {
+      const o = wrapX(Math.round(off)), t = reduceMotion ? 0.3 : time, dim = 0.5 * nightAmt, by = CABIN.y;
+      const N = (hex) => lerp(hex, '#0e1630', dim);
+      const wood = N('#8a5433'), woodDk = N('#633a23'), woodSh = N('#724428'), stone = N('#77686a');
+      const snowC = lerp(PAL.slopeHi, '#ffffff', 0.35), snowSh = lerp(PAL.slopeShade, PAL.slopeBase, 0.3);
+      const win = lerp('#f3c76c', '#ffe08a', nightAmt);
+      for (const sh of [-o - W, -o, W - o]) {
+        const cx = CABIN.x + sh;
+        if (cx < -40 || cx > W + 40) continue;
+        // window light spilling onto the snow, and a warm halo after dark
+        if (nightAmt > 0.05) { haloGradient(cx - 7, by - 5, 22, '#ffbe5c', 0.5 * nightAmt); haloGradient(cx + 7, by - 5, 22, '#ffbe5c', 0.5 * nightAmt); }
+        // snowman
+        px(cx - 20, by - 4, 5, 5, snowC); px(cx - 19, by - 7, 3, 3, snowC); px(cx - 20, by, 5, 1, snowSh);
+        dot(cx - 19, by - 6, '#1b2236'); dot(cx - 17, by - 6, '#1b2236'); dot(cx - 16, by - 5, '#f08a3c'); px(cx - 20, by - 4, 5, 1, '#d2483f');
+        // walls of stacked logs
+        px(cx - 11, by - 9, 22, 10, wood); px(cx + 7, by - 9, 4, 10, woodSh);
+        for (const ly of [-7, -4, -1]) px(cx - 11, by + ly, 22, 1, woodDk);
+        px(cx - 12, by - 9, 1, 10, woodDk); px(cx + 11, by - 9, 1, 10, woodDk);
+        // chimney (behind the roof snow), then the snow-loaded gable
+        px(cx + 6, by - 21, 4, 9, stone); px(cx + 5, by - 22, 6, 1, snowC);
+        for (let r = 0; r < 9; r++) {
+          const half = 2 + Math.round(r * 1.55), y = by - 18 + r;
+          px(cx - half, y, half * 2 + 1, 1, snowC);
+          if (r >= 4) px(cx - (half - 4), y, (half - 4) * 2 + 1, 1, r === 8 ? woodDk : wood);
+        }
+        px(cx - 15, by - 9, 5, 1, snowSh); px(cx + 11, by - 9, 5, 1, snowSh);     // eave shadow
+        dot(cx - 15, by - 8, snowC); dot(cx + 15, by - 8, snowC);                // icicles
+        dot(cx - 13, by - 8, snowC); dot(cx + 13, by - 8, snowC);
+        // door and windows
+        px(cx - 2, by - 6, 4, 7, woodDk); dot(cx + 1, by - 3, '#ffd27a');
+        for (const wx of [-9, 5]) { px(cx + wx, by - 7, 5, 5, woodDk); px(cx + wx + 1, by - 6, 3, 3, win); px(cx + wx + 2, by - 6, 1, 3, woodDk); }
+        px(cx - 1, by - 13, 2, 2, win);
+        if (nightAmt > 0.05) { px(cx - 9, by + 1, 5, 2, hexA('#ffca6a', 0.4 * nightAmt)); px(cx + 5, by + 1, 5, 2, hexA('#ffca6a', 0.4 * nightAmt)); }
+        // snow banked against the walls, and a woodpile
+        px(cx - 14, by + 1, 28, 1, snowC); px(cx - 12, by, 5, 1, snowC); px(cx + 4, by, 3, 1, snowC);
+        px(cx + 13, by - 3, 5, 4, woodDk); px(cx + 13, by - 4, 5, 1, snowC); dot(cx + 14, by - 2, wood); dot(cx + 16, by - 1, wood);
+        // chimney smoke drifting downwind
+        const smoke = lerp('#eef2f8', PAL.skyHor, 0.3 + 0.3 * nightAmt);
+        for (let i = 0; i < 7; i++) {
+          const age = ((t * 0.3 + i / 7) % 1 + 1) % 1, sz = 1 + Math.floor(age * 3.2);
+          px(cx + 7 - age * 16 + Math.sin(age * 6 + i) * 1.5, by - 23 - age * 17, sz, sz, hexA(smoke, (1 - age) * 0.8));
+        }
+      }
+    }
+
+    let PINEC = null;   // the foreground pines' colours, dimmed toward night
+    const TRACKS = { A: [], B: [] };
+    function drawTracks() {
+      const col = hexA(PAL.slopeShade, 0.6);
+      for (const k of ['A', 'B']) {
+        const arr = TRACKS[k];
+        while (arr.length && (arr[0].wx - camX < -6 || arr.length > 520)) arr.shift();
+        ctx.fillStyle = col;
+        for (const p of arr) { const x = p.wx - camX, y = edge(x) + p.b; ctx.fillRect(x | 0, (y - 2) | 0, 2, 1); ctx.fillRect((x + 1) | 0, (y + 2) | 0, 2, 1); }
+      }
+    }
     function render(time, dt, T) {
       ctx.clearRect(0, 0, W, H);
-      drawSky(); drawCelestial(time);
-      drawTile(t0, camX * 0.06); drawTile(t1, camX * 0.12); drawTile(t2, camX * 0.22); drawTile(t3, camX * 0.40);
+      updateLight();
+      const dimP = 0.5 * nightAmt;
+      PINEC = { dark: lerp(PINE.dark, '#0b1226', dimP), mid: lerp(PINE.mid, '#0b1226', dimP), lite: lerp(PINE.lite, '#0b1226', dimP), snow: lerp(PINE.snow, PAL.slopeBase, dimP * 1.2), snowSh: lerp(PINE.snowSh, PAL.slopeShade, dimP * 1.2), trunk: lerp(PINE.trunk, '#0b1226', dimP) };
+      drawSky(); drawStars(time); drawCelestial(time); drawClouds(time);
+      drawTile(t0, camX * 0.06); drawPlumes(time, layers[0], camX * 0.06);
+      drawMist(time, HOR - MU * 0.95, Math.round(MU * 0.3), 0.3, 5, 0.4);
+      drawTile(t1, camX * 0.12); drawPlumes(time, layers[1], camX * 0.12);
+      drawMist(time, HOR - MU * 0.55, Math.round(MU * 0.34), 0.36, -8, 2.1);
+      drawTile(t2, camX * 0.22); drawLift(time, camX * 0.22);
+      drawTile(t3, camX * 0.40); drawCabin(time, camX * 0.40);
       drawSlope(); drawMoguls();
       const moving = T > INTRO_END;
-      const A = steer(time, 'A', moving), B = steer(time, 'B', moving);
-      refs._pA = { x: A.sx * PIXEL, y: (A.sy - 14) * PIXEL };
-      refs._pB = { x: B.sx * PIXEL, y: (B.sy - 14) * PIXEL };
+      const go = reduceMotion ? 1 : clamp01((T - INTRO_END) / 2.2);
+      const A = steer(time, 'A', moving, dt, go), B = steer(time, 'B', moving, dt, go);
+      refs._pA = { x: A.sx * PIXEL, y: (A.fy - 31) * PIXEL };
+      refs._pB = { x: B.sx * PIXEL, y: (B.fy - 31) * PIXEL };
+      if (!reduceMotion && go > 0.3) {
+        for (const q of [['A', A], ['B', B]]) { const tx = q[1].sx - 9; TRACKS[q[0]].push({ wx: camX + tx, b: q[1].fy - edge(tx) }); }
+      }
+      drawTracks();
       stepSpray(dt); emitSpray(A); emitSpray(B);
-      // Painter's ordering: sort trees + both skiers by their ground-contact Y so
-      // each tree independently appears in front of or behind each skier — whichever
-      // sprite's base sits lower on screen draws later (in front). FOOT is where the
-      // skis meet the snow, matching a tree's trunk-base contact point.
-      const FOOT = 16;
-      const aFoot = A.sy + FOOT, bFoot = B.sy + FOOT;
+      // Painter's ordering: sort trees + both skiers by their ground-contact Y so each tree
+      // independently appears in front of or behind each skier.
       const SPAN = W + 60;
       const ents = [];
       for (const tr of trees) {
@@ -165,10 +312,10 @@
         const baseY = edge(sx) + tr.below;
         ents.push({ footY: baseY, draw: function () { drawPine(sx, baseY, tr.scale, tr.seed); } });
       }
-      ents.push({ footY: aFoot, draw: function () { drawSkier(time, A.sx, A.sy, A.dir, A.lean, KITA, moving); } });
-      ents.push({ footY: bFoot, draw: function () { drawSkier(time, B.sx, B.sy, B.dir, B.lean, KITB, moving); } });
+      ents.push({ footY: A.fy, draw: function () { drawSkier(time, 'A', A, KITA); } });
+      ents.push({ footY: B.fy, draw: function () { drawSkier(time, 'B', B, KITB); } });
       // spray belongs to the front-most skier's depth (in front of skiers, behind nearer trees)
-      ents.push({ footY: Math.max(aFoot, bFoot) + 0.1, draw: drawSpray });
+      ents.push({ footY: Math.max(A.fy, B.fy) + 0.1, draw: drawSpray });
       ents.sort(function (p, q) { return p.footY - q.footY; });
       for (const e of ents) e.draw();
       drawSnow(dt);
@@ -192,118 +339,327 @@
       requestAnimationFrame(frame);
     }
 
+    // ---- noise + dithering ---------------------------------------------------
+    const hash1 = (i, s) => { const v = Math.sin(i * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); };
+    const hash2 = (x, y, s) => { const v = Math.sin(x * 127.1 + y * 311.7 + s * 13.3) * 43758.5453; return v - Math.floor(v); };
+    // Value noise around a loop of `cells` lattice points, so anything built from it tiles at W.
+    const pnoise = (u, cells, seed) => {
+      const f = (((u % 1) + 1) % 1) * cells, i = Math.floor(f), t = f - i;
+      const a = hash1(i % cells, seed), b = hash1((i + 1) % cells, seed), s = t * t * (3 - 2 * t);
+      return a + (b - a) * s;
+    };
+    // Ordered (Bayer) dithering: turns a smooth 0..1 ramp into `levels` clean pixel-art steps.
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const bayer = (x, y) => (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16;
+    const dither = (v, levels, x, y, soft) => Math.max(0, Math.min(levels, Math.floor(v * levels + 0.5 + (bayer(x, y) - 0.5) * (soft || 1))));
+    const wrapX = (x) => ((x % W) + W) % W;
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+    // Jagged alpine skyline: ridged noise, so peaks come to a point instead of rolling over.
+    function alpineRidge(base, amp, seed, cells) {
+      const a = new Float32Array(W);
+      for (let x = 0; x < W; x++) {
+        const u = x / W; let n = 0, w = 1, tot = 0, c = cells;
+        for (let o = 0; o < 5; o++) { const v = 1 - Math.abs(2 * pnoise(u, c, seed + o * 17) - 1); n += v * v * w; tot += w; w *= 0.5; c *= 2; }
+        a[x] = base - (n / tot) * amp;
+      }
+      return a;
+    }
+    // Soft rolling skyline for the forested ridge and the near snow hills.
+    function softRidge(base, amp, seed, cells) {
+      const a = new Float32Array(W);
+      for (let x = 0; x < W; x++) {
+        const u = x / W; let n = 0, w = 1, tot = 0, c = cells;
+        for (let o = 0; o < 3; o++) { n += pnoise(u, c, seed + o * 31) * w; tot += w; w *= 0.45; c *= 2; }
+        a[x] = base - (n / tot - 0.5) * 2 * amp;
+      }
+      return a;
+    }
+    // Split a skyline at its valleys: each stretch between two valleys is one mountain, with
+    // its summit. Coordinates are unwrapped (x1 may exceed W) so a mountain can straddle the seam.
+    function ridgeSegments(ridge, rad) {
+      const sm = new Float32Array(W);
+      for (let x = 0; x < W; x++) { let s = 0; for (let k = -rad; k <= rad; k++) s += ridge[wrapX(x + k)]; sm[x] = s / (rad * 2 + 1); }
+      const valleys = [];
+      for (let x = 0; x < W; x++) if (sm[x] >= sm[wrapX(x - 1)] && sm[x] > sm[wrapX(x + 1)]) valleys.push(x);
+      if (!valleys.length) valleys.push(0);
+      const segOf = new Int16Array(W), segs = [];
+      for (let i = 0; i < valleys.length; i++) {
+        const x0 = valleys[i], x1 = (i === valleys.length - 1) ? valleys[0] + W : valleys[i + 1];
+        let pk = x0, py = Infinity;
+        for (let xu = x0; xu < x1; xu++) { const y = ridge[wrapX(xu)]; if (y < py) { py = y; pk = xu; } segOf[wrapX(xu)] = i; }
+        segs.push({ x0: x0, x1: x1, pk: pk, py: Math.round(py) });
+      }
+      return { segOf: segOf, segs: segs };
+    }
+
+    let LIFT = null, CABIN = null, stars = [], clouds = [];
     function buildGeometry() {
-      rg0 = makeRidge(HOR - MU * 1.85, MU * 0.2, [{ f: 1, a: 1, p: 0.3 }, { f: 2, a: 0.4, p: 1.1 }, { f: 3, a: 0.16, p: 2.0 }]);
-      rg1 = makeRidge(HOR - MU * 1.45, MU * 0.27, [{ f: 1, a: 1, p: 1.0 }, { f: 2, a: 0.5, p: 0.4 }, { f: 3, a: 0.18, p: 2.3 }]);
-      rg2 = makeRidge(HOR - MU * 1.08, MU * 0.34, [{ f: 1, a: 1, p: 2.0 }, { f: 2, a: 0.52, p: 0.7 }, { f: 3, a: 0.22, p: 1.4 }, { f: 5, a: 0.1, p: 2.6 }]);
-      rg3 = makeRidge(HOR - MU * 0.78, MU * 0.4, [{ f: 1, a: 1, p: 0.6 }, { f: 2, a: 0.55, p: 1.7 }, { f: 3, a: 0.24, p: 1.0 }, { f: 5, a: 0.12, p: 2.4 }]);
+      rg0 = alpineRidge(HOR - MU * 1.22, MU * 1.0, 7, 4);
+      rg1 = alpineRidge(HOR - MU * 0.82, MU * 1.0, 13, 3);
+      rg2 = softRidge(HOR - MU * 0.9, MU * 0.42, 23, 4);
+      rg3 = softRidge(HOR - MU * 0.46, MU * 0.3, 37, 3);
+      // chairlift: from a summit of the forested ridge down toward the valley on the right
+      let xt = 0; for (let x = 1; x < W; x++) if (rg2[x] < rg2[xt]) xt = x;
+      LIFT = { xt: xt, yt: Math.round(rg2[xt]) + 4, xb: xt + Math.round(W * 0.36), yb: Math.round(HOR + MU * 0.12) };
+      // cabin: on the highest shoulder of the near hills
+      let xc = 0; for (let x = 1; x < W; x++) if (rg3[x] < rg3[xc]) xc = x;
+      CABIN = { x: xc, y: Math.round(rg3[xc]) + 6 };
       buildLayers();
       const SPAN = W + 60; const sd = { s: 7 }; const R = () => { sd.s = (sd.s * 1103515245 + 12345) & 0x7fffffff; return sd.s / 0x7fffffff; };
       trees = []; const tc = Math.max(20, Math.round(W / 24));
-      for (let i = 0; i < tc; i++) trees.push({ wx: R() * SPAN, below: 6 + R() * Math.max(MU * 1.5, (H - E0) * 0.72), scale: 2.2 + R() * 2.6, seed: (R() * 1e9) | 0 });
+      for (let i = 0; i < tc; i++) {
+        const tr = { wx: R() * SPAN, below: 6 + R() * Math.max(MU * 1.5, (H - E0) * 0.72), scale: 2.2 + R() * 2.6, seed: (R() * 1e9) | 0 };
+        // keep the spots where the two skiers stand during the intro clear of trees
+        const nearStart = [0.40, 0.60].some((f) => Math.abs(tr.wx - f * W) < 20) && tr.below > 14 && tr.below < 86;
+        if (!nearStart) trees.push(tr);
+      }
       moguls = []; const mc = Math.max(22, Math.round(W / 18));
       for (let i = 0; i < mc; i++) moguls.push({ wx: R() * SPAN, below: 5 + R() * Math.max(MU * 1.6, (H - E0) * 0.82), w: 2 + Math.round(R() * 4) });
+      stars = []; const nst = Math.round((W * HOR) / 900);
+      for (let i = 0; i < nst; i++) stars.push({ x: (R() * W) | 0, y: (R() * HOR * 0.92) | 0, tw: 0.6 + R() * 2.4, ph: R() * 6.28, big: R() > 0.93 });
+      clouds = []; const ncl = Math.max(4, Math.round(W / 130));
+      for (let i = 0; i < ncl; i++) {
+        const w = 34 + R() * 70, puffs = []; let px0 = 0;
+        while (px0 < w) { const r = 4 + R() * 7; puffs.push({ dx: px0, r: Math.round(r) }); px0 += r * (0.9 + R() * 0.6); }
+        clouds.push({ x: R() * (W + 200), y: Math.round(H * (0.07 + R() * 0.3)), w: w, puffs: puffs, sp: 1.2 + R() * 2.6 });
+      }
       snow = []; const n = Math.round((W * H) / 2400);
       for (let i = 0; i < n; i++) { const sz = Math.random(); const r = sz < 0.62 ? 1 : (sz < 0.9 ? 2 : 3); snow.push({ x: Math.random() * W, y: Math.random() * H, s: 0.35 + r * 0.33 + Math.random() * 0.4, r }); }
       streaks = []; const ns = Math.round((W * H) / 6000);
       for (let i = 0; i < ns; i++) streaks.push({ x: Math.random() * W, y: H * 0.4 + Math.random() * H * 0.6, len: 3 + Math.round(Math.random() * 4) });
     }
     // --- Mountain layers: indexed-palette baking ----------------------------
-    // The geometry (which material each pixel is, and its shade/gradient level) is
-    // time-invariant, so we bake it ONCE into a Uint16 index map. Recolouring then
-    // only builds a small per-recipe colour LUT and blits it with a packed-Uint32
-    // copy — no per-pixel sin/lerp/strings — so colours can transition every frame
-    // with no hiccup. Q = quantisation levels for the continuous shade/rock/snow ramps.
-    const Q = 32;
+    // The geometry (which material each pixel is, which way its face points, how deep in the
+    // haze it sits) never changes, so it is baked ONCE into a Uint16 index map. Recolouring
+    // then only builds a small colour table and blits it with a packed-Uint32 copy, so the
+    // light can swing across the peaks as the sun and moon move without re-drawing anything.
     const _le = (() => { const b = new ArrayBuffer(4); new Uint32Array(b)[0] = 1; return new Uint8Array(b)[0] === 1; })();
     const pack = _le
       ? ((r, g, b) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0)
       : ((r, g, b) => ((r << 24) | (g << 16) | (b << 8) | 255) >>> 0);
+    function slotter() {
+      const map = new Map(), recipes = [null]; // slot 0 = transparent
+      return { recipes: recipes, slot: (key, rec) => { let s = map.get(key); if (s === undefined) { s = recipes.length; recipes.push(rec); map.set(key, s); } return s; } };
+    }
 
-    function bakeRangeIdx(ridge, opt) {
-      const idx = new Uint16Array(W * H), map = new Map(), recipes = [null]; // slot 0 = transparent
-      const slot = (key, rec) => { let s = map.get(key); if (s === undefined) { s = recipes.length; recipes.push(rec); map.set(key, s); } return s; };
+    // Alpine range. Each mountain gets a zig-zag spine running down from its summit; pixels left
+    // of it belong to the left face, pixels right of it to the right face, so one side can sit
+    // in light and the other in shadow. Diagonal strata give each face ribs and gullies.
+    // Recipe: ['A', material (0 snow, 1 rock, 2 forest), face (0 left, 1 right), shade (0 hi, 1 mid, 2 dark), haze step 0..3]
+    function bakeAlpine(ridge, opt) {
+      const idx = new Uint16Array(W * H), S = slotter(), R = prand(opt.seed * 7919 + 1);
+      const sg = ridgeSegments(ridge, Math.max(3, Math.round(W / 70)));
+      for (const s of sg.segs) {
+        const spine = new Int16Array(H); let sx = s.pk, dir = R() < 0.5 ? -1 : 1, run = 0;
+        for (let dp = 0; dp < H; dp++) {
+          spine[dp] = sx;
+          if (--run <= 0) { if (R() < 0.75) dir = -dir; run = 2 + Math.floor(R() * 6); }
+          if (R() < 0.62) sx += dir;
+          sx = Math.max(s.x0 + 1, Math.min(s.x1 - 1, sx));
+        }
+        s.spine = spine;
+      }
+      const ribCells = Math.max(8, Math.round(W / 7)), gulCells = Math.max(4, Math.round(W / 46));
+      const ribA = new Float32Array(W), ribB = new Float32Array(W), gul = new Float32Array(W);
+      for (let x = 0; x < W; x++) { ribA[x] = pnoise(x / W, ribCells, opt.seed + 3); ribB[x] = pnoise(x / W, ribCells, opt.seed + 5); gul[x] = pnoise(x / W, gulCells, opt.seed + 9); }
+      // the creases between neighbouring mountains wander from row to row instead of dropping straight down
+      const crease = new Int16Array(H);
+      for (let y = 0; y < H; y++) crease[y] = Math.round((pnoise(y / 640, 64, opt.seed + 21) - 0.5) * 22 + (pnoise(y / 192, 64, opt.seed + 4) - 0.5) * 6);
       for (let x = 0; x < W; x++) {
         const top = Math.round(ridge[x]);
-        const slope = ridge[(x + 4) % W] - ridge[(x - 4 + W) % W];
-        const shaded = slope < -0.25;
-        const qs = Math.round(Math.max(0, Math.min(1, slope * 0.5 + 0.5)) * Q);
-        const vis = Math.max(10, HOR - top);
-        const gully = 0.5 + 0.3 * Math.sin(x * 0.05 + opt.seed) + 0.2 * Math.sin(x * 0.13 + opt.seed * 1.7);
-        const snowEnd = vis * opt.snowFrac * (0.82 + gully * 0.42);
-        const treeEnd = snowEnd + vis * opt.treeFrac * (0.7 + gully * 0.6);
-        const crestKey = shaded ? 'c:crestSh' : 'c:crest', crestRec = ['c', shaded ? 'crestSh' : 'crest'];
-        for (let y = top; y < H; y++) {
-          const d = y - top;
-          const hs = Math.sin(x * 127.1 + y * 311.7 + opt.seed * 13.3) * 43758.5453; const hash = hs - Math.floor(hs);
-          let key, rec;
-          if (d < 1) { key = crestKey; rec = crestRec; }
-          else if (d < snowEnd) {
-            if (d > snowEnd - 2.5 && hash < 0.4) { key = 'c:treeDk'; rec = ['c', 'treeDk']; }
-            else if (hash > 0.93) { key = 'c:snowHi'; rec = ['c', 'snowHi']; }
-            else if (hash < 0.05) { key = 'c:snowSh2'; rec = ['c', 'snowSh2']; }
-            else { key = 'm:' + qs; rec = ['m', qs]; }
-          } else if (d < treeEnd) {
-            if (d < snowEnd + 2 && hash > 0.82) { key = 'c:snowSh'; rec = ['c', 'snowSh']; }
-            else if (hash > 0.7) { key = 'c:treeHi'; rec = ['c', 'treeHi']; }
-            else if (hash < 0.26) { key = 'c:treeDk'; rec = ['c', 'treeDk']; }
-            else { key = 'c:tree'; rec = ['c', 'tree']; }
-          } else {
-            const qr = Math.round(Math.min(1, (d - treeEnd) / Math.max(10, vis * 0.55)) * Q);
-            if (hash > 0.9) { key = 'c:rockHi'; rec = ['c', 'rockHi']; }
-            else if (hash < 0.12) { key = 'c:rockDk'; rec = ['c', 'rockDk']; }
-            else { key = 'r:' + qs + ':' + qr; rec = ['r', qs, qr]; }
+        for (let y = Math.max(0, top); y < H; y++) {
+          const s = sg.segs[sg.segOf[wrapX(x + crease[y])]];
+          let xu = x; if (xu < s.x0 - W / 2) xu += W; else if (xu > s.x1 + W / 2) xu -= W;
+          const vis = Math.max(14, HOR - s.py);
+          const d = y - top, dp = Math.min(H - 1, Math.max(0, y - s.py));
+          const face = xu < s.spine[dp] ? 0 : 1;
+          const rib = face === 0 ? ribA[wrapX(Math.round(x + y * 0.9))] : ribB[wrapX(Math.round(x - y * 0.9))];
+          let shade = rib > 0.68 ? 2 : (rib < 0.2 ? 0 : 1);
+          const hgt = (y - s.py) / vis;   // 0 at the summit, 1 down at the horizon
+          const snowLine = opt.snowFrac * (0.7 + 0.6 * gul[x]) + (rib > 0.6 ? 0.14 : 0);
+          let mat = hgt < snowLine - bayer(x, y) * 0.07 ? 0 : 1;
+          if (mat === 1 && rib < 0.22 && hgt < snowLine + 0.3) mat = 0;                          // snow caught on ledges
+          if (mat === 0 && rib > 0.74 && hgt > snowLine * 0.45) mat = 1;                         // rock ribs showing through
+          if (opt.forest && hgt > opt.forest - 0.12 * gul[x] - bayer(x, y) * 0.03) mat = 2;
+          if (d < 1) shade = 0;                                                                // catch-light on the crest
+          const fade = dither((hgt - opt.fadeFrom) / (1 - opt.fadeFrom), 3, x, y);
+          idx[y * W + x] = S.slot('A' + mat + face + shade + fade, ['A', mat, face, shade, fade]);
+        }
+      }
+      const peaks = sg.segs.slice().sort((a, b) => a.py - b.py).slice(0, 3).map((s) => ({ x: wrapX(s.pk), y: s.py }));
+      return { idx: idx, recipes: S.recipes, peaks: peaks };
+    }
+
+    // Forested ridge: a canopy of little pines with snow on their tips, cut by ski runs and
+    // the chairlift line, with a bare snowy summit here and there.
+    // Recipe: ['F', kind (0 gap, 1 pine left half, 2 pine right half, 3 snowy tip, 4 open snow, 5 snow edge), haze step 0..2]
+    function bakeForest(ridge, opt) {
+      const idx = new Uint16Array(W * H), S = slotter(), R = prand(opt.seed * 7919 + 1);
+      const bald = new Float32Array(W), canopy = new Float32Array(W);
+      for (let x = 0; x < W; x++) bald[x] = Math.max(0, (pnoise(x / W, 5, opt.seed + 2) - 0.62) * MU * 0.9);
+      let tx = 0;
+      while (tx < W) {
+        const hgt = 3 + R() * 6, half = Math.ceil(hgt / 2);
+        for (let k = -half; k <= half; k++) { const xx = wrapX(tx + k); if (bald[xx] <= 0) canopy[xx] = Math.max(canopy[xx], hgt - Math.abs(k) * 2); }
+        tx += 2 + Math.floor(R() * 4);
+      }
+      let rmin = Infinity; for (let x = 0; x < W; x++) rmin = Math.min(rmin, ridge[x]);
+      const pistes = [];
+      for (let i = 0; i < 3; i++) { const x0 = Math.floor(R() * W); pistes.push({ x0: x0, y0: ridge[x0], slant: (R() - 0.35) * 0.7, ph: R() * 6.28 }); }
+      const liftSlope = (LIFT.yb - LIFT.yt) / (LIFT.xb - LIFT.xt);
+      const ncol = Math.max(4, Math.round(W / 6)), cw = W / ncol, ch = 7;
+      for (let x = 0; x < W; x++) {
+        const rtop = Math.round(ridge[x]), top = Math.round(ridge[x] - canopy[x]);
+        for (let y = Math.max(0, top); y < H; y++) {
+          const d = y - rtop; let kind;
+          if (y < rtop) kind = (y === top) ? 3 : (hash2(x, y, opt.seed) > 0.5 ? 2 : 1);     // canopy silhouette
+          else if (d < bald[x]) kind = (d > bald[x] - 1.5) ? 5 : 4;                           // bare summit
+          else {
+            kind = -1;
+            for (const p of pistes) {
+              const dy = y - p.y0; if (dy < 3) continue;
+              const cx = p.x0 + dy * p.slant + Math.sin(dy * 0.07 + p.ph) * 9, hw = Math.min(8, 2 + dy * 0.06);
+              let dx = Math.abs(wrapX(x - Math.round(cx))); if (dx > W / 2) dx = W - dx;
+              if (dx < hw) { kind = dx > hw - 1.3 ? 5 : 4; break; }
+            }
+            if (kind < 0) {
+              for (let k = 0; k < 2; k++) {                                                   // chairlift clearing
+                const xu = x + k * W;
+                if (xu >= LIFT.xt - 2 && xu <= LIFT.xb + 2) { const ly = LIFT.yt + (xu - LIFT.xt) * liftSlope; if (Math.abs(y - ly) <= 3) kind = Math.abs(y - ly) > 2 ? 5 : 4; }
+              }
+            }
+            if (kind < 0) {
+              const row = Math.floor(y / ch), gx = x / cw + ((row & 1) ? 0.5 : 0), col = Math.floor(gx) % ncol;
+              const fx = (gx - Math.floor(gx)) * cw, j = hash2(col, row, opt.seed);
+              const fy = y - row * ch - Math.floor(hash2(col, row, opt.seed + 9) * 3);     // stagger the pines so they don't line up in rows
+              const apex = cw / 2 + (j - 0.5) * 2.6, off = fx - apex;
+              const meadow = pnoise(x / W, 7, opt.seed + 70) * 0.6 + pnoise(y / 320, 20, opt.seed + 71) * 0.4;
+              // between the pines: shaded snow in the open stands, dark understory in the thick ones
+              const ground = meadow > 0.7 ? 4 : (meadow > 0.42 ? 5 : 0);
+              if (meadow > 0.7 || fy < 0 || hash2(col, row, opt.seed + 50) < 0.16) kind = ground;          // no tree in this spot
+              else if (Math.abs(off) <= (fy + 1) * (0.36 + j * 0.18)) kind = (fy === 0 || (fy === 1 && j > 0.45)) ? 3 : (off < 0 ? 1 : 2);
+              else kind = ground;
+            }
           }
-          idx[y * W + x] = slot(key, rec);
+          const fade = dither(((y - rmin) / Math.max(20, HOR - rmin) - 0.45) / 0.55, 2, x, y);
+          idx[y * W + x] = S.slot('F' + kind + fade, ['F', kind, fade]);
         }
       }
-      return { idx: idx, recipes: recipes };
+      return { idx: idx, recipes: S.recipes };
     }
-    function bakeSnowIdx(ridge, opt) {
-      const idx = new Uint16Array(W * H), map = new Map(), recipes = [null];
-      const slot = (key, rec) => { let s = map.get(key); if (s === undefined) { s = recipes.length; recipes.push(rec); map.set(key, s); } return s; };
+
+    // Near snow hills: soft slopes shaded by which way they face, wind-sculpted contour lines,
+    // and scattered clumps of small pines.
+    // Recipes: ['H', facing 0..4 (4 = faces left), depth 0..3], ['P', 0 trunk / 1 dark / 2 mid / 3 snow]
+    function bakeHills(ridge, opt) {
+      const idx = new Uint16Array(W * H), S = slotter(), R = prand(opt.seed * 7919 + 1);
       for (let x = 0; x < W; x++) {
         const top = Math.round(ridge[x]);
-        const vis = Math.max(10, HOR - top);
-        for (let y = top; y < H; y++) {
+        const slope = ridge[wrapX(x + 5)] - ridge[wrapX(x - 5)];
+        const face = clamp01(0.5 - slope * 0.09);
+        const wob = Math.round(pnoise(x / W, 9, opt.seed) * 10);
+        for (let y = Math.max(0, top); y < H; y++) {
           const d = y - top;
-          const hs = Math.sin(x * 127.1 + y * 311.7 + opt.seed * 13.3) * 43758.5453; const hash = hs - Math.floor(hs);
-          let key, rec;
-          if (d < 1) { key = 'c:crest'; rec = ['c', 'crest']; }
-          else if (hash > 0.94) { key = 'c:snowHi'; rec = ['c', 'snowHi']; }
-          else { const qg = Math.round(Math.min(1, d / vis) * Q); key = 'g:' + qg; rec = ['g', qg]; }
-          idx[y * W + x] = slot(key, rec);
+          const f = 0.5 + (face - 0.5) * Math.max(0.25, 1 - d / (MU * 0.9));
+          const fl = dither(f, 4, x, y, 0.4);
+          let dl = dither(Math.min(1, d / (MU * 1.1)), 3, x, y, 0.5);
+          if (d > 4 && (d + wob) % 13 === 0 && ((x + y) & 1)) dl = Math.min(3, dl + 1);
+          idx[y * W + x] = d < 1 ? S.slot('c:crest', ['c', 'crest']) : S.slot('H' + fl + dl, ['H', fl, dl]);
         }
       }
-      return { idx: idx, recipes: recipes };
+      const stamps = [], nCl = Math.max(4, Math.round(W / 44));
+      for (let i = 0; i < nCl; i++) {
+        const cx = R() * W, cnt = 2 + Math.floor(R() * 4);
+        for (let j = 0; j < cnt; j++) {
+          const x = Math.round(wrapX(cx + (R() - 0.5) * 30)), by = Math.round(ridge[x] + 2 + R() * MU * 0.45), hgt = 6 + Math.floor(R() * 7);
+          let dxc = Math.abs(x - CABIN.x); if (dxc > W / 2) dxc = W - dxc;
+          if (dxc < 20) continue;                       // keep the cabin's clearing open
+          stamps.push({ x: x, by: by, h: hgt });
+        }
+      }
+      for (const k of [-19, 17]) stamps.push({ x: wrapX(CABIN.x + k), by: CABIN.y + 2 + (k > 0 ? 1 : 0), h: 11 + (k > 0 ? 2 : 0) });   // two pines framing the cabin
+      stamps.sort((a, b) => a.by - b.by);
+      const put = (x, y, key, rec) => { if (y >= 0 && y < H) idx[y * W + wrapX(x)] = S.slot(key, rec); };
+      for (const t of stamps) {
+        put(t.x + 1, t.by + 1, 'H03', ['H', 0, 3]); put(t.x + 2, t.by + 1, 'H03', ['H', 0, 3]); put(t.x + 3, t.by + 1, 'H03', ['H', 0, 3]);   // ground shadow
+        put(t.x, t.by, 'P0', ['P', 0]);
+        for (let r = 0; r < t.h; r++) {
+          const half = Math.floor(r * 0.42 + (r % 3 === 2 ? 1 : 0)), y = t.by - t.h + r;
+          for (let k = -half; k <= half; k++) {
+            const sn = r < 2 || (r % 3 === 0 && k <= 0), v = sn ? 3 : (k < 0 ? 1 : 2);
+            put(t.x + k, y, 'P' + v, ['P', v]);
+          }
+        }
+      }
+      return { idx: idx, recipes: S.recipes };
     }
+
     function buildLayers() {
       const defs = [
-        { ridge: rg0, kind: 'range', opt: { seed: 7, snowFrac: 0.6, treeFrac: 0.1, haze: 0.45 }, src: (P) => ({ snow: lerp(P.farSnow, P.skyHor, 0.45), rock: lerp(P.farRock, P.skyHor, 0.4) }) },
-        { ridge: rg1, kind: 'snow', opt: { seed: 13, haze: 0.26 }, src: (P) => ({ snow: P.farSnow, rock: P.farRock }) },
-        { ridge: rg2, kind: 'snow', opt: { seed: 23, haze: 0.1 }, src: (P) => ({ snow: P.midSnow, rock: P.midRock }) },
-        { ridge: rg3, kind: 'snow', opt: { seed: 37, haze: 0 }, src: (P) => ({ snow: P.nearSnow, rock: P.nearRock }) }
+        { ridge: rg0, bake: bakeAlpine, opt: { seed: 7, snowFrac: 0.52, fadeFrom: 0.3, fadeMax: 0.75, haze: 0.4, glow: 0.6 }, src: (P) => ({ snow: lerp(P.farSnow, P.skyHor, 0.25), rock: lerp(P.farRock, P.skyHor, 0.3) }) },
+        { ridge: rg1, bake: bakeAlpine, opt: { seed: 13, snowFrac: 0.4, forest: 0.84, fadeFrom: 0.45, fadeMax: 0.6, haze: 0.16, glow: 0.42 }, src: (P) => ({ snow: lerp(P.farSnow, P.midSnow, 0.6), rock: lerp(P.farRock, P.midRock, 0.75) }) },
+        { ridge: rg2, bake: bakeForest, opt: { seed: 23, fadeMax: 0.45, haze: 0.08 }, src: (P) => ({ snow: P.midSnow, rock: P.midRock }) },
+        { ridge: rg3, bake: bakeHills, opt: { seed: 37, haze: 0 }, src: (P) => ({ snow: lerp(P.nearSnow, P.slopeHi, 0.6), rock: P.nearRock }) }
       ];
       layers = defs.map(function (def) {
-        const baked = def.kind === 'range' ? bakeRangeIdx(def.ridge, def.opt) : bakeSnowIdx(def.ridge, def.opt);
+        const baked = def.bake(def.ridge, def.opt);
         const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
         const c2 = canvas.getContext('2d');
         const img = c2.createImageData(W, H);
-        return { canvas: canvas, ctx: c2, img: img, data32: new Uint32Array(img.data.buffer), lut: new Uint32Array(baked.recipes.length), idx: baked.idx, recipes: baked.recipes, opt: def.opt, src: def.src };
+        return { canvas: canvas, ctx: c2, img: img, data32: new Uint32Array(img.data.buffer), lut: new Uint32Array(baked.recipes.length), idx: baked.idx, recipes: baked.recipes, peaks: baked.peaks || [], opt: def.opt, src: def.src };
       });
       t0 = layers[0].canvas; t1 = layers[1].canvas; t2 = layers[2].canvas; t3 = layers[3].canvas;
+    }
+
+    // Where the light is coming from. lightK: 1 = from the left, 0 = from the right (it follows
+    // whichever of the sun and moon is higher). glowAmt: alpenglow near sunrise and sunset.
+    let lightK = 0.5, glowAmt = 0, nightAmt = 0;
+    function updateLight() {
+      const st = celestialState();
+      lightK = Math.max(0.06, Math.min(0.94, 0.5 + (0.5 - st.cx) * 2.4));
+      glowAmt = st.s.alt > -0.12 ? clamp01(1 - Math.abs(st.s.alt - 0.1) / 0.3) : 0;
+      nightAmt = clamp01((0.1 - st.s.alt) / 0.3);
     }
     function evalRecipe(rec, pal) {
       switch (rec[0]) {
         case 'c': return pal[rec[1]];
-        case 'm': return lerp(pal.snowSh, pal.snowLit, rec[1] / Q);
-        case 'r': return lerp(lerp(pal.rockSh, pal.rockLit, rec[1] / Q), pal.rockDk, rec[2] / Q);
-        case 'g': return lerp(pal.snowTop, pal.snowBot, rec[1] / Q);
+        case 'A': {
+          const lit = rec[2] === 0 ? pal.k : 1 - pal.k; let col;
+          if (rec[1] === 0) { col = lerp(pal.shSnow, pal.snowLit, lit); col = rec[3] === 0 ? lerp(col, pal.snowHi, 0.7) : (rec[3] === 2 ? lerp(col, pal.shSnow, 0.55) : col); }
+          else if (rec[1] === 1) { col = lerp(pal.rockSh, pal.rockLit, lit); col = rec[3] === 0 ? lerp(col, pal.rockHi, 0.6) : (rec[3] === 2 ? lerp(col, pal.rockDk, 0.6) : col); }
+          else { col = lerp(pal.treeDk, pal.tree, lit); col = rec[3] === 0 ? lerp(col, pal.treeHi, 0.5) : (rec[3] === 2 ? lerp(col, pal.treeDk, 0.6) : col); }
+          return lerp(col, pal.haze, (rec[4] / 3) * pal.fadeMax);
+        }
+        case 'F': {
+          let col;
+          switch (rec[1]) {
+            case 0: col = pal.treeDk; break;
+            case 1: col = lerp(pal.treeDk, pal.tree, 0.25 + 0.75 * pal.k); break;
+            case 2: col = lerp(pal.treeDk, pal.tree, 0.25 + 0.75 * (1 - pal.k)); break;
+            case 3: col = lerp(pal.shSnow, pal.snowLit, 0.8); break;
+            case 4: col = pal.snowLit; break;
+            default: col = lerp(pal.shSnow, pal.snowLit, 0.35);
+          }
+          return lerp(col, pal.haze, (rec[2] / 2) * pal.fadeMax);
+        }
+        case 'H': {
+          const face = rec[1] / 4, lit = face * pal.k + (1 - face) * (1 - pal.k);
+          return lerp(lerp(pal.shSnow, pal.snowLit, clamp01(0.74 + (lit - 0.5) * 1.5)), pal.snowBot, (rec[2] / 3) * 0.2);
+        }
+        case 'P': return rec[1] === 0 ? pal.trunk : (rec[1] === 1 ? pal.treeDk : (rec[1] === 2 ? pal.tree : lerp(pal.shSnow, pal.snowLit, 0.85)));
       }
       return '#000000';
     }
     function recolorLayer(L) {
       const sr = L.src(PAL), pal = layerPal(sr.snow, sr.rock);
+      pal.k = lightK; pal.haze = PAL.skyHor; pal.fadeMax = L.opt.fadeMax || 0;
+      pal.shSnow = lerp(pal.snowSh2, PAL.skyTop, 0.3);                      // shadows on snow pick up the sky
+      // evergreens darken toward the sky colour at night instead of staying daytime green
+      const dim = 0.55 * nightAmt;
+      pal.tree = lerp(pal.tree, PAL.skyTop, dim); pal.treeHi = lerp(pal.treeHi, PAL.skyTop, dim); pal.treeDk = lerp(pal.treeDk, PAL.skyTop, dim);
+      pal.trunk = lerp('#3a2c22', PAL.skyTop, dim);
+      if (L.opt.glow) { const g = glowAmt * L.opt.glow, warm = lerp(PAL.sun, '#ff9c7c', 0.55); pal.snowLit = lerp(pal.snowLit, warm, g * 0.6); pal.snowHi = lerp(pal.snowHi, warm, g * 0.45); }
       const hz = L.opt.haze, hzT = PAL.skyHor, recs = L.recipes, lut = L.lut;
       lut[0] = 0; // transparent
       for (let s = 1; s < recs.length; s++) {
@@ -315,7 +671,7 @@
       for (let i = 0; i < N; i++) data[i] = lut[idx[i]];
       L.ctx.putImageData(L.img, 0, 0);
     }
-    function rebakeRanges() { if (!layers.length) return; for (let i = 0; i < layers.length; i++) recolorLayer(layers[i]); }
+    function rebakeRanges() { if (!layers.length) return; updateLight(); for (let i = 0; i < layers.length; i++) recolorLayer(layers[i]); }
     // Setters used by the UI. setHour/setMood update one axis and keep the other; each
     // re-bakes immediately and (under reduced motion, where there's no loop) renders once.
     function applyScene(h01, mood) { dayHour = ((h01 % 1) + 1) % 1; curMood = mood; PAL = computePalette(dayHour, curMood); rebakeRanges(); bakedHour = dayHour; bakedMood = curMood; if (reduceMotion) render(0, 0.016, 999); }
@@ -411,7 +767,9 @@
       const lean = (R() * 2 - 1) * 0.45;
       const totalH = Math.round(11 * scale), baseHalf = Math.max(2, Math.round(3.6 * scale));
       const layers = 6, step = totalH / (layers + 0.5);
-      px(x, baseY - 1, Math.max(1, Math.round(scale * 0.5)), 3, PINE.trunk);
+      const sho = Math.round((lightK - 0.5) * baseHalf * 1.6), shc = hexA(PAL.slopeShade, 0.55);
+      px(x - baseHalf + sho, baseY + 1, baseHalf * 2 + 1, 1, shc); px(x - baseHalf + 2 + sho, baseY + 2, Math.max(1, baseHalf * 2 - 3), 1, shc);
+      px(x, baseY - 1, Math.max(1, Math.round(scale * 0.5)), 3, PINEC.trunk);
       px(x - Math.round(scale) - 1, baseY, (Math.round(scale) + 1) * 2 + 1, 1, hexA('#ffffff', 0.82));
       px(x - Math.round(scale), baseY - 1, Math.round(scale) * 2 + 1, 1, hexA('#dfeaf2', 0.66));
       for (let j = 0; j < layers; j++) {
@@ -420,40 +778,46 @@
         const topY = Math.round(baseY - step * (j + 1)); const skirtH = Math.max(2, Math.round(step) + 1);
         for (let row = 0; row < skirtH; row++) {
           const rr = row / skirtH, sp = Math.max(0, Math.round(half * (0.25 + 0.95 * rr)));
-          px(cx - sp, topY + row, sp * 2 + 1, 1, PINE.dark);
-          if (sp > 0) px(cx + 1, topY + row, sp, 1, PINE.mid);
-          if (sp > 1 && rr > 0.4) px(cx + Math.max(1, sp - 1), topY + row, 1, 1, PINE.lite);
+          px(cx - sp, topY + row, sp * 2 + 1, 1, PINEC.dark);
+          if (sp > 0) px(cx + 1, topY + row, sp, 1, PINEC.mid);
+          if (sp > 1 && rr > 0.4) px(cx + Math.max(1, sp - 1), topY + row, 1, 1, PINEC.lite);
           const spr = 0.55 - rr * 0.85;
-          if (spr > 0) { for (let k = -sp; k <= sp; k++) { if (R() < spr) px(cx + k, topY + row, 1, 1, (k >= 0 ? PINE.snow : PINE.snowSh)); } }
+          if (spr > 0) { for (let k = -sp; k <= sp; k++) { if (R() < spr) px(cx + k, topY + row, 1, 1, (k >= 0 ? PINEC.snow : PINEC.snowSh)); } }
         }
         const by = topY + skirtH;
-        for (let k = -half; k <= half; k++) { if (R() < 0.4) px(cx + k, by, 1, 1, (k >= 0 ? PINE.mid : PINE.dark)); }
-        for (let k = -half; k <= half; k++) { if (R() < 0.32) px(cx + k, by - 1, 1, 1, (k >= 0 ? PINE.snow : PINE.snowSh)); }
+        for (let k = -half; k <= half; k++) { if (R() < 0.4) px(cx + k, by, 1, 1, (k >= 0 ? PINEC.mid : PINEC.dark)); }
+        for (let k = -half; k <= half; k++) { if (R() < 0.32) px(cx + k, by - 1, 1, 1, (k >= 0 ? PINEC.snow : PINEC.snowSh)); }
       }
       const tx = x + Math.round(lean * totalH * 0.12), ty = Math.round(baseY - step * layers - 1);
-      px(tx, ty, 1, 2, PINE.dark); px(tx, ty, 1, 1, PINE.snow);
+      px(tx, ty, 1, 2, PINEC.dark); px(tx, ty, 1, 1, PINEC.snow);
     }
 
-    const SKI = { A: { y: null, x: null }, B: { y: null, x: null } };
+    // ---- skiers -------------------------------------------------------------------
+    // Each skier is posed from a small rig (skis, legs, torso, arms, head) into its own little
+    // canvas every frame, then given a one-pixel dark outline, so the whole turn animates
+    // smoothly: skis swing with the direction of travel, knees sink at the apex, the view of
+    // the body changes as they turn toward or away from us.
+    const SKI = { A: { y: null, x: null, h: 0 }, B: { y: null, x: null, h: 0 } };
+    const TURN_RATE = 1.3;                      // radians per second through the S-turns
     let spray = [];
     function screenXOf(tr) { const SPAN = W + 60; return ((((tr.wx - camX) % SPAN) + SPAN) % SPAN); }
-    function steer(time, which, moving) {
+    // Returns where the skier's feet are (sx, fy) and the pose inputs. `go` eases 0 -> 1 as they set off.
+    function steer(time, which, moving, dt, go) {
       const S = SKI[which];
       const baseX0 = (which === 'A' ? 0.40 : 0.60) * W;
       const driftAmp = moving ? W * 0.06 : W * 0.02;
-      let targetX = baseX0 + Math.sin(time * 0.33 + (which === 'A' ? 0 : 2.1)) * driftAmp;
+      let targetX = baseX0 + Math.sin(time * 0.33 + (which === 'A' ? 0 : 2.1)) * driftAmp * go;
       const other = SKI[which === 'A' ? 'B' : 'A'];
       if (other.x !== null) {
-        const cur = (S.x === null ? targetX : S.x); const dx = cur - other.x; const minGap = Math.max(22, W * 0.075);
+        const cur = (S.x === null ? targetX : S.x); const dx = cur - other.x; const minGap = Math.max(30, W * 0.085);
         if (Math.abs(dx) < minGap) { targetX += (dx >= 0 ? 1 : -1) * (minGap - Math.abs(dx)) * 0.6; }
       }
       if (S.x === null) S.x = targetX;
       S.x += (targetX - S.x) * 0.07;
       const baseX = Math.round(S.x);
-      const baseY = edge(baseX) + (which === 'A' ? 12 : 15);
-      const amp = moving ? Math.max(7, MU * 0.22) : Math.max(2, MU * 0.05);
-      const phase = which === 'A' ? 0 : 1.15;
-      const carve = Math.sin(time * 1.0 + phase);
+      const baseY = edge(baseX) + (which === 'A' ? 21 : 23);
+      const amp = Math.max(9, MU * 0.22) * go;
+      const carve = reduceMotion ? 0 : Math.sin(time * TURN_RATE + (which === 'A' ? 0 : 1.15));
       let targetY = baseY + carve * amp;
       if (S.y === null) S.y = targetY;
       if (moving) {
@@ -462,23 +826,24 @@
           const tx = screenXOf(tr); const dxs = Math.abs(tx - baseX);
           if (dxs < nd) { const ty = edge(tx) + tr.below; if (ty > baseY - amp - 12 && ty < baseY + amp + 14) { nd = dxs; ny = ty; found = true; } }
         }
-        if (found) { const k = 1 - nd / rx; targetY += (S.y <= ny ? -1 : 1) * k * 8; }
+        if (found) { const k = 1 - nd / rx; targetY += (S.y <= ny ? -1 : 1) * k * 8 * go; }
       }
       targetY = Math.max(baseY - amp - 6, Math.min(baseY + amp + 12, targetY));
-      const prev = S.y; S.y += (targetY - S.y) * 0.12; const vy = S.y - prev;
-      const sy = Math.round(S.y);
-      const lean = Math.max(-2.2, Math.min(2.2, carve * 2.0));
-      const turn = moving ? Math.min(1, Math.abs(carve)) : 0;
-      return { sx: baseX, sy, dir: carve, carve, lean, turn, vy, moving };
+      const prev = S.y; S.y += (targetY - S.y) * 0.12;
+      // heading: +1 = cutting down the screen toward us, -1 = heading up and away
+      const vy = (S.y - prev) / Math.max(dt, 0.004);
+      const hv = amp > 0.5 ? Math.max(-1, Math.min(1, vy / (amp * TURN_RATE))) : 0;
+      S.h += (hv - S.h) * 0.18;
+      return { sx: baseX, fy: Math.round(S.y), h: S.h, carve: carve * go, turn: Math.abs(carve) * go, moving: moving, go: go, which: which };
     }
     function emitSpray(p) {
-      if (reduceMotion || !p || !p.moving) return;
-      const n = Math.round(p.turn * p.turn * 8);
+      if (reduceMotion || !p || p.go < 0.5) return;
+      const n = Math.round(Math.max(0, p.turn - 0.45) * 12);
       for (let i = 0; i < n; i++) {
         spray.push({
-          x: p.sx - 3 + (Math.random() * 5 - 2.5), y: p.sy + 8 + Math.random() * 3,
-          vx: -(0.3 + Math.random() * 1.0), vy: -(1.0 + Math.random() * 2.0),
-          life: 0.7 + Math.random() * 0.6, sz: (Math.random() < 0.45 ? 1 : (Math.random() < 0.85 ? 2 : 3))
+          x: p.sx - 9 + (Math.random() * 6 - 3), y: p.fy - 1 + Math.random() * 3,
+          vx: -(0.3 + Math.random() * 1.1), vy: -(0.5 + Math.random() * 1.7) + p.carve * 0.5,
+          life: 0.6 + Math.random() * 0.6, sz: (Math.random() < 0.45 ? 1 : (Math.random() < 0.85 ? 2 : 3))
         });
       }
     }
@@ -493,27 +858,106 @@
     function drawSpray() {
       for (const s of spray) {
         const a = Math.max(0, Math.min(0.92, s.life));
-        if (s.sz >= 2) px(s.x + 1, s.y + 1, s.sz, s.sz, hexA('#8fb0cf', a * 0.5));
-        px(s.x, s.y, s.sz, s.sz, hexA('#f4f9ff', a));
+        if (s.sz >= 2) px(s.x + 1, s.y + 1, s.sz, s.sz, hexA(PAL.slopeShade, a * 0.6));
+        px(s.x, s.y, s.sz, s.sz, hexA(lerp('#f4f9ff', PAL.slopeHi, 0.75 * nightAmt), a));
       }
     }
-    function drawSkier(time, sx, sy, dir, lean, K, moving) {
-      const t = Math.round(lean);
-      px(sx - 6, sy + 18, 17, 1, hexA('#9fb2c8', 0.38));
-      line(sx - 7, sy + 10, sx + 7, sy + 13, K.skiEdge); line(sx - 7, sy + 9, sx + 7, sy + 12, K.ski); px(sx + 7, sy + 11, 2, 1, K.ski); px(sx + 8, sy + 10, 1, 1, K.ski);
-      line(sx - 4, sy + 14, sx + 9, sy + 17, K.skiEdge); line(sx - 4, sy + 13, sx + 9, sy + 16, K.ski); px(sx + 9, sy + 15, 2, 1, K.ski); px(sx + 10, sy + 14, 1, 1, K.ski);
-      px(sx - 3, sy + 8, 3, 2, K.boot); px(sx + 1, sy + 10, 3, 2, K.boot);
-      px(sx - 3, sy + 4, 3, 4, K.pants); px(sx, sy + 5, 4, 4, K.pants); px(sx - 3, sy + 4, 3, 1, K.pantsHi);
-      px(sx - 2 + t, sy - 3, 6, 7, K.jacket); px(sx + 2 + t, sy - 3, 2, 6, K.accent); px(sx + 2 + t, sy - 3, 2, 1, K.accentHi);
-      px(sx + t, sy - 3, 1, 7, K.trim); px(sx - 2 + t, sy + 3, 6, 1, K.jacketSh);
-      px(sx - 3 + t, sy - 1, 2, 2, K.jacket); px(sx - 4 + t, sy + 1, 1, 1, K.glove); line(sx - 4 + t, sy + 1, sx - 9, sy + 6, K.pole); px(sx - 9, sy + 6, 1, 1, K.basket);
-      px(sx + 4 + t, sy - 1, 2, 2, K.accent); px(sx + 6 + t, sy + 1, 1, 1, K.glove); line(sx + 6 + t, sy + 1, sx + 11, sy + 7, K.pole); px(sx + 11, sy + 7, 1, 1, K.basket);
-      const hx = sx + 2 + t, hy = sy - 10;
-      px(hx, hy + 1, 5, 4, K.helmet); px(hx, hy, 5, 1, K.helmet); px(hx + 1, hy - 1, 3, 1, K.helmet);
-      px(hx + 1, hy - 1, 2, 1, K.helmetHi); px(hx, hy + 1, 1, 4, K.helmetSh);
-      px(hx + 1, hy + 5, 3, 2, K.skin); px(hx + 1, hy + 6, 1, 1, K.skinSh);
-      px(hx + 1, hy + 4, 5, 1, K.strap); px(hx + 2, hy + 4, 4, 2, K.strap); px(hx + 2, hy + 5, 4, 1, K.lens);
-      px(hx + 2, hy + 5, 1, 1, K.lensHi); px(hx + 3 + (dir > 0 ? 1 : 0), hy + 5, 1, 1, '#ffffff');
+
+    const SPR_W = 76, SPR_H = 64, SPR_OX = 36, SPR_OY = 48;   // sprite canvas; (OX, OY) is the point between the feet
+    const mkSprite = () => { const c = document.createElement('canvas'); c.width = SPR_W; c.height = SPR_H; return { c: c, g: c.getContext('2d', { willReadFrequently: true }) }; };
+    const SPRITES = { A: mkSprite(), B: mkSprite() };
+    const OUTLINE = pack(0x14, 0x1a, 0x2c);
+    // Head art, 7 x 7, in three views. H helmet, h highlight, s shade, G goggle lens, g lens glint,
+    // S goggle strap, k skin, K skin shade.
+    const HEADS = {
+      front: ['..HHHH.', '.HhhHHH', '.HHHHHH', 'sHSGGGg', 'sHSGGGG', '.sHkkkk', '..kkkK.'],
+      side: ['..HHHH.', '.HhhHHH', 'sHHHHHH', 'sHHSGGg', 'sHHSGGG', '.sHHkkk', '..skkK.'],
+      back: ['..HHHH.', '.HhhHHH', 'sHHHHHH', 'sSSSSSH', 'sHHHHHG', '.sHHHHk', '..sHHk.']
+    };
+    function drawSkier(time, which, p, K) {
+      const S = SPRITES[which], g = S.g, h = p.h, go = p.go;
+      g.globalCompositeOperation = 'source-over';
+      g.clearRect(0, 0, SPR_W, SPR_H);
+      const P = (x, y, w, hh, col) => { g.fillStyle = col; g.fillRect(SPR_OX + Math.round(x), SPR_OY + Math.round(y), w, hh); };
+      const Ln = (x0, y0, x1, y1, col, tw, th) => {
+        x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+        let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx - dy;
+        g.fillStyle = col;
+        for (;;) { g.fillRect(SPR_OX + x0 - ((tw || 1) >> 1), SPR_OY + y0, tw || 1, th || 1); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 > -dy) { err -= dy; x0 += sx; } if (e2 < dx) { err += dx; y0 += sy; } }
+      };
+      const t = reduceMotion ? 0 : time;
+      const idle = 1 - go;
+      const crouch = (1 + Math.abs(p.carve) * 2.4) * go + (reduceMotion ? 0 : Math.sin(t * 2.2 + (which === 'A' ? 0 : 1.7)) * 0.5 * idle);
+      // skis point where the skier is heading; the far ski sits a little up the screen
+      const ang = 0.10 + h * 0.44, cx = Math.cos(ang), sy = Math.sin(ang);
+      const F = { x: 2.6 * sy, y: -2.6 * cx - 0.5 }, N = { x: -2.6 * sy, y: 2.6 * cx - 0.5 };
+      const ski = (o, lead) => {
+        const tx = o.x + cx * (13 + lead), ty = o.y + sy * (13 + lead), bx = o.x - cx * (10 - lead), by = o.y - sy * (10 - lead);
+        Ln(bx, by + 1, tx, ty + 1, K.skiEdge); Ln(bx, by, tx, ty, K.ski);
+        P(tx + 1, ty - 1, 1, 1, K.ski); P(tx + 2, ty - 2, 1, 1, K.ski);
+      };
+      ski(F, h > 0 ? 0 : 1.5); ski(N, h > 0 ? 1.5 : 0);
+      // body joints
+      const hip = { x: -3 + h * 0.6, y: -12 + crouch };
+      const sh = { x: hip.x + 6 - crouch * 0.25, y: hip.y - 10 + crouch * 0.45 };
+      const kF = { x: F.x + 3.5, y: F.y - 7 + crouch * 0.5 }, kN = { x: N.x + 3.5, y: N.y - 7 + crouch * 0.5 };
+      const spread = 1 + h;
+      const handF = { x: sh.x + 7, y: sh.y + 6 - spread }, handN = { x: sh.x + 6, y: sh.y + 8 + spread * 0.6 };
+      // far arm and far leg first (they sit behind the body)
+      Ln(sh.x + 2, sh.y + 1, sh.x + 4, sh.y + 5, K.jacketSh, 2, 2); Ln(sh.x + 4, sh.y + 5, handF.x, handF.y, K.jacketSh, 2, 2);
+      P(handF.x, handF.y, 2, 2, K.glove);
+      P(F.x - 1, F.y - 3, 4, 3, K.boot);
+      Ln(F.x + 1, F.y - 4, kF.x, kF.y, K.pantsSh, 3, 2); Ln(kF.x, kF.y, hip.x + 1, hip.y, K.pantsSh, 3, 2);
+      // near leg
+      P(N.x - 1, N.y - 3, 4, 3, K.boot); P(N.x - 1, N.y - 3, 4, 1, K.bootHi);
+      Ln(N.x + 1, N.y - 4, kN.x, kN.y, K.pants, 3, 2); Ln(kN.x, kN.y, hip.x, hip.y + 1, K.pants, 3, 2);
+      Ln(kN.x + 1, kN.y, hip.x + 1, hip.y + 1, K.pantsHi, 1, 1);
+      // torso, leaning forward into the fall line
+      const view = h > 0.3 ? 'front' : (h < -0.3 ? 'back' : 'side');
+      for (let i = 0; i <= 10; i++) {
+        const k = i / 10, tx = hip.x + 1 + (sh.x - hip.x - 1) * k, ty = hip.y + (sh.y - hip.y) * k;
+        P(tx - 3, ty, 7, 1, K.jacket); P(tx - 3, ty, 2, 1, K.jacketSh);
+        if (i === 0) P(tx - 3, ty, 7, 1, K.jacketSh);
+        if (view === 'front') { P(tx + 1, ty, 1, 1, K.trim); if (i === 6 || i === 7) { P(tx - 1, ty, 2, 1, K.accent); P(tx + 2, ty, 2, 1, K.accent); } }
+        else if (view === 'back') { if (i >= 3 && i <= 8) { P(tx - 2, ty, 5, 1, i === 8 ? K.accentHi : K.accent); } }
+        else { if (i >= 3 && i <= 8) P(tx - 4, ty, 2, 1, i === 8 ? K.accentHi : K.accent); if (i === 6) P(tx - 1, ty, 5, 1, K.accent); }
+      }
+      // scarf: hangs while standing, streams out behind at speed
+      for (let i = 0; i < 5; i++) {
+        const fl = reduceMotion ? 0 : Math.sin(t * 11 + i * 1.1 + (which === 'A' ? 0 : 2)) * (0.3 + i * 0.4);
+        P(sh.x - 3 - i * 1.9 * go, sh.y - 1 + i * 1.5 * idle + fl * go, 2, 2, (i & 1) ? K.scarfSh : K.scarf);
+      }
+      // head
+      const hx = sh.x - 2, hy = sh.y - 8, map = HEADS[view];
+      const HC = { H: K.helmet, h: K.helmetHi, s: K.helmetSh, G: K.lens, g: K.lensHi, S: K.strap, k: K.skin, K: K.skinSh };
+      for (let r = 0; r < 7; r++) for (let c = 0; c < 7; c++) { const ch = map[r][c]; if (ch !== '.') P(hx + c, hy + r, 1, 1, HC[ch]); }
+      if (K.pom) { P(hx + 1, hy + 2, 6, 1, K.helmetHi); P(hx + 2, hy - 2, 3, 2, K.pom); P(hx + 3, hy - 3, 1, 1, K.pom); }
+      // near arm, over the torso
+      Ln(sh.x - 1, sh.y + 2, sh.x + 2, sh.y + 6, K.jacket, 2, 2); Ln(sh.x + 2, sh.y + 6, handN.x, handN.y, K.jacket, 2, 2);
+      P(sh.x + 3, sh.y + 6, 2, 1, K.accent); P(handN.x, handN.y, 2, 2, K.glove);
+
+      // one-pixel outline around everything drawn so far
+      const img = g.getImageData(0, 0, SPR_W, SPR_H), d32 = new Uint32Array(img.data.buffer), src = new Uint32Array(d32);
+      for (let y = 1; y < SPR_H - 1; y++) for (let x = 1; x < SPR_W - 1; x++) {
+        const i = y * SPR_W + x;
+        if (src[i] === 0 && (src[i - 1] !== 0 || src[i + 1] !== 0 || src[i - SPR_W] !== 0 || src[i + SPR_W] !== 0)) d32[i] = OUTLINE;
+      }
+      g.putImageData(img, 0, 0);
+      // poles: thin, no outline. They trail behind at speed; the downhill one reaches forward
+      // to plant as one turn hands over to the next; planted upright while standing.
+      const plant = go * Math.max(0, 1 - Math.abs(p.carve) * 2.4) * (h > 0 ? 1 : 0.4);
+      const tipN = { x: handN.x + (-10 + 13 * plant) * go + 1 * idle, y: handN.y + (N.y + 3 - handN.y) * (go > 0 ? 1 : 1) };
+      const tipF = { x: handF.x - 9 * go + 1 * idle, y: F.y + 2 };
+      tipN.y = N.y + 3;
+      Ln(handN.x + 1, handN.y + 1, tipN.x, tipN.y, K.pole); P(tipN.x - 1, tipN.y - 1, 3, 1, K.basket);
+      g.globalCompositeOperation = 'destination-over';      // the far pole goes behind the body
+      Ln(handF.x + 1, handF.y + 1, tipF.x, tipF.y, K.pole); P(tipF.x - 1, tipF.y - 1, 3, 1, K.basket);
+      if (nightAmt > 0.02) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = hexA('#0b1226', 0.42 * nightAmt); g.fillRect(0, 0, SPR_W, SPR_H); }
+      g.globalCompositeOperation = 'source-over';
+      // soft shadow on the snow, thrown away from the light
+      const so = Math.round((lightK - 0.5) * 10), shc = hexA(PAL.slopeShade, 0.6);
+      px(p.sx - 8 + so, p.fy + 3, 19, 1, shc); px(p.sx - 5 + so, p.fy + 4, 14, 1, shc);
+      ctx.drawImage(S.c, p.sx - SPR_OX, p.fy - SPR_OY);
     }
 
     function setBubble(el, msg, show, pos) {
@@ -541,7 +985,8 @@
     }
 
     resize();
-    window.addEventListener('resize', resize, { passive: true });
+    let resizeTimer = 0;
+    window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 140); }, { passive: true });
     refs.applyScene = applyScene;
     refs.setHour = setHour;
     refs.setMood = setMood;

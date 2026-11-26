@@ -101,6 +101,26 @@ Local testing: `node reader.mjs --dev`, then open `http://localhost:8788/hn/`.
 After changing `hn-reader/`: `npm ci` if dependencies changed, then
 `sudo systemctl restart openglades-hn-reader`.
 
+## 4c. Glade Run (openglades.com/ski)
+
+The game itself is static (`site/ski/`). Its leaderboard is a small zero-dependency Node
+service in `ski-scores/` that nginx proxies at `/ski/api/`. Without the service the game still
+runs and keeps scores in the player's browser instead.
+
+```sh
+sudo cp open-glades/deploy/openglades-ski-scores.service /etc/systemd/system/
+# edit WorkingDirectory / User in the unit to match the checkout
+sudo systemctl daemon-reload && sudo systemctl enable --now openglades-ski-scores
+curl -s http://127.0.0.1:8789/ski/api/health      # {"ok":true}
+```
+
+Add the `location ^~ /ski/api/` block from `nginx-openglades.conf` to the live server block and
+reload nginx. Scores are stored in `/var/lib/openglades-ski/scores.json`; to remove an entry,
+stop the service, edit that file, and start it again.
+
+Locally: `node ski-scores/scores.mjs --dev` serves the site and the leaderboard together at
+http://localhost:8789/ski/.
+
 ## 5. nginx
 
 ```sh

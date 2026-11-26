@@ -82,8 +82,21 @@ function proxyFairweather(req, res) {
   req.pipe(upstream);
 }
 
+// Glade Run leaderboard (ski-scores/scores.mjs) runs on :8789; mirror nginx locally. Without it the game
+// falls back to a leaderboard kept in the browser.
+const SKI = { host: '127.0.0.1', port: Number(process.env.SKI_PORT || 8789) };
+function proxySki(req, res) {
+  const upstream = http.request(
+    { host: SKI.host, port: SKI.port, method: req.method, path: req.url, headers: req.headers },
+    (up) => { res.writeHead(up.statusCode || 502, up.headers); up.pipe(res); }
+  );
+  upstream.on('error', () => { res.writeHead(502, { 'Content-Type': 'application/json' }); res.end('{"error":"ski_scores_down"}'); });
+  req.pipe(upstream);
+}
+
 http.createServer((req, res) => {
   if (req.url === '/fairweather' || req.url.startsWith('/fairweather/') || req.url.startsWith('/fairweather?') || req.url.startsWith('/fairweather#')) return proxyFairweather(req, res);
+  if (req.url.startsWith('/ski/api/')) return proxySki(req, res);
   if (req.url.startsWith('/api/')) return proxyApi(req, res);
   return serveStatic(req, res);
 }).listen(PORT, () => {

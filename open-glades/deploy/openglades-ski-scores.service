@@ -1,0 +1,36 @@
+# systemd unit for the Glade Run leaderboard (openglades.com/ski).
+# Install: sudo cp openglades-ski-scores.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now openglades-ski-scores
+#
+# No npm install needed (zero dependencies). Edit WorkingDirectory / User to match your server.
+# Listens on 127.0.0.1:8789; nginx proxies /ski/api/ to it (see nginx-openglades.conf).
+# Scores are kept in /var/lib/openglades-ski/scores.json (created by StateDirectory).
+
+[Unit]
+Description=Open Glades Glade Run leaderboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# >>> EDIT THESE <<<
+User=www-data
+WorkingDirectory=/srv/jroverton.com/open-glades/ski-scores
+ExecStart=/usr/bin/node --max-old-space-size=64 scores.mjs
+Environment=NODE_ENV=production
+StateDirectory=openglades-ski
+Restart=on-failure
+RestartSec=3
+MemoryMax=150M
+# hardening: it only needs its state directory and a loopback socket
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
