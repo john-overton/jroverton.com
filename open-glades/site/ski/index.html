@@ -8,6 +8,12 @@
   <link rel="canonical" href="https://openglades.com/ski/" />
   <meta name="theme-color" content="#0a1020" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Glade Run" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/vt323-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/pressstart2p-400-latin.woff2" crossorigin />
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
@@ -254,5 +260,6 @@
   </div>
 
   <script src="/ski/game.js"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});</script>
 </body>
 </html>

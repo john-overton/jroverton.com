@@ -1227,6 +1227,6 @@
   let rz = 0;
   window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { resize(); camX = s.x - W / 2 + look; }, 120); });
   show('menu'); hud(true); loadBoard();
-  window.GLADE = { npcs: npcs, stick: stick, s: s, run: run, keys: keys, start: startRun, vis: vis, mode: function () { return mode; } };   // handy for testing
+  window.GLADE = { art: function () { return { SPR: SPR, TILE: TILE, build: buildSkier, KITS: KITS }; }, npcs: npcs, stick: stick, s: s, run: run, keys: keys, start: startRun, vis: vis, mode: function () { return mode; } };   // handy for testing
   requestAnimationFrame(function (t) { last = t; requestAnimationFrame(frame); });
 })();
