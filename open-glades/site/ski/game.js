@@ -963,6 +963,7 @@
     if (col === edgeCol || now - edgeAt < 3000) return;
     edgeCol = col; edgeAt = now;
     document.documentElement.style.background = col; document.body.style.background = col;
+    document.documentElement.style.setProperty('--band', col);
     const e = $('edge'); if (e) { const f = e.cloneNode(false); f.style.background = col; e.replaceWith(f); }
   }
 

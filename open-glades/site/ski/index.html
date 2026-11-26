@@ -29,6 +29,10 @@
        starts the page below it. It takes the band's colour from the page, and from a fixed opaque element at
        the very top edge when there is one, so this hairline carries the colour of the snow. */
     #edge { position: fixed; top: 0; left: 0; right: 0; height: 1px; background: #f2f6fb; z-index: 5; }
+    /* ...and a soft fade from that colour into the scene, so the band doesn't end in a hard line */
+    #fade { display: none; position: fixed; top: 0; left: 0; right: 0; height: 64px; pointer-events: none;
+      background: linear-gradient(to bottom, var(--band, #f2f6fb) 0%, color-mix(in srgb, var(--band, #f2f6fb) 72%, transparent) 28%, color-mix(in srgb, var(--band, #f2f6fb) 30%, transparent) 62%, transparent 100%); }
+    html.ios-app #fade { display: block; }
 
     #diag { margin-top: 14px; font-size: 15px; line-height: 1.15; color: #7f8ba3; white-space: pre-line; }
     #probe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
@@ -156,6 +160,7 @@
 <body class="mode-menu">
   <div id="edge" aria-hidden="true"></div>
   <canvas id="ski-canvas" aria-label="Glade Run game"></canvas>
+  <div id="fade" aria-hidden="true"></div>
   <div id="pops" aria-hidden="true"></div>
   <div id="probe" aria-hidden="true"></div>
 
