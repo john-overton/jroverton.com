@@ -250,12 +250,16 @@
     S.tower = mk(31, 24, function (P) {
       P(2, 2, 27, 2, C.rockD); P(2, 2, 27, 1, C.rock); P(0, 0, 31, 1, C.white); P(14, 4, 3, 18, C.rockD); P(15, 4, 1, 18, C.rockL); P(12, 22, 7, 1, C.snowSh);
     }); S.tower.ax = 15; S.tower.ay = 22;
-    S.chairs = [['#8e5bd0', '#e8c53a'], ['#3fa56a', '#d9534f'], ['#3d7fd6', '#ff9a3c'], null].map(function (r) {
-      return mk(11, 12, function (P) {
-        P(5, 0, 1, 5, C.rockD); P(1, 5, 9, 1, C.rockD); P(1, 5, 1, 5, C.rockD); P(9, 5, 1, 5, C.rockD); P(1, 9, 9, 1, C.rock);
-        if (r) { P(2, 4, 3, 2, '#e7eef4'); P(2, 6, 3, 3, r[0]); P(6, 4, 3, 2, '#2b3550'); P(6, 6, 3, 3, r[1]); P(3, 10, 1, 2, C.gold); P(7, 10, 1, 2, '#7fd0e0'); }
-      });
+    S.chair = mk(13, 13, function (P) {                 // a double chair, seen from the front
+      P(6, 0, 1, 4, C.rockD); P(1, 4, 11, 1, C.rockD); P(1, 4, 1, 8, C.rockD); P(11, 4, 1, 8, C.rockD);
+      P(2, 5, 9, 3, '#8794b3'); P(2, 5, 9, 1, '#a9b4cc'); P(1, 9, 11, 2, '#39415b'); P(1, 9, 11, 1, '#56607f'); P(2, 12, 9, 1, C.rockD);
     });
+    S.hut = mk(20, 22, function (P) {                   // the liftie's hut beside the top station
+      for (let r = 0; r < 6; r++) P(2 - Math.min(2, r), r + 1, 16 + Math.min(2, r) * 2, 1, r > 3 ? C.snowSh : C.white);
+      P(1, 7, 18, 1, C.barkD); P(2, 8, 16, 11, '#b94a30'); P(2, 8, 2, 11, '#8f3723'); P(16, 8, 2, 11, '#d2603f');
+      P(5, 10, 6, 5, C.barkD); P(6, 11, 4, 3, C.glass); P(8, 11, 1, 3, C.barkD); P(13, 11, 3, 8, C.door); P(1, 19, 18, 1, C.snowSh);
+    }); S.hut.ax = 10; S.hut.ay = 20;
+    S.ramp = ellipse(24, 6, '#fbfdff');
     S.pole = [C.flag, '#3d7fd6'].map(function (c) { return mk(3, 8, function (P) { P(1, 0, 1, 7, c); P(1, 2, 1, 2, C.white); P(0, 7, 3, 1, C.snowDk); }); });
     S.cord = (function () {                              // corduroy: the groomer's fall-line ridges
       const c = document.createElement('canvas'); c.width = 3; c.height = 2; const g = c.getContext('2d');
@@ -425,14 +429,17 @@
         P(11, 10, 8, 5, K.jacket); P(11, 14, 8, 1, K.jacketSh); P(18, 8, 2, 5, K.pants); P(21, 10, 2, 4, K.pantsSh);
         P(6, 9, 5, 1, K.helmet); P(6, 10, 5, 1, K.strap); P(7, 10, 3, 1, K.lens); P(6, 11, 5, 2, K.skin); P(20, 14, 2, 2, K.glove);
       }, OUT);
-      o.sit = mk(20, 18, function (P) {                 // sitting in the run, facing downhill, board across the feet
-        P(8, 1, 3, 1, K.helmetHi); P(7, 2, 5, 3, K.helmet); P(7, 4, 5, 1, K.strap);
-        P(6, 5, 7, 5, K.jacket); P(6, 5, 1, 5, K.jacketSh); P(7, 7, 5, 1, K.accent);
-        P(4, 6, 2, 4, K.jacketSh); P(13, 6, 2, 4, K.jacket); P(4, 10, 2, 1, K.glove); P(13, 10, 2, 1, K.glove);
-        P(7, 10, 2, 4, K.pantsSh); P(10, 10, 2, 4, K.pants);
-        P(3, 14, 13, 2, K.ski); P(3, 14, 1, 2, K.skiEdge); P(15, 14, 1, 2, K.skiEdge); P(7, 13, 2, 1, K.boot); P(10, 13, 2, 1, K.boot);
+      o.sit = mk(20, 19, function (P) {                 // sitting in the run, facing downhill, board across the feet
+        P(8, 1, 3, 1, K.helmetHi); P(7, 2, 5, 1, K.helmet); if (K.pom) P(9, 0, 1, 1, K.pom);
+        P(7, 3, 5, 1, K.strap); P(8, 3, 3, 1, K.lens); P(10, 3, 1, 1, K.lensHi);                    // goggles
+        P(7, 4, 5, 1, K.skin); P(7, 4, 1, 1, K.skinSh);
+        P(6, 5, 7, 1, K.scarf); P(6, 5, 1, 1, K.scarfSh); P(11, 6, 2, 2, K.scarf); P(12, 8, 1, 1, K.scarfSh);   // scarf, with a loose end
+        P(6, 6, 7, 5, K.jacket); P(6, 6, 1, 5, K.jacketSh); P(7, 8, 4, 1, K.accent); P(11, 6, 2, 2, K.scarf);
+        P(4, 7, 2, 4, K.jacketSh); P(13, 7, 2, 4, K.jacket); P(4, 11, 2, 1, K.glove); P(13, 11, 2, 1, K.glove);
+        P(7, 11, 2, 4, K.pantsSh); P(10, 11, 2, 4, K.pants); P(7, 14, 2, 1, K.boot); P(10, 14, 2, 1, K.boot);
+        P(3, 15, 13, 2, K.ski); P(3, 15, 1, 2, K.skiEdge); P(15, 15, 1, 2, K.skiEdge); P(6, 15, 1, 1, K.skiEdge); P(12, 16, 1, 1, K.skiEdge);
       }, OUT);
-      o.sit.ax = 10; o.sit.ay = 12;
+      o.sit.ax = 10; o.sit.ay = 13;
     }
     o.stuck = mk(22, 16, function (P) {                 // head and ski tips poking out of a tree well
       lineP(P, 3, 9, 5, 2, K.ski); lineP(P, 18, 9, 16, 1, K.ski);
@@ -658,7 +665,7 @@
     s.x = 0; s.y = 0; s.th = HALF * 0.999; s.v = 0; s.z = 0; s.vz = 0; s.state = 'idle'; s.timer = 0; s.inv = 0; s.hops = [];
     run.t = 0; run.score = 0; run.falls = 0; run.clean = 0; run.bestClean = 0; run.jumps = 0; run.bigAir = 0; run.items = 0; run.top = 0; run.token = null;
     look = 0; camX = s.x - W / 2; camY = s.y - skierRow();
-    npcs.length = 0; npcT = 0; ntracks.length = 0;                           // the crowd just off the lift, setting off one by one
+    npcs.length = 0; npcT = 0; ntracks.length = 0; resetLift();                           // the crowd just off the lift, setting off one by one
     for (let i = 0; i < 9; i++) {
       const side = i % 2 ? 1 : -1, x = side * (13 + Math.random() * 62), y = -24 + Math.random() * 46;
       npcs.push(newNpc(0, x, y, 55 + Math.random() * 70, { state: 'wait', timer: 0.25 + Math.random() * 5.5, th: [HALF, -HALF, 0.7, -0.7, 0][i % 5], off: clamp(x / 80, -0.8, 0.8) }));
@@ -777,14 +784,17 @@
       const j = NPC_COL[i], pp = NPC_PANTS[(i * 3) % 5], h = NPC_COL[(i * 7 + 3) % 10], sk = NPC_COL[(i * 5 + 1) % 10];
       const kitN = Object.assign({}, KITS.A, { jacket: j[0], jacketSh: j[1], accent: pp[0], pants: pp[0], pantsSh: pp[1], helmet: h[0], helmetHi: h[0], scarf: h[0], scarfSh: h[1], ski: sk[0], skiEdge: sk[1], pom: i % 3 === 0 ? '#ffffff' : undefined });
       out.push(buildSkier(kitN));
-      BOARDERS.push(buildSkier(Object.assign({}, kitN, { board: 1, jacket: NPC_COL[(i + 4) % 10][0], jacketSh: NPC_COL[(i + 4) % 10][1] })));
+      BOARDERS.push(buildSkier(Object.assign({}, kitN, { board: 1, jacket: NPC_COL[(i + 4) % 10][0], jacketSh: NPC_COL[(i + 4) % 10][1], scarf: NPC_COL[(i + 7) % 10][0], scarfSh: NPC_COL[(i + 7) % 10][1], lens: i % 2 ? '#ffcf5c' : '#7fd0e0', lensHi: i % 2 ? '#fff3c4' : '#d8f4fb' })));
     }
     return out;
   }
   function newNpc(k, x, y, vt, o) {
-    const n = { t: 'npc', k: k, x: x, y: y, v: vt, vt: vt, th: 0, off: (Math.random() * 2 - 1) * 0.7, ph: Math.random() * 6.28, rate: 1.1 + Math.random() * 1.5, amp: 0.2 + Math.random() * 0.45, spr: NPCS[Math.floor(Math.random() * NPCS.length)], state: 'ski', timer: 0, inv: 0, lx: x, ly: y };
-    if (Math.random() < 0.36) { n.board = 1; n.spr = BOARDERS[Math.floor(Math.random() * BOARDERS.length)]; n.rate *= 0.75; n.amp = Math.min(0.75, n.amp * 1.5); }   // boarders carve wider, slower arcs
+    const board = o && o.board !== undefined ? !!o.board : Math.random() < 0.36;
+    const ki = o && o.kit !== undefined ? o.kit : Math.floor(Math.random() * NPCS.length);
+    const n = { t: 'npc', k: k, x: x, y: y, v: vt, vt: vt, th: 0, off: (Math.random() * 2 - 1) * 0.7, ph: Math.random() * 6.28, rate: 1.1 + Math.random() * 1.5, amp: 0.2 + Math.random() * 0.45, spr: (board ? BOARDERS : NPCS)[ki], state: 'ski', timer: 0, inv: 0, lx: x, ly: y };
+    if (board) { n.rate *= 0.75; n.amp = Math.min(0.75, n.amp * 1.5); }   // boarders carve wider, slower arcs
     if (o) for (const key in o) n[key] = o[key];
+    n.board = board ? 1 : 0;
     if (n.state === 'wait') n.v = 0;
     return n;
   }
@@ -824,6 +834,32 @@
         n.state = 'fall'; n.timer = 1.7; fall(Math.random() < 0.5 ? 'SORRY!' : 'ON YOUR LEFT!');
       }
       if (n.y < camY - 170 || n.y > camY + H + 260 || Math.abs(n.x - s.x) > W + 260) npcs.splice(i, 1);
+    }
+  }
+
+  // ---- the chairlift: chairs arrive with riders, who get off at the top and drop in --------------
+  const LIFT_GAP = 66, LIFT_N = 9, LIFT_TOP = -44;
+  const lift = [];
+  function loadChair(c) {
+    c.riders = [];
+    if (Math.random() < 0.8) { const n = Math.random() < 0.5 ? 1 : 2; for (let i = 0; i < n; i++) c.riders.push({ kit: Math.floor(Math.random() * NPCS.length), board: Math.random() < 0.4 }); }
+    return c;
+  }
+  function resetLift() { lift.length = 0; for (let i = 0; i < LIFT_N; i++) lift.push(loadChair({ y: LIFT_TOP - 30 - i * LIFT_GAP })); }
+  function updateLift(dt) {
+    if (camY > 520) return;                              // out of sight: let it rest
+    for (let i = 0; i < lift.length; i++) {
+      const c = lift[i]; c.y += 22 * dt;
+      if (c.y < LIFT_TOP) continue;
+      const playing = mode === 'play';
+      for (let r = 0; r < c.riders.length; r++) {        // everyone off: they ski or ride away down the run
+        if (npcs.length >= (playing ? 14 : 11)) break;
+        const q = c.riders[r];
+        npcs.push(playing
+          ? newNpc(0, -16 + r * 8, -30 + Math.random() * 4, 55 + Math.random() * 70, { kit: q.kit, board: q.board, v: 14 })
+          : newNpc(0, -34 + Math.random() * 68, -22 + Math.random() * 30, 55 + Math.random() * 70, { kit: q.kit, board: q.board, state: 'wait', timer: 0.4 + Math.random() * 6, th: [HALF, -HALF, 0.7, -0.7][Math.floor(Math.random() * 4)] }));
+      }
+      c.y -= LIFT_N * LIFT_GAP; loadChair(c);
     }
   }
 
@@ -898,6 +934,7 @@
   function stepFx(dt) {
     for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 90 * dt; }
     for (let i = smoke.length - 1; i >= 0; i--) { const p = smoke[i]; p.life -= dt; if (p.life <= 0) { smoke.splice(i, 1); continue; } p.x += (6 + Math.sin(p.life * 3) * 5) * dt; p.y -= 9 * dt; }
+    updateLift(dt);
     const drift = Math.sin(performance.now() / 4000) * 6 + 5;
     for (let i = 0; i < flakes.length; i++) {
       const f = flakes[i]; f.y += f.v * dt; f.x += (drift + Math.sin(f.w += dt * 1.6) * 5) * dt;
@@ -1024,17 +1061,33 @@
       }
     }
   }
+  function drawRider(x, y, K, board) {                   // a small figure on a chair, in that rider's own colours
+    px2(x, y, 3, 2, K.helmet); px2(x, y + 2, 3, 1, K.lens); px2(x, y + 3, 3, 1, K.scarf); px2(x, y + 4, 3, 3, K.jacket); px2(x, y + 4, 1, 3, K.jacketSh);
+    px2(x, y + 7, 1, 3, K.pantsSh); px2(x + 2, y + 7, 1, 3, K.pants);
+    if (board) px2(x - 1, y + 10, 5, 1, K.ski); else { px2(x, y + 10, 1, 3, K.ski); px2(x + 2, y + 10, 1, 3, K.ski); }
+  }
+  function px2(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
   function drawLift(cx, cy) {                            // the chairlift that drops everyone at the top
     if (cy > 90) return;
-    const x = -cx, top = -44 - cy, t = performance.now() / 1000;
+    const x = -cx, top = LIFT_TOP - cy, t = performance.now() / 1000;
+    ctx.drawImage(SPR.ramp, x - 24, -30 - cy - 6);
     ctx.fillStyle = '#39415b'; ctx.fillRect(x - 12, 0, 1, Math.max(0, top)); ctx.fillRect(x + 12, 0, 1, Math.max(0, top));
+    ctx.fillStyle = '#6b7594'; ctx.fillRect(x - 11, 0, 1, Math.max(0, top)); ctx.fillRect(x + 13, 0, 1, Math.max(0, top));
     for (let ty = -190; ty > cy - 30; ty -= 170) ctx.drawImage(SPR.tower, x - SPR.tower.ax, ty - cy - SPR.tower.ay);
-    for (let i = 0; i < 9; i++) {
-      const u = (t * 22 + i * 66) % 594;
-      const ya = -44 - 594 + u - cy, yb = -44 - u - cy;   // arriving full on the left, leaving empty on the right
-      if (ya > -14 && ya < top - 4) ctx.drawImage(SPR.chairs[i % 3], x - 12 - 5, Math.round(ya));
-      if (yb > -14 && yb < top - 4) ctx.drawImage(SPR.chairs[3], x + 12 - 5, Math.round(yb));
+    for (let i = 0; i < LIFT_N; i++) {                    // empty chairs heading back down the far side
+      const yb = Math.round(LIFT_TOP - ((t * 22 + i * LIFT_GAP) % (LIFT_N * LIFT_GAP)) - cy);
+      if (yb > -16 && yb < top - 6) ctx.drawImage(SPR.chair, x + 12 - 6, yb);
     }
+    for (let i = 0; i < lift.length; i++) {               // loaded chairs coming up
+      const c = lift[i], ya = Math.round(c.y - cy);
+      if (ya < -16 || ya > top - 2) continue;
+      ctx.drawImage(SPR.chair, x - 12 - 6, ya);
+      for (let r = 0; r < c.riders.length; r++) {
+        const q = c.riders[r];
+        drawRider(x - 12 - 6 + (c.riders.length === 1 ? 5 : 2 + r * 6), ya + 2, (q.board ? BOARDERS : NPCS)[q.kit].K, q.board);
+      }
+    }
+    ctx.drawImage(SPR.hut, x + 38 - SPR.hut.ax, -40 - cy - SPR.hut.ay);
     ctx.drawImage(SPR.station, x - SPR.station.ax, -36 - cy - SPR.station.ay);
   }
   function drawSkier(cx, cy) {
