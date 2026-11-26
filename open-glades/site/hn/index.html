@@ -154,6 +154,21 @@
   footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; padding: 16px 0 32px; }
   footer a { color: var(--muted); }
 
+  /* back / forward pill, only when running as an installed app (no browser buttons there) */
+  .pwa-nav {
+    display: none; position: fixed; z-index: 6;
+    left: 50%; transform: translateX(-50%);
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    gap: 4px; padding: 4px;
+    background: var(--bg); border: 1.5px solid var(--rule); border-radius: 999px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  }
+  html.standalone .pwa-nav { display: flex; }
+  html.standalone main { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+  .pwa-nav button { display: grid; place-items: center; width: 3rem; height: 2.2rem; padding: 0; border: 0; border-radius: 999px; }
+  .pwa-nav button:disabled { opacity: 0.3; cursor: default; background: none; }
+  .pwa-nav svg { width: 1.2rem; height: 1.2rem; }
+
   @media (max-width: 600px) {
     header.bar .wrap { justify-content: space-between; }
     nav { order: 3; flex: 0 0 100%; justify-content: space-between; }
@@ -181,6 +196,15 @@
   </footer>
 </div>
 
+<div class="pwa-nav" role="group" aria-label="History">
+  <button id="nav-back" type="button" aria-label="Back" title="Back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <button id="nav-fwd" type="button" aria-label="Forward" title="Forward">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+  </button>
+</div>
+
 <script>
 (() => {
   'use strict';
@@ -203,6 +227,32 @@
   let token = 0;                 // guards against out-of-order renders
   let currentKey = null;
   let linkNav = false;           // true when navigation came from a click (vs back/forward)
+
+  // ---------- keeping your place ----------
+  // Scroll positions live in memory while you move around inside the reader. They are also
+  // written to sessionStorage when the page is hidden, so coming Back from an article on
+  // another site lands on the same story even if the browser had to reload the page.
+  const STATE_KEY = 'hn-nav-state';
+  function saveState() {
+    if (currentKey) scrollPos.set(currentKey, window.scrollY);
+    try {
+      sessionStorage.setItem(STATE_KEY, JSON.stringify({ scroll: [...scrollPos], shown: [...feedShown], ids: [...feedIds] }));
+    } catch (e) {}
+  }
+  function loadState() {
+    try {
+      // Only when arriving via Back/Forward: a fresh visit or a reload should start clean.
+      const entry = performance.getEntriesByType('navigation')[0];
+      if (!entry || entry.type !== 'back_forward') return;
+      const s = JSON.parse(sessionStorage.getItem(STATE_KEY) || 'null');
+      if (!s) return;
+      for (const [k, v] of s.scroll || []) scrollPos.set(k, v);
+      for (const [k, v] of s.shown || []) feedShown.set(k, v);
+      for (const [k, v] of s.ids || []) feedIds.set(k, v);
+    } catch (e) {}
+  }
+  window.addEventListener('pagehide', saveState);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveState(); });
 
   // ---------- helpers ----------
   function h(tag, props, ...kids) {
@@ -506,6 +556,27 @@
     paintTheme();
   });
   paintTheme();
+  loadState();
+
+  // ---------- installed-app back / forward ----------
+  const standaloneMq = matchMedia('(display-mode: standalone)');
+  const backBtn = document.getElementById('nav-back');
+  const fwdBtn = document.getElementById('nav-fwd');
+  function paintStandalone() {
+    document.documentElement.classList.toggle('standalone', standaloneMq.matches || navigator.standalone === true);
+  }
+  function paintHistory() {
+    // The Navigation API knows whether there is anywhere to go; without it, leave both enabled.
+    if (!window.navigation) return;
+    backBtn.disabled = !navigation.canGoBack;
+    fwdBtn.disabled = !navigation.canGoForward;
+  }
+  backBtn.addEventListener('click', () => history.back());
+  fwdBtn.addEventListener('click', () => history.forward());
+  standaloneMq.addEventListener('change', paintStandalone);
+  if (window.navigation) navigation.addEventListener('currententrychange', paintHistory);
+  paintStandalone();
+  paintHistory();
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
