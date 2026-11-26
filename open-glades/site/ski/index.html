@@ -13,7 +13,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Glade Run" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/vt323-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/pressstart2p-400-latin.woff2" crossorigin />
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
@@ -25,9 +25,15 @@
     body { touch-action: none; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
     #ski-canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; touch-action: none; }
     .ps { font-family: 'Press Start 2P', monospace; }
+    /* Installed app on iOS 26+ draws a blur ("scroll edge effect") over the top of the page, smearing the HUD.
+       WebKit skips it when it finds an opaque fixed element at the very top edge to take a colour from, and
+       colours the status bar to match. Same fix as Fairweather; the strip must stay hit-testable to be found. */
+    #edge { display: none; position: fixed; top: 0; left: 0; right: 0; height: calc(env(safe-area-inset-top, 0px) + 6px); background: #0b1121; z-index: 5; }
+    html.ios-app #edge { display: block; }
+    html.ios-app { --edge: 6px; background: #0b1121; }
 
     /* HUD */
-    #hud { position: fixed; inset: 0; pointer-events: none; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    #hud { position: fixed; left: 0; top: 0; width: 100%; height: var(--app-h, 100%); pointer-events: none; padding: calc(var(--edge, 0px) + max(10px, env(safe-area-inset-top))) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
     .hud-box { background: rgba(11,17,33,.82); border: 2px solid rgba(247,238,221,.7); box-shadow: 3px 3px 0 rgba(8,12,24,.35); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
     .hud-row { display: flex; align-items: center; gap: 10px; font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: .06em; color: var(--mute); white-space: nowrap; }
     .hud-row b { color: var(--cream); font-weight: 400; }
@@ -44,13 +50,13 @@
     body:not(.mode-play):not(.mode-pause) #hud { opacity: .0; }
     #hud { transition: opacity .2s; }
 
-    #btn-pause { pointer-events: auto; position: fixed; left: 50%; top: max(10px, env(safe-area-inset-top)); transform: translateX(-50%); }
+    #btn-pause { pointer-events: auto; position: fixed; left: 50%; top: calc(var(--edge, 0px) + max(10px, env(safe-area-inset-top))); transform: translateX(-50%); }
     .chip { font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .08em; color: var(--cream); background: rgba(11,17,33,.82); border: 2px solid rgba(247,238,221,.6); padding: 8px 10px; cursor: pointer; text-decoration: none; }
     .chip:hover { border-color: var(--gold); }
     body:not(.mode-play) #btn-pause { display: none; }
 
     /* touch controls: a thumb stick and glass buttons */
-    #touch { display: none; position: fixed; inset: 0; pointer-events: none; }
+    #touch { display: none; position: fixed; left: 0; top: 0; width: 100%; height: var(--app-h, 100%); pointer-events: none; }
     @media (pointer: coarse) { body.mode-play #touch { display: block; } }
     .glass { pointer-events: auto; touch-action: none; -webkit-tap-highlight-color: transparent; border-radius: 50%; color: var(--cream);
       background: linear-gradient(160deg, rgba(255,255,255,.34), rgba(120,150,200,.16) 45%, rgba(22,35,62,.3));
@@ -85,14 +91,14 @@
     }
 
     /* floating score popups */
-    #pops { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    #pops { position: fixed; left: 0; top: 0; width: 100%; height: var(--app-h, 100%); pointer-events: none; overflow: hidden; }
     .pop { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: .04em;
       color: var(--cream); text-shadow: 1px 1px 0 #0b1121, -1px 1px 0 #0b1121, 1px -1px 0 #0b1121, -1px -1px 0 #0b1121, 0 2px 0 #0b1121; animation: rise 1.15s steps(14) forwards; }
     .pop.gold { color: var(--gold); font-size: 10px; } .pop.bad { color: #ff9a8a; font-size: 11px; } .pop.dim { color: #cfe3f1; font-size: 8px; }
     @keyframes rise { 0% { opacity: 0; margin-top: 8px; } 12% { opacity: 1; margin-top: 0; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -34px; } }
 
     /* cards */
-    .veil { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(10,16,32,.42); overflow: auto; touch-action: pan-y; }
+    .veil { position: fixed; left: 0; top: 0; width: 100%; height: var(--app-h, 100%); display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(10,16,32,.42); overflow: auto; touch-action: pan-y; }
     .veil[hidden] { display: none; }
     .card { width: min(100%, 520px); max-height: 100%; overflow: auto; background: rgba(11,17,33,.95); border: 2px solid rgba(247,238,221,.75); box-shadow: 6px 6px 0 rgba(8,12,24,.5); padding: 20px 20px 18px; -webkit-user-select: text; user-select: text; }
     .card h1 { margin: 0; font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: clamp(20px, 6vw, 28px); letter-spacing: .04em; color: var(--cream); text-shadow: 3px 3px 0 #1f8a9c; }
@@ -142,6 +148,7 @@
   </style>
 </head>
 <body class="mode-menu">
+  <div id="edge" aria-hidden="true"></div>
   <canvas id="ski-canvas" aria-label="Glade Run game"></canvas>
   <div id="pops" aria-hidden="true"></div>
 
