@@ -324,7 +324,12 @@
     const phi = i * HALF / 4, sx = Math.sin(phi), cs = Math.cos(phi);
     const ox = 15, oy = air ? 18 : 20, lean = Math.round(sx * 2);
     const tip = air ? 5 : 7, tail = air ? 4 : 5, feet = [];
-    for (let s = -1; s <= 1; s += 2) {
+    if (K.board) {                                     // one board, two feet along it, riding side-on
+      const wx = Math.abs(sx) < 0.75 ? 1 : 0, wy = wx ? 0 : 1;
+      for (let w = 0; w < 2; w++) lineP(P, ox - sx * 6 + w * wx - (wx ? 0.5 : 0), oy - cs * 5 + w * wy, ox + sx * 6 + w * wx - (wx ? 0.5 : 0), oy + cs * 5 + w * wy, K.ski);
+      P(ox + sx * 6, oy + cs * 5, 1, 1, K.skiEdge); P(ox - sx * 6, oy - cs * 5, 1, 1, K.skiEdge);
+      feet.push([ox - sx * 2.5 - cs * 0.8, oy - cs * 2], [ox + sx * 2.5 + cs * 0.8, oy + cs * 2]);
+    } else for (let s = -1; s <= 1; s += 2) {
       const fx = ox + s * 2 * cs, fy = oy - s * 1.3 * sx; feet.push([fx, fy]);
       const bx = fx + sx * tip, by = fy + cs * tip * 0.8;
       lineP(P, fx - sx * tail, fy - cs * tail * 0.8, bx, by, K.ski);
@@ -376,11 +381,11 @@
     if (air) {
       P(tx - 2, oy - 14, 2, 4, K.jacketSh); P(tx + 6, oy - 14, 2, 4, K.jacket);
       P(tx - 2, oy - 16, 2, 2, K.glove); P(tx + 6, oy - 16, 2, 2, K.glove);
-      lineP(P, tx - 2, oy - 16, tx - 6, oy - 11, K.pole); lineP(P, tx + 7, oy - 16, tx + 11, oy - 11, K.pole);
+      if (!K.board) { lineP(P, tx - 2, oy - 16, tx - 6, oy - 11, K.pole); lineP(P, tx + 7, oy - 16, tx + 11, oy - 11, K.pole); }
     } else {
       P(tx - 2, oy - 11, 2, 4, K.jacketSh); P(tx + 6, oy - 11, 2, 4, K.jacket);
       P(tx - 2, oy - 7, 2, 2, K.glove); P(tx + 6, oy - 7, 2, 2, K.glove);
-      lineP(P, tx - 2, oy - 6, tx - 4, oy + 1, K.pole); lineP(P, tx + 7, oy - 6, tx + 9, oy + 1, K.pole);
+      if (!K.board) { lineP(P, tx - 2, oy - 6, tx - 4, oy + 1, K.pole); lineP(P, tx + 7, oy - 6, tx + 9, oy + 1, K.pole); }
     }
     const hx = ox + lean - 2 + side, hy = oy - 17;
     if (K.style === 'santa') {                         // belt, fur trim, hat and a proper beard
@@ -414,6 +419,21 @@
       P(5, 11, 5, 1, K.helmet); P(5, 12, 5, 1, K.strap); P(6, 12, 3, 1, K.lens); P(5, 13, 5, 2, K.skin); P(9, 14, 2, 2, K.scarf);
       P(8, 16, 2, 2, K.glove); lineP(P, 20, 16, 27, 12, K.pole);
     }, OUT);
+    if (K.board) {
+      o.crash = mk(30, 22, function (P) {               // boarder down: board flipped up beside them
+        P(3, 15, 13, 2, K.ski); P(3, 15, 1, 2, K.skiEdge); P(15, 15, 1, 2, K.skiEdge);
+        P(11, 10, 8, 5, K.jacket); P(11, 14, 8, 1, K.jacketSh); P(18, 8, 2, 5, K.pants); P(21, 10, 2, 4, K.pantsSh);
+        P(6, 9, 5, 1, K.helmet); P(6, 10, 5, 1, K.strap); P(7, 10, 3, 1, K.lens); P(6, 11, 5, 2, K.skin); P(20, 14, 2, 2, K.glove);
+      }, OUT);
+      o.sit = mk(20, 18, function (P) {                 // sitting in the run, facing downhill, board across the feet
+        P(8, 1, 3, 1, K.helmetHi); P(7, 2, 5, 3, K.helmet); P(7, 4, 5, 1, K.strap);
+        P(6, 5, 7, 5, K.jacket); P(6, 5, 1, 5, K.jacketSh); P(7, 7, 5, 1, K.accent);
+        P(4, 6, 2, 4, K.jacketSh); P(13, 6, 2, 4, K.jacket); P(4, 10, 2, 1, K.glove); P(13, 10, 2, 1, K.glove);
+        P(7, 10, 2, 4, K.pantsSh); P(10, 10, 2, 4, K.pants);
+        P(3, 14, 13, 2, K.ski); P(3, 14, 1, 2, K.skiEdge); P(15, 14, 1, 2, K.skiEdge); P(7, 13, 2, 1, K.boot); P(10, 13, 2, 1, K.boot);
+      }, OUT);
+      o.sit.ax = 10; o.sit.ay = 12;
+    }
     o.stuck = mk(22, 16, function (P) {                 // head and ski tips poking out of a tree well
       lineP(P, 3, 9, 5, 2, K.ski); lineP(P, 18, 9, 16, 1, K.ski);
       P(9, 5, 3, 1, K.helmetHi); P(8, 6, 5, 1, K.helmet); P(8, 7, 5, 1, K.strap); P(9, 7, 3, 1, K.lens); P(8, 8, 5, 1, K.skin);
@@ -494,6 +514,12 @@
         const y = y0 + 12 + R() * 60, x = pisteC(y, pk) + (R() - 0.5) * pisteHW(y, pk);
         m.objs.push({ t: 'kick', x: Math.round(x), y: Math.round(y), spr: SPR.kick, ground: true });
         m.clear.push([x - 14, y - 34, x + 14, y + 135]);
+      } else if (y0 > 320 && roll > 0.86) {               // a boarder or two, sat down in the middle of the run
+        const sy = y0 + 20 + R() * 80, sxm = pisteC(sy, pk) + (R() - 0.5) * pisteHW(sy, pk) * 0.5, two = R() < 0.42;
+        for (let e = 0; e < (two ? 2 : 1); e++) {
+          m.objs.push({ t: 'sitter', x: Math.round(sxm + e * (11 + R() * 5)), y: Math.round(sy + e * (R() * 6 - 3)), r: 3.5, h: 10, spr: BOARDERS[Math.floor(R() * BOARDERS.length)].sit, sh: SPR.shS, msg: 'SORRY, DUDE!', hop: 'BOARDER HOP' });
+        }
+        m.clear.push([sxm - 12, sy - 12, sxm + 28, sy + 12]);
       } else if (y0 > 200 && roll < 0.5) {
         const iy = y0 + 30 + R() * 70, hw = pisteHW(iy, pk);
         if (hw > 52) {
@@ -632,7 +658,7 @@
     s.x = 0; s.y = 0; s.th = HALF * 0.999; s.v = 0; s.z = 0; s.vz = 0; s.state = 'idle'; s.timer = 0; s.inv = 0; s.hops = [];
     run.t = 0; run.score = 0; run.falls = 0; run.clean = 0; run.bestClean = 0; run.jumps = 0; run.bigAir = 0; run.items = 0; run.top = 0; run.token = null;
     look = 0; camX = s.x - W / 2; camY = s.y - skierRow();
-    npcs.length = 0; npcT = 0;                           // the crowd just off the lift, setting off one by one
+    npcs.length = 0; npcT = 0; ntracks.length = 0;                           // the crowd just off the lift, setting off one by one
     for (let i = 0; i < 9; i++) {
       const side = i % 2 ? 1 : -1, x = side * (13 + Math.random() * 62), y = -24 + Math.random() * 46;
       npcs.push(newNpc(0, x, y, 55 + Math.random() * 70, { state: 'wait', timer: 0.25 + Math.random() * 5.5, th: [HALF, -HALF, 0.7, -0.7, 0][i % 5], off: clamp(x / 80, -0.8, 0.8) }));
@@ -744,16 +770,20 @@
   // ---- other skiers -----------------------------------------------------------------------
   const NPC_COL = [['#8e5bd0', '#6a3fa6'], ['#3fa56a', '#2c7a4c'], ['#e8c53a', '#b99522'], ['#e06aa8', '#b24782'], ['#3d7fd6', '#2a5aa3'], ['#d9534f', '#a83a37'], ['#f1f1f1', '#c9d0dc'], ['#2b3550', '#1b2236'], ['#ff9a3c', '#c9701f'], ['#58c7c2', '#3a9490']];
   const NPC_PANTS = [['#2b3550', '#1b2236'], ['#465689', '#35426c'], ['#5a4a86', '#443867'], ['#3a3a3a', '#242424'], ['#7a5539', '#573a26']];
+  const BOARDERS = [], ntracks = [];
   function buildNpcs() {
     const out = [];
     for (let i = 0; i < 10; i++) {
       const j = NPC_COL[i], pp = NPC_PANTS[(i * 3) % 5], h = NPC_COL[(i * 7 + 3) % 10], sk = NPC_COL[(i * 5 + 1) % 10];
-      out.push(buildSkier(Object.assign({}, KITS.A, { jacket: j[0], jacketSh: j[1], accent: pp[0], pants: pp[0], pantsSh: pp[1], helmet: h[0], helmetHi: h[0], scarf: h[0], scarfSh: h[1], ski: sk[0], skiEdge: sk[1], pom: i % 3 === 0 ? '#ffffff' : undefined })));
+      const kitN = Object.assign({}, KITS.A, { jacket: j[0], jacketSh: j[1], accent: pp[0], pants: pp[0], pantsSh: pp[1], helmet: h[0], helmetHi: h[0], scarf: h[0], scarfSh: h[1], ski: sk[0], skiEdge: sk[1], pom: i % 3 === 0 ? '#ffffff' : undefined });
+      out.push(buildSkier(kitN));
+      BOARDERS.push(buildSkier(Object.assign({}, kitN, { board: 1, jacket: NPC_COL[(i + 4) % 10][0], jacketSh: NPC_COL[(i + 4) % 10][1] })));
     }
     return out;
   }
   function newNpc(k, x, y, vt, o) {
-    const n = { t: 'npc', k: k, x: x, y: y, v: vt, vt: vt, th: 0, off: (Math.random() * 2 - 1) * 0.7, ph: Math.random() * 6.28, rate: 1.1 + Math.random() * 1.5, amp: 0.2 + Math.random() * 0.45, spr: NPCS[Math.floor(Math.random() * NPCS.length)], state: 'ski', timer: 0, inv: 0 };
+    const n = { t: 'npc', k: k, x: x, y: y, v: vt, vt: vt, th: 0, off: (Math.random() * 2 - 1) * 0.7, ph: Math.random() * 6.28, rate: 1.1 + Math.random() * 1.5, amp: 0.2 + Math.random() * 0.45, spr: NPCS[Math.floor(Math.random() * NPCS.length)], state: 'ski', timer: 0, inv: 0, lx: x, ly: y };
+    if (Math.random() < 0.36) { n.board = 1; n.spr = BOARDERS[Math.floor(Math.random() * BOARDERS.length)]; n.rate *= 0.75; n.amp = Math.min(0.75, n.amp * 1.5); }   // boarders carve wider, slower arcs
     if (o) for (const key in o) n[key] = o[key];
     if (n.state === 'wait') n.v = 0;
     return n;
@@ -786,6 +816,10 @@
       if (pdy > 2 && pdy < 50 && Math.abs(pdx) < 13) th = pdx >= 0 ? -1.05 : 1.05;
       n.th += (th - n.th) * Math.min(1, 4.5 * dt);
       n.x += Math.sin(n.th) * n.v * dt; n.y += Math.cos(n.th) * n.v * dt;
+      if (Math.abs(n.x - n.lx) + Math.abs(n.y - n.ly) > 1.5) {   // everyone leaves tracks: two for skis, one for a board
+        n.lx = n.x; n.ly = n.y; ntracks.push({ x: n.x, y: n.y, c: Math.cos(n.th), n: Math.sin(n.th), b: n.board });
+        if (ntracks.length > 2600) ntracks.splice(0, 400);
+      }
       if (!s.hold && n.inv <= 0 && s.inv <= 0 && s.z < 10 && (s.state === 'ski' || s.state === 'air') && pdx * pdx + pdy * pdy * 1.6 < 34) {
         n.state = 'fall'; n.timer = 1.7; fall(Math.random() < 0.5 ? 'SORRY!' : 'ON YOUR LEFT!');
       }
@@ -904,6 +938,11 @@
     drawPistes(cx, cy);
     for (let i = 0; i < vis.length; i++) { const o = vis[i]; if (o.wr) ctx.drawImage(SPR.well, o.x - cx - SPR.well.ax, o.y - cy - SPR.well.ay); }
     ctx.fillStyle = C.track;
+    for (let i = 0; i < ntracks.length; i++) {
+      const p = ntracks[i], x = p.x - cx, y = p.y - cy; if (y < -4 || y > H + 4 || x < -4 || x > W + 4) continue;
+      if (p.b) ctx.fillRect(Math.round(x) - 1, Math.round(y), 2, 1);
+      else { ctx.fillRect(Math.round(x + p.c * 2), Math.round(y - p.n * 1.3), 1, 1); ctx.fillRect(Math.round(x - p.c * 2), Math.round(y + p.n * 1.3), 1, 1); }
+    }
     for (let i = 0; i < tracks.length; i++) {
       const p = tracks[i], x = p.x - cx, y = p.y - cy; if (y < -4 || y > H + 4) continue;
       ctx.fillRect(Math.round(x + p.c * 2), Math.round(y - p.n * 1.3), 1, 1); ctx.fillRect(Math.round(x - p.c * 2), Math.round(y + p.n * 1.3), 1, 1);
