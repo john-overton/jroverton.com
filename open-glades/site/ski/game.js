@@ -655,9 +655,8 @@
     for (let i = 0; i < Math.round(W * H / 2600); i++) flakes.push({ x: Math.random() * W, y: Math.random() * H, v: 14 + Math.random() * 22, w: Math.random() * 6.28, big: Math.random() < 0.25 });
   }
 
-  // How far down the screen the skier sits. In the installed iPhone app the score panels are pushed down
-  // clear of the status bar, so the skier moves down by the same amount to stay clear of them.
-  function skierRow() { return Math.round(H * 0.3 + (IOS_APP ? 50 / SCALE : 0)); }
+  // How far down the screen the skier sits.
+  function skierRow() { return Math.round(H * 0.3); }
   function resetWorld() {
     seed = Math.floor(Math.random() * 1e9) | 0;
     chunks = new Map(); majors = new Map(); pz0 = vnoise(0, 0, seed + 33);
@@ -952,16 +951,19 @@
     return SKYKEYS[SKYKEYS.length - 1][1];
   }
 
-  // iOS 26 leaves a strip along the bottom of a home-screen app that it will not let the page paint into
-  // (a WebKit regression: the paintable area is short by the status bar's height). The strip shows the
-  // page background, so keep that matched to the snow, the time of day and any dimming card on top.
-  let edgeCol = '';
+  // The installed iPhone app has an opaque band behind the clock, coloured from the page. Keep the page
+  // background (and the hairline at the top edge that iOS samples) on the colour of the snow, following the
+  // time of day. iOS holds on to the first colour it sampled; swapping in a fresh copy of the hairline makes
+  // it look again, so that is done at most every few seconds while the light is changing.
+  let edgeCol = '', edgeAt = 0;
   function syncEdge() {
     let c = hexRgb(C.snow);
-    if (run.t > 40) { const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(tintAt(run.t)); if (m) c = [c[0] * m[1] / 255, c[1] * m[2] / 255, c[2] * m[3] / 255]; }
-    if (mode !== 'play') c = [c[0] * 0.58 + 10 * 0.42, c[1] * 0.58 + 16 * 0.42, c[2] * 0.58 + 32 * 0.42];   // under a card's veil
-    const col = 'rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ')';
-    if (col !== edgeCol) { edgeCol = col; document.documentElement.style.background = col; document.body.style.background = col; }
+    if (run.t > 40 && mode !== 'menu') { const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(tintAt(run.t)); if (m) c = [c[0] * m[1] / 255, c[1] * m[2] / 255, c[2] * m[3] / 255]; }
+    const col = 'rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ')', now = performance.now();
+    if (col === edgeCol || now - edgeAt < 3000) return;
+    edgeCol = col; edgeAt = now;
+    document.documentElement.style.background = col; document.body.style.background = col;
+    const e = $('edge'); if (e) { const f = e.cloneNode(false); f.style.background = col; e.replaceWith(f); }
   }
 
   // ---- drawing ----------------------------------------------------------------------------

@@ -6,7 +6,7 @@
   <title>Glade Run — Open Glades</title>
   <meta name="description" content="Glade Run: a cozy pixel-art downhill ski game from Open Glades. Thread the trees, hop the logs, drop the cliffs." />
   <link rel="canonical" href="https://openglades.com/ski/" />
-  <meta name="theme-color" content="#0a1020" />
+  <meta name="theme-color" content="#f2f6fb" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -25,9 +25,10 @@
     body { touch-action: none; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
     #ski-canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; touch-action: none; }
     .ps { font-family: 'Press Start 2P', monospace; }
-    /* Installed iPhone app: iOS blurs whatever sits under the status bar, so the score panels and the pause
-       button start below that zone. */
-    html.ios-app { --edge: 50px; }
+    /* Installed iPhone app: with the "default" status bar style iOS draws an opaque band behind the clock and
+       starts the page below it. It takes the band's colour from the page, and from a fixed opaque element at
+       the very top edge when there is one, so this hairline carries the colour of the snow. */
+    #edge { position: fixed; top: 0; left: 0; right: 0; height: 1px; background: #f2f6fb; z-index: 5; }
 
     #diag { margin-top: 14px; font-size: 15px; line-height: 1.15; color: #7f8ba3; white-space: pre-line; }
     #probe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
@@ -153,6 +154,7 @@
   </style>
 </head>
 <body class="mode-menu">
+  <div id="edge" aria-hidden="true"></div>
   <canvas id="ski-canvas" aria-label="Glade Run game"></canvas>
   <div id="pops" aria-hidden="true"></div>
   <div id="probe" aria-hidden="true"></div>
