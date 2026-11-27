@@ -103,6 +103,21 @@
     .pop { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: .04em;
       color: var(--cream); text-shadow: 1px 1px 0 #0b1121, -1px 1px 0 #0b1121, 1px -1px 0 #0b1121, -1px -1px 0 #0b1121, 0 2px 0 #0b1121; animation: rise 1.15s steps(14) forwards; }
     .pop.gold { color: var(--gold); font-size: 10px; } .pop.bad { color: #ff9a8a; font-size: 11px; } .pop.dim { color: #cfe3f1; font-size: 8px; }
+    .pop.trick { color: #4ff0ff; font-size: min(var(--fs, 16px), 5.4vw); text-align: center; line-height: 1.25; z-index: 2; animation: boom var(--dur, 1.6s) linear forwards;
+      text-shadow: 2px 2px 0 #0b1121, -2px 2px 0 #0b1121, 2px -2px 0 #0b1121, -2px -2px 0 #0b1121, 0 4px 0 #0b1121, 0 0 14px rgba(79,240,255,.9); }
+    .pop.trick small { display: block; white-space: normal; width: max-content; max-width: 86vw; margin: 7px auto 0; line-height: 1.5; font-size: min(9px, 2.5vw); color: var(--cream); text-shadow: 1px 1px 0 #0b1121, -1px 1px 0 #0b1121, 1px -1px 0 #0b1121, -1px -1px 0 #0b1121, 0 2px 0 #0b1121; }
+    .pop.trick.t2, .pop.trick.t3 { animation: boom var(--dur, 1.8s) linear forwards, flash .16s steps(2) 6; }
+    @keyframes boom { 0% { opacity: 0; scale: .1; rotate: -16deg; } 9% { opacity: 1; scale: 1.4; rotate: 6deg; } 16% { scale: .9; rotate: -4deg; } 23% { scale: 1.12; rotate: 2deg; } 30% { scale: 1; rotate: 0deg; }
+      78% { opacity: 1; scale: 1; margin-top: 0; } 100% { opacity: 0; scale: 1.3; margin-top: -46px; } }
+    @keyframes flash { 50% { color: #fff; } }
+    .spark { position: absolute; margin: -2px 0 0 -2px; box-shadow: 0 0 0 1px #0b1121; animation: fly .7s cubic-bezier(.1,.7,.3,1) forwards; }
+    @keyframes fly { 70% { opacity: 1; } 100% { translate: var(--dx) var(--dy); opacity: 0; scale: .3; } }
+    #ski-canvas.shake { animation: shake .36s steps(6); }
+    @keyframes shake { 0%, 100% { translate: 0 0; } 20% { translate: -5px 3px; } 40% { translate: 5px -4px; } 60% { translate: -4px -2px; } 80% { translate: 3px 3px; } }
+    .say { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-family: 'VT323', monospace; font-size: 17px; line-height: 1; color: var(--navy); background: #fff;
+      padding: 2px 6px 3px; border: 2px solid #0b1121; box-shadow: 2px 2px 0 rgba(11,17,33,.35); opacity: 0; animation: say 1.75s steps(12) forwards; }
+    .say::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 6px; height: 6px; margin-left: -3px; background: #fff; border-right: 2px solid #0b1121; border-bottom: 2px solid #0b1121; transform: rotate(45deg) translate(-2px, -2px); }
+    @keyframes say { 0% { opacity: 0; scale: .4; } 8% { opacity: 1; scale: 1.12; } 14% { scale: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
     @keyframes rise { 0% { opacity: 0; margin-top: 8px; } 12% { opacity: 1; margin-top: 0; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -34px; } }
 
     /* cards */
@@ -190,8 +205,10 @@
       <p class="sub">Thread the trees. Hop the logs. Drop the cliffs. Three falls and it&rsquo;s cocoa time.</p>
       <ul class="how">
         <li class="desk"><kbd>&larr;</kbd><kbd>&rarr;</kbd> steer &nbsp; <kbd>&darr;</kbd> point it &nbsp; <kbd>&uarr;</kbd> brake &nbsp; <kbd>SPACE</kbd> jump</li>
+        <li class="desk">Tricks: tap <kbd>SPACE</kbd> in the air. <kbd>&darr;</kbd> front flip, <kbd>&uarr;</kbd> backflip, <kbd>&larr;</kbd><kbd>&rarr;</kbd> spin. Finish the flip before you land.</li>
         <li class="desk">Or steer toward the mouse and click to jump.</li>
         <li class="touch">Push the stick the way you want to go: down to point it, sideways to traverse. JUMP hops, BRAKE stops.</li>
+        <li class="touch">Tricks: tap JUMP in the air. Stick down flips forward, up flips back, sideways spins. Finish the flip before you land.</li>
         <li>Big pines hide tree wells. Kickers and cliffs are free air.</li>
         <li>Groomed runs are faster and busier: dodge the other skiers. Speed earns points.</li>
         <li>Grab lost gloves, phones and poles for points. A heart gives a life back.</li>

@@ -409,6 +409,124 @@
     P(hx, hy + 4, 5, 1, K.scarf); P(hx, hy + 4, 1, 1, K.scarfSh);
     if (K.pom) P(hx + 2, hy - 1, 1, 1, K.pom);
   }
+  // ---- trick sprites: what a flip or a spin looks like from down the hill ----------------------
+  // Heads first, since every character wears a different one. (x, y) is the top-left of a 5x5 box;
+  // view is 'front', 'back', 'side' (facing right) or 'top' (looking down on the crown).
+  function trickHead(P, K, x, y, v) {
+    const f = v === 'front', sd = v === 'side';
+    if (K.style === 'snowman') {
+      if (v === 'top') { P(x - 1, y, 7, 5, OUTHEX); P(x + 1, y + 1, 3, 3, C.red); P(x + 2, y + 2, 1, 1, OUTHEX); P(x + 2, y + 5, 1, 1, C.carrot); return; }
+      P(x, y + 1, 5, 4, C.white); P(x, y + 1, 1, 4, C.snowSh);
+      if (f) { P(x + 1, y + 2, 1, 1, OUTHEX); P(x + 3, y + 2, 1, 1, OUTHEX); P(x + 2, y + 3, 1, 1, C.carrot); }
+      if (sd) { P(x + 3, y + 2, 1, 1, OUTHEX); P(x + 4, y + 3, 3, 1, C.carrot); }
+      P(x - 1, y, 7, 1, OUTHEX); P(x + 1, y - 3, 3, 3, OUTHEX); P(x + 1, y - 1, 3, 1, C.red);
+      return;
+    }
+    if (K.style === 'sasquatch') {
+      if (v === 'top') { P(x, y, 5, 5, K.jacket); P(x, y, 1, 5, K.jacketSh); P(x + 1, y + 1, 3, 2, K.helmetHi); P(x + 1, y + 4, 3, 1, K.skin); return; }
+      P(x + 1, y - 1, 3, 1, K.helmetHi); P(x, y, 5, 5, K.jacket); P(x, y, 1, 5, K.jacketSh);
+      if (f) { P(x + 1, y + 1, 3, 3, K.skin); P(x + 1, y + 1, 3, 1, K.skinSh); P(x + 1, y + 2, 1, 1, OUTHEX); P(x + 3, y + 2, 1, 1, OUTHEX); P(x + 2, y + 3, 1, 1, K.boot); }
+      else if (sd) { P(x + 3, y + 1, 2, 3, K.skin); P(x + 3, y + 1, 2, 1, K.skinSh); P(x + 3, y + 2, 1, 1, OUTHEX); P(x + 4, y + 3, 1, 1, K.boot); }
+      else P(x + 1, y + 3, 3, 1, K.jacketSh);
+      return;
+    }
+    if (K.style === 'santa') {
+      if (v === 'top') { P(x, y, 5, 4, K.jacket); P(x, y, 1, 4, K.jacketSh); P(x, y + 3, 5, 1, C.white); P(x + 2, y + 1, 2, 2, C.white); P(x + 1, y + 4, 3, 1, C.white); return; }
+      P(x + 1, y - 1, 3, 1, K.jacket); P(x, y, 5, 1, K.jacket); P(sd ? x - 1 : x + 4, y - 1, 2, 2, C.white); P(x, y + 1, 5, 1, C.white);
+      if (f) { P(x, y + 2, 5, 1, K.skin); P(x + 1, y + 2, 1, 1, OUTHEX); P(x + 3, y + 2, 1, 1, OUTHEX); P(x, y + 3, 5, 2, C.white); P(x + 2, y + 3, 1, 1, '#e79a8a'); P(x + 1, y + 5, 3, 1, C.white); }
+      else if (sd) { P(x, y + 2, 2, 1, C.white); P(x + 2, y + 2, 3, 1, K.skin); P(x + 3, y + 2, 1, 1, OUTHEX); P(x + 5, y + 2, 1, 1, '#e79a8a'); P(x + 1, y + 3, 5, 2, C.white); P(x + 3, y + 5, 3, 1, C.white); }
+      else { P(x, y + 2, 5, 2, C.white); P(x, y + 3, 1, 1, C.snowSh); }
+      return;
+    }
+    if (v === 'top') { P(x, y, 5, 4, K.helmet); P(x + 1, y + 1, 3, 2, K.helmetHi); P(x, y + 4, 5, 1, K.strap); P(x + 1, y + 4, 3, 1, K.lens); if (K.pom) P(x + 2, y + 2, 1, 1, K.pom); return; }
+    P(x + 1, y, 3, 1, K.helmetHi); P(x, y + 1, 5, 1, K.helmet); P(x, y + 2, 5, 1, K.strap);
+    if (f) { P(x + 1, y + 2, 3, 1, K.lens); P(x + 3, y + 2, 1, 1, K.lensHi); P(x, y + 3, 5, 1, K.skin); P(x, y + 3, 1, 1, K.skinSh); }
+    else if (sd) { P(x + 3, y + 2, 2, 1, K.lens); P(x + 4, y + 2, 1, 1, K.lensHi); P(x, y + 3, 2, 1, K.helmet); P(x + 2, y + 3, 3, 1, K.skin); }
+    else P(x, y + 3, 5, 1, K.helmet);
+    P(x, y + 4, 5, 1, K.scarf); P(x, y + 4, 1, 1, K.scarfSh);
+    if (K.pom) P(x + 2, y - 1, 1, 1, K.pom);
+  }
+  function trickTorso(P, K, x, y, w, h) {
+    if (K.style === 'snowman') { P(x, y, w, h, C.white); P(x, y, 1, h, C.snowSh); P(x + 1, y + h - 1, w - 1, 1, C.snowSh); P(x, y, w, 1, K.scarf); return; }
+    P(x, y, w, h, K.jacket); P(x, y, 1, h, K.jacketSh); P(x, y + h - 1, w, 1, K.jacketSh);
+    if (K.style === 'santa') { P(x, y + h - 3, w, 1, OUTHEX); P(x, y + h - 1, w, 1, C.white); }
+    else if (K.style === 'sasquatch') { P(x + 2, y + 2, 2, 1, K.jacketSh); P(x + w - 3, y + h - 3, 2, 1, K.jacketSh); }
+    else P(x + 1, y + 2, w - 1, 1, K.accent);
+  }
+  function buildTricks(K) {
+    const snow = K.style === 'snowman', big = K.style === 'sasquatch';
+    const leg = snow ? C.white : K.pants, legSh = snow ? C.snowSh : K.pantsSh, boot = snow ? OUTHEX : K.boot;
+    const arm = snow ? K.glove : K.jacket, armSh = snow ? K.glove : K.jacketSh;
+    const cuff = function (P, x, y) { if (K.style === 'santa') P(x, y, 2, 1, C.white); };
+    const make = function (fn, flipX, flipY) {
+      return mk(30, 34, function (P) {
+        fn(function (x, y, w, h, c) { x = Math.round(x); y = Math.round(y); P(flipX ? 30 - x - w : x, flipY ? 31 - y - h : y, w, h, c); });
+      }, OUT);
+    };
+    // seen from behind, in the air: the ordinary air pose with the face, buttons and buckle painted out
+    const back = function (P) {
+      skierPose(function (x, y, w, h, c) { P(x, y + 4, w, h, c); }, K, 0, true);
+      if (snow) { P(15, 12, 1, 1, C.white); P(15, 14, 1, 1, C.white); P(15, 17, 1, 1, C.white); P(13, 5, 5, 4, C.white); trickHead(P, K, 13, 4, 'back'); }
+      else if (big) { P(14, 11, 3, 3, K.jacket); P(13, 9, 1, 1, K.jacket); P(17, 13, 1, 1, K.jacket); P(15, 10, 1, 4, K.jacketSh); trickHead(P, K, 13, 3, 'back'); }
+      else if (K.style === 'santa') { P(14, 13, 2, 1, OUTHEX); P(14, 10, 3, 1, K.jacket); trickHead(P, K, 13, 5, 'back'); }
+      else trickHead(P, K, 13, 5, 'back');
+    };
+    // side on, facing right: skis level, knees bent, hands forward, poles trailing
+    const side = function (P) {
+      if (K.board) { P(7, 24, 14, 2, K.ski); P(6, 24, 1, 1, K.skiEdge); P(21, 24, 1, 1, K.skiEdge); P(21, 23, 1, 1, K.ski); }
+      else { P(5, 24, 17, 1, K.ski); P(22, 23, 1, 1, K.ski); P(23, 22, 1, 1, K.skiEdge); P(5, 24, 1, 1, K.skiEdge); }
+      if (snow) { P(11, 16, 7, 7, C.white); P(11, 16, 2, 7, C.snowSh); P(12, 22, 6, 1, C.snowSh); P(16, 18, 1, 1, OUTHEX); trickTorso(P, K, 12, 11, 5, 5); P(16, 13, 1, 1, OUTHEX); }
+      else {
+        P(12, 22, 4, 2, boot); P(13, 19, 3, 3, legSh); P(13, 17, 5, 2, leg);
+        if (big) {                                       // shaggy back, and the scarf streaming out behind
+          trickTorso(P, K, 10, 10, 7, 7); P(9, 12, 1, 3, K.jacketSh);
+          P(11, 9, 6, 1, K.scarf); P(11, 9, 1, 1, K.scarfSh);
+          P(8, 9, 3, 2, K.scarf); P(6, 8, 3, 2, K.scarf); P(3, 7, 4, 2, K.scarf); P(1, 8, 3, 2, K.scarf); P(0, 10, 2, 1, K.scarfSh);
+          P(8, 10, 2, 1, K.scarfSh); P(4, 8, 2, 1, K.scarfSh); P(1, 9, 2, 1, K.scarfSh);
+        } else trickTorso(P, K, 11, 11, 5, 7);
+      }
+      if (!K.board) lineP(P, 18, 14, 8, 20, K.pole);
+      P(15, 12, 4, 2, arm); P(15, 13, 4, 1, armSh); cuff(P, 18, 12); P(19, 11, 2, 2, K.glove);
+      trickHead(P, K, big ? 12 : 12, big ? 4 : 6, 'side');
+    };
+    // a quarter of the way into a front flip: diving at the camera, crown first, skis up behind
+    const dive = function (P) {
+      if (K.board) { P(7, 6, 17, 3, K.ski); P(6, 7, 1, 1, K.skiEdge); P(24, 7, 1, 1, K.skiEdge); P(8, 8, 15, 1, K.skiEdge); }
+      else {
+        lineP(P, 12, 10, 9, 2, K.ski); lineP(P, 13, 10, 10, 2, K.ski); lineP(P, 18, 10, 21, 2, K.ski); lineP(P, 17, 10, 20, 2, K.ski);
+        P(9, 1, 2, 1, K.skiEdge); P(20, 1, 2, 1, K.skiEdge);
+      }
+      if (!snow) { P(11, 9, 3, 2, boot); P(17, 9, 3, 2, boot); P(11, 11, 3, 2, legSh); P(17, 11, 3, 2, leg); }
+      else { P(11, 8, 9, 5, C.white); P(11, 8, 2, 5, C.snowSh); }
+      trickTorso(P, K, big ? 9 : 10, 13, big ? 13 : 11, big ? 6 : 5);
+      P(6, 14, 4, 2, armSh); P(21, 14, 4, 2, arm); cuff(P, 6, 14); cuff(P, 23, 14); P(4, 14, 2, 2, K.glove); P(25, 14, 2, 2, K.glove);
+      if (!K.board) { lineP(P, 4, 13, 2, 8, K.pole); lineP(P, 26, 13, 28, 8, K.pole); }
+      trickHead(P, K, 13, big ? 18 : 17, 'top');
+    };
+    // three quarters round (or a quarter into a backflip): laid back, ski bases to the camera, face between them
+    const soles = function (P) {
+      trickTorso(P, K, big ? 9 : 10, 13, big ? 13 : 11, 5);
+      P(6, 13, 4, 2, armSh); P(21, 13, 4, 2, arm); cuff(P, 6, 13); cuff(P, 23, 13); P(4, 12, 2, 2, K.glove); P(25, 12, 2, 2, K.glove);
+      if (!K.board) { lineP(P, 4, 12, 1, 18, K.pole); lineP(P, 26, 12, 29, 18, K.pole); }
+      trickHead(P, K, 13, big ? 7 : 8, 'front');
+      P(12, 17, 7, 3, leg); P(12, 17, 2, 3, legSh);
+      if (K.board) { P(6, 15, 19, 5, K.skiEdge); P(7, 16, 17, 3, K.ski); P(5, 16, 1, 3, K.skiEdge); P(25, 16, 1, 3, K.skiEdge); P(10, 17, 2, 1, boot); P(19, 17, 2, 1, boot); return; }
+      P(9, 6, 3, 19, K.skiEdge); P(19, 6, 3, 19, K.skiEdge); P(10, 7, 1, 17, K.ski); P(20, 7, 1, 17, K.ski);
+      P(10, 5, 1, 1, K.skiEdge); P(20, 5, 1, 1, K.skiEdge); P(9, 15, 3, 2, boot); P(19, 15, 3, 2, boot);
+    };
+    return {
+      // flip[q]: q quarter turns forward (a backflip runs the same frames the other way); spin[q]: quarter turns to the right
+      flip: [null, make(dive), make(back, false, true), make(soles)],
+      flipM: [null, make(dive, true), make(back, true, true), make(soles, true)],
+      spin: [null, make(side), make(back), make(side, true)]
+    };
+  }
+  function trickFrame(spr, flip, spin) {                 // the drawn frame for this much flip and spin, or null when upright
+    const fq = ((Math.round(flip / HALF) % 4) + 4) % 4, sq = ((Math.round(spin / HALF) % 4) + 4) % 4;
+    if (!fq && !sq) return null;
+    const T = spr.trick || (spr.trick = buildTricks(spr.K));
+    return fq ? (sq === 1 || sq === 2 ? T.flipM : T.flip)[fq] : T.spin[sq];
+  }
   function buildSkier(K) {
     const o = { dir: [], air: [], K: K };
     for (let i = -4; i <= 4; i++) {
@@ -653,7 +771,7 @@
   let W = 480, H = 270, SCALE = 3;
   let mode = 'menu';                 // menu | play | pause | over
   let kit = 'A';
-  const s = { x: 0, y: 0, th: HALF, v: 0, z: 0, vz: 0, state: 'idle', timer: 0, inv: 0, airT: 0, from: '', hops: [], well: null };
+  const s = { x: 0, y: 0, th: HALF, v: 0, z: 0, vz: 0, state: 'idle', timer: 0, inv: 0, airT: 0, from: '', hops: [], well: null, flip: 0, spin: 0, flipT: 0, spinT: 0, trk: 0 };
   const run = { t: 0, score: 0, falls: 0, clean: 0, bestClean: 0, jumps: 0, bigAir: 0, items: 0, top: 0, token: null, started: 0 };
   let camX = 0, camY = 0, look = 0;
   const vis = [], tracks = [], parts = [], flakes = [], smoke = [], npcs = [];
@@ -684,7 +802,7 @@
     chunks = new Map(); majors = new Map(); pz0 = vnoise(0, 0, seed + 33);
     tracks.length = 0; parts.length = 0; smoke.length = 0;
     s.x = 0; s.y = 0; s.th = HALF * 0.999; s.v = 0; s.z = 0; s.vz = 0; s.state = 'idle'; s.timer = 0; s.inv = 0; s.hops = [];
-    run.t = 0; run.score = 0; run.falls = 0; run.clean = 0; run.bestClean = 0; run.jumps = 0; run.bigAir = 0; run.items = 0; run.top = 0; run.token = null;
+    run.t = 0; run.score = 0; run.falls = 0; run.clean = 0; run.bestClean = 0; run.jumps = 0; run.bigAir = 0; run.items = 0; run.top = 0; run.tricks = 0; run.token = null;
     look = 0; camX = s.x - W / 2; camY = s.y - skierRow();
     npcs.length = 0; npcT = 0; ntracks.length = 0; resetLift();                           // the crowd just off the lift, setting off one by one
     for (let i = 0; i < 9; i++) {
@@ -701,6 +819,40 @@
     el.style.top = Math.round((s.y - camY - s.z - 26) * SCALE - pops.childElementCount * 16) + 'px';
     pops.appendChild(el); setTimeout(function () { el.remove(); }, 1150);
   }
+  // Riders nearby pass comment on a good trick or a wipe-out: little speech bubbles that follow whoever said it.
+  const says = [];
+  const CHEERS = [['nice!', 'sweet', 'yew!', 'clean!', 'tidy', 'smooth', 'stomped it', 'not bad!', 'ooh, nice'], ['whoa!', 'sick!', 'rad!', 'yeah!!', 'so steezy', 'styled it!', 'buttery!', 'okay, show-off', 'dang!', 'woo!', 'big air!'], ['NO WAY!', 'did you see that?!', 'SEND IT!', 'legend!', 'teach me!', 'holy cow!', 'again! again!', 'are you sponsored?', 'film that!', 'my hero!', 'HUGE!', 'what was THAT?!', 'ten out of ten']];
+  const OUCH = ['ooh!', 'ouch!', 'you ok?', 'yard sale!', 'oof', 'that looked bad', 'walk it off!', 'tree 1, you 0', 'haha!', 'need a hand?', 'so close!', 'full send, zero land', 'gravity wins', 'snow snack?', 'seen worse', 'that will bruise', 'ski patrol!', 'nice try!'];
+  function chatter(lines, max, chance, at) {           // at: the rider being talked about (the player if left out)
+    const now = performance.now(), near = [], c = at || s;
+    const take = function (o) {
+      const dx = o.x - s.x, dy = o.y - s.y;
+      const ex = o.x - c.x, ey = o.y - c.y, d = ex * ex + ey * ey;
+      if (o !== at && (o._say || 0) < now && Math.abs(dx) < W * 0.48 && dy > -H * 0.17 && dy < H * 0.55 && d > 150 && (!at || d < 9000)) near.push({ o: o, d: d });
+    };
+    for (let i = 0; i < npcs.length; i++) if (npcs[i].state === 'ski' || npcs[i].state === 'wait') take(npcs[i]);
+    for (let i = 0; i < vis.length; i++) if (vis[i].t === 'sitter') take(vis[i]);
+    near.sort(function (a, b) { return a.d - b.d; });
+    const used = [];
+    for (let i = 0, n = 0; i < near.length && n < max; i++) {
+      if (Math.random() > chance) continue;
+      let line = lines[Math.floor(Math.random() * lines.length)]; if (used.indexOf(line) >= 0) continue; used.push(line);
+      const o = near[i].o, el = document.createElement('div'); el.className = 'say'; el.textContent = line; el.style.animationDelay = (120 + n * 260) + 'ms';
+      o._say = now + 2600; says.push({ o: o, el: el, t: 1.9 + n * 0.26 }); pops.appendChild(el); n++;
+    }
+    placeSays(0);
+  }
+  function placeSays(dt) {
+    for (let i = says.length - 1; i >= 0; i--) {
+      const q = says[i]; q.t -= dt;
+      if (q.t <= 0) { q.el.remove(); says.splice(i, 1); continue; }
+      const x = (q.o.x - camX) * SCALE, half = q.el.offsetWidth / 2 + 4;
+      q.el.style.left = Math.round(clamp(x, half, window.innerWidth - half)) + 'px';
+      const y = Math.round((q.o.y - camY - (q.o.z || 0) - (q.o.t === 'sitter' ? 15 : 27)) * SCALE);
+      q.el.style.top = y + 'px'; q.el.style.visibility = y < 84 || y > window.innerHeight ? 'hidden' : '';   // not under the score panels
+    }
+  }
+  function clearSays() { for (let i = 0; i < says.length; i++) says[i].el.remove(); says.length = 0; }
   function mult() { return 1 + Math.min(4, Math.floor(run.clean / 12)); }
   function add(pts) { const p = Math.round(pts * mult()); run.score += p; return p; }
   let hudT = 0, lastMult = 1;
@@ -723,15 +875,52 @@
   }
   function launch(vz, from, z0) {
     s.state = 'air'; s.vz = vz; s.z = z0 || 0.01; s.airT = 0; s.from = from; s.hops = [];
+    s.flip = s.spin = s.flipT = s.spinT = 0; s.trk = 0;
     burst(6);
   }
+  // Tricks: every press of jump in the air is a quarter turn, the way the arrows or the stick point.
+  // Down flips forward, up flips back, left and right spin. Nothing held spins the way you are heading.
+  const TAU = Math.PI * 2, TRICK_RATE = 13, FLIP_PTS = 300, WORDS = [['SWEET', 'FRESH', 'NICE', 'TASTY'], ['RAD', 'AWESOME', 'STEEZY', 'STYLISH'], ['GNARLY', 'SICK', 'EPIC', 'UNREAL'], ['MIND BLOWN', 'LEGENDARY', 'SUPER DUPER', 'BONKERS']];
+  function trick() {
+    let d = '';
+    if (stick.on && stick.x * stick.x + stick.y * stick.y > 0.16) d = Math.abs(stick.y) >= Math.abs(stick.x) ? (stick.y > 0 ? 'front' : 'back') : (stick.x > 0 ? 'right' : 'left');
+    else if (keys.down) d = 'front'; else if (keys.up) d = 'back'; else if (keys.left) d = 'left'; else if (keys.right) d = 'right';
+    if (!d) d = s.th < -0.15 ? 'left' : 'right';
+    if (d === 'front') s.flipT += HALF; else if (d === 'back') s.flipT -= HALF; else if (d === 'left') s.spinT -= HALF; else s.spinT += HALF;
+    s.trk++;
+  }
+  function popTrick(word, line, tier) {
+    const px = Math.round((s.x - camX) * SCALE), py = Math.round((s.y - camY - 30) * SCALE), dur = 1500 + tier * 250;
+    const el = document.createElement('div'); el.className = 'pop trick t' + tier;
+    el.style.top = Math.max(120, py) + 'px';
+    el.style.setProperty('--fs', [14, 18, 23, 29][tier] + 'px'); el.style.setProperty('--dur', dur + 'ms');
+    el.textContent = word + '!'; const sm = document.createElement('small'); sm.textContent = line; el.appendChild(sm);
+    pops.appendChild(el); setTimeout(function () { el.remove(); }, dur);
+    const half = Math.min(window.innerWidth / 2, el.offsetWidth * 0.56 + 6);   // keep the whole shout on screen
+    el.style.left = clamp(px, half, window.innerWidth - half) + 'px';
+    const n = 10 + tier * 10, cols = ['#4ff0ff', '#ffffff', '#4ff0ff', '#ffce5c', '#b8fbff'];
+    for (let i = 0; i < n; i++) {                        // a ring of sparks thrown out from the landing
+      const sp = document.createElement('i'), a = i / n * TAU + Math.random() * 0.4, r = (46 + tier * 34) * (0.55 + Math.random() * 0.7), z = 3 + (i % 3) + tier;
+      sp.className = 'spark'; sp.style.left = px + 'px'; sp.style.top = (py + 20 * SCALE) + 'px'; sp.style.width = sp.style.height = z + 'px'; sp.style.background = cols[i % cols.length];
+      sp.style.setProperty('--dx', Math.round(Math.cos(a) * r) + 'px'); sp.style.setProperty('--dy', Math.round(Math.sin(a) * r * 0.8 - 14) + 'px');
+      sp.style.animationDuration = (520 + tier * 130 + Math.random() * 260) + 'ms';
+      pops.appendChild(sp); setTimeout(function () { sp.remove(); }, 1300);
+    }
+    if (tier >= 2) { cv.classList.remove('shake'); void cv.offsetWidth; cv.classList.add('shake'); }
+    if (tier >= 1 && navigator.vibrate) { try { navigator.vibrate(tier >= 3 ? [30, 40, 60] : 25); } catch (e) { /* not allowed */ } }
+  }
   function jump() {
+    if (mode === 'play' && s.state === 'air') { trick(); return; }
     if (mode !== 'play' || s.state !== 'ski') return;
     if (s.hold) { s.hold = false; s.th = 0; document.body.classList.remove('holding'); return; }   // the first press just sets you off
     launch(86, 'hop');
   }
   function land() {
     s.state = 'ski'; s.z = 0; s.vz = 0; burst(8);
+    const nf = Math.round(s.flip / TAU), nh = Math.round(s.spin / Math.PI), tricked = s.trk > 0;
+    const short = Math.abs(s.flip - nf * TAU) > 1.75;    // came down part way round a flip
+    s.flip = s.spin = s.flipT = s.spinT = 0; s.trk = 0;
+    if (short && s.inv <= 0) { fall('FACE PLANT!'); return; }
     const t = s.airT; let pts = 0; const lines = [];
     if (s.from !== 'hop' || t > 0.5) { run.jumps++; }
     if (t > run.bigAir) run.bigAir = t;
@@ -739,6 +928,19 @@
     else if (s.from === 'kick') { pts += 100; lines.push('KICKER'); }
     if (s.from !== 'hop') pts += Math.round(t * 200);
     for (let i = 0; i < s.hops.length; i++) { pts += 100; if (lines.indexOf(s.hops[i]) < 0) lines.push(s.hops[i]); }
+    if (tricked && !short && (nf || nh)) {               // a spin is worth half a front flip, a back flip double, and mixing the two triples the lot
+      const af = Math.abs(nf), ah = Math.abs(nh), names = [];
+      let tp = af * (nf > 0 ? FLIP_PTS : FLIP_PTS * 2) + ah * FLIP_PTS / 4;
+      if (af) names.push((af > 1 ? ['', '', 'DOUBLE ', 'TRIPLE ', 'QUAD '][Math.min(af, 4)] : '') + (nf > 0 ? 'FRONT FLIP' : 'BACKFLIP'));
+      if (ah) names.push(String(ah * 180));
+      if (af && ah) tp *= 3;
+      const got = add(tp + pts), tier = got < 400 ? 0 : got < 1200 ? 1 : got < 3000 ? 2 : 3;
+      run.tricks = (run.tricks || 0) + 1;
+      burst(10 + tier * 10, '#4ff0ff');
+      chatter(CHEERS[Math.min(tier, 2)], Math.min(3, tier + 1), tier ? 0.85 : 0.5);
+      popTrick(WORDS[tier][Math.floor(Math.random() * 4)], names.join(' + ') + (af && ah ? '  x3' : '') + (lines.length ? ' + ' + lines.join(' + ') : '') + '  +' + got.toLocaleString('en-US'), tier);
+      return;
+    }
     if (pts > 0) {
       const got = add(pts);
       pop((lines.length ? lines.join(' + ') + '  ' : 'AIR  ') + (s.from !== 'hop' ? t.toFixed(1) + 's  ' : '') + '+' + got, s.from === 'cliff' ? 'gold' : '');
@@ -752,7 +954,7 @@
       s.state = 'stuck'; s.timer = 1.5; s.well = stuckAt;
       const side = s.x >= stuckAt.x ? 1 : -1; s.x = stuckAt.x + side * 6; s.y = stuckAt.y + 3;
     } else { s.state = 'fall'; s.timer = 1.05; }
-    burst(16); pop(msg, 'bad'); hud(true);
+    burst(16); pop(msg, 'bad'); hud(true); chatter(OUCH, 2, 0.7);
     if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) { /* not allowed */ } }
   }
   function gather() {
@@ -810,6 +1012,18 @@
     }
     return out;
   }
+  // Other riders throw tricks too: off most kickers, and now and then off a hop of their own.
+  // The better ones nearly always bring it round; the rest sometimes come down short of a flip.
+  function npcTrick(n) {
+    const air = 2 * n.vz / 260, r = Math.random(), dir = Math.random() < 0.5 ? 1 : -1;
+    n.flip = n.spin = 0; n.fT = 0; n.sT = 0;
+    if (r < 0.5 || air < 0.6) n.sT = dir * Math.PI * 2;
+    else if (r < 0.72) n.fT = Math.PI * 2;
+    else if (r < 0.9) n.fT = -Math.PI * 2;
+    else { n.fT = dir * Math.PI * 2; n.sT = Math.PI * 2; }
+    const botch = Math.random() > n.skill + 0.05;
+    n.tr = Math.PI * 2 / (air * (botch ? 1.45 : 0.8));
+  }
   function newNpc(k, x, y, vt, o) {
     const board = o && o.board !== undefined ? !!o.board : Math.random() < 0.36;
     const ki = o && o.kit !== undefined ? o.kit : Math.floor(Math.random() * NPCS.length);
@@ -845,7 +1059,7 @@
       for (let j = 0; j < vis.length; j++) {
         const o = vis[j], dy = o.y - n.y, dx = o.x - n.x;
         if (o.t === 'kick') {                             // take the jump if it is in the way
-          if (n.z <= 0 && dy >= 0 && dy < n.v * dt + 0.6 && Math.abs(dx) < 10) { n.vz = 52 + n.v * 0.45; n.z = 0.01; }
+          if (n.z <= 0 && dy >= 0 && dy < n.v * dt + 0.6 && Math.abs(dx) < 10) { n.vz = 52 + n.v * 0.45; n.z = 0.01; n.tr = 0; n.flip = n.spin = 0; if (Math.random() < 0.3) npcTrick(n); }
           continue;
         }
         if (!o.r) continue;
@@ -865,7 +1079,18 @@
       if (hit) continue;
       const pdy = s.y - n.y, pdx = s.x - n.x;             // and round the player, when coming up from behind
       if (pdy > 2 && pdy < 50 && Math.abs(pdx) < 13) th = pdx >= 0 ? -1.05 : 1.05;
-      if (n.z > 0) { n.vz -= G * dt; n.z += n.vz * dt; if (n.z <= 0) { n.z = 0; n.vz = 0; } th = n.th; }   // no steering in the air
+      if (n.z <= 0 && n.v > 60 && Math.random() < 0.0225 * dt && Math.abs(n.x - s.x) < W && Math.abs(n.y - s.y) < H) { n.vz = 92; n.z = 0.01; npcTrick(n); }   // a hop, just to show off
+      if (n.z > 0) {                                     // no steering in the air
+        n.vz -= G * dt; n.z += n.vz * dt; th = n.th;
+        if (n.tr) { const k = n.tr * dt; n.flip += clamp(n.fT - n.flip, -k, k); n.spin += clamp(n.sT - n.spin, -k, k); }
+        if (n.z <= 0) {
+          n.z = 0; n.vz = 0;
+          const short = n.tr && Math.abs(n.fT - n.flip) > 1.75;
+          if (n.tr && Math.random() < 0.5) chatter(short ? OUCH : CHEERS[n.fT ? 1 : 0], 1, 1, n);   // half the time someone nearby has an opinion
+          n.tr = 0; n.flip = n.spin = 0;
+          if (short) { n.state = 'fall'; n.timer = 1.7; continue; }
+        }
+      }
       n.th += (th - n.th) * Math.min(1, 4.5 * dt);
       n.x += Math.sin(n.th) * n.v * dt; n.y += Math.cos(n.th) * n.v * dt;
       if (n.z <= 0 && Math.abs(n.x - n.lx) + Math.abs(n.y - n.ly) > 1.5) {   // everyone leaves tracks: two for skis, one for a board
@@ -930,8 +1155,9 @@
 
     // steering
     let target = null; const air = s.state === 'air', rate = air ? 0.3 : 1;
-    const braking = keys.up || brakeBtn || (stick.on && stick.y < -0.45 && Math.abs(stick.x) < -stick.y);
-    if (stick.on || brakeBtn) {
+    const braking = !air && (keys.up || brakeBtn || (stick.on && stick.y < -0.45 && Math.abs(stick.x) < -stick.y));
+    if (air && s.trk) { /* committed to the trick: the arrows pick the next turn instead of steering */ }
+    else if (stick.on || brakeBtn) {
       if (braking) target = s.th >= 0 ? HALF : -HALF;
       else if (stick.x * stick.x + stick.y * stick.y > 0.05) target = stick.y <= 0.02 ? (stick.x >= 0 ? HALF : -HALF) : Math.atan2(stick.x, stick.y);
     } else if (keys.left || keys.right || keys.up || keys.down) {
@@ -963,6 +1189,8 @@
 
     if (air) {
       s.airT += dt; s.vz -= G * dt; s.z += s.vz * dt;
+      const tk = TRICK_RATE * dt;
+      s.flip += clamp(s.flipT - s.flip, -tk, tk); s.spin += clamp(s.spinT - s.spin, -tk, tk);
       if (s.z <= 0) land();
     } else {
       const lt = tracks[tracks.length - 1];
@@ -1083,7 +1311,7 @@
     const x = Math.round(n.x - cx), y = Math.round(n.y - cy);
     if (y < -30 || y > H + 30) return;
     if (n.state === 'fall') { ctx.drawImage(n.spr.crash, x - 15, y - 17); return; }
-    ctx.drawImage((n.z > 0 ? n.spr.air : n.spr.dir)[clamp(Math.round(n.th / HALF * 4), -4, 4) + 4], x - 15, y - 24 - Math.round(n.z));
+    ctx.drawImage((n.z > 0 && n.tr && trickFrame(n.spr, n.flip, n.spin)) || (n.z > 0 ? n.spr.air : n.spr.dir)[clamp(Math.round(n.th / HALF * 4), -4, 4) + 4], x - 15, y - 24 - Math.round(n.z));
   }
   function drawPistes(cx, cy) {
     const k0 = Math.round((cx + W / 2) / PISTE_P), m = ((cx % 3) + 3) % 3;
@@ -1143,6 +1371,10 @@
     if (s.inv > 0 && Math.floor(s.inv * 12) % 2 === 0) return;
     const idx = clamp(Math.round(s.th / HALF * 4), -4, 4) + 4, air = s.state === 'air';
     const yy = y - Math.round(s.z);
+    if (air && (s.flip || s.spin)) {                     // mid-trick: a drawn frame for each quarter turn
+      ctx.drawImage(trickFrame(SK, s.flip, s.spin) || SK.air[idx], x - 15, yy - 24);
+      return;
+    }
     ctx.drawImage((air ? SK.air : SK.dir)[idx], x - 15, yy - 24);
     if (s.state !== 'idle') {                            // scarf tail streaming back up the hill
       const n = 2 + Math.round(s.v / 55), lean = Math.round(Math.sin(s.th) * 2), by = yy - (air ? 15 : 13), t = performance.now() / 90;
@@ -1161,7 +1393,7 @@
     if (mode === 'pause') { draw(); return; }
     const sub = dt > 0.02 ? 2 : 1;                       // two physics steps on slow frames, so nothing tunnels
     for (let i = 0; i < sub; i++) update(dt / sub);
-    stepFx(dt); draw(); if (mode === 'play') hud(false);
+    stepFx(dt); draw(); placeSays(dt); if (mode === 'play') hud(false);
   }
 
   // ---- leaderboard -----------------------------------------------------------------------------
@@ -1219,7 +1451,7 @@
   // ---- screens --------------------------------------------------------------------------------
   function show(id) { ['menu', 'over', 'paused'].forEach(function (k) { $(k).hidden = k !== id; }); document.body.className = 'mode-' + mode; syncEdge(); }
   function startRun() {
-    resetWorld(); SK = buildSkier(KITS[kit]);
+    resetWorld(); clearSays(); SK = buildSkier(KITS[kit]);
     mode = 'play'; s.state = 'ski'; s.th = HALF * 0.999; s.v = 0; s.hold = true; lastMult = 1; run.started = Date.now();   // standing at the top until you steer
     useMouse = false; show(null); hud(true);
     fetch(API + '/run', { method: 'POST' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.token) run.token = j.token; }).catch(function () { });
@@ -1391,6 +1623,6 @@
   let rz = 0;
   window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { resize(); camX = s.x - W / 2 + look; }, 120); });
   show('menu'); hud(true); loadBoard();
-  window.GLADE = { art: function () { return { SPR: SPR, TILE: TILE, build: buildSkier, KITS: KITS }; }, npcs: npcs, stick: stick, s: s, run: run, keys: keys, start: startRun, vis: vis, mode: function () { return mode; } };   // handy for testing
+  window.GLADE = { art: function () { return { SPR: SPR, TILE: TILE, build: buildSkier, tricks: buildTricks, KITS: KITS }; }, npcs: npcs, stick: stick, s: s, run: run, keys: keys, start: startRun, vis: vis, mode: function () { return mode; } };   // handy for testing
   requestAnimationFrame(function (t) { last = t; requestAnimationFrame(frame); });
 })();

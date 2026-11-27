@@ -113,11 +113,11 @@ function sameOrigin(req) {
 function topRows() { return scores.slice(0, TOP).map(({ n, s, t, d, c, j, at }) => ({ n, s, t, d, c, j, at })); }
 
 // Is this run possible? Top speed is about 22 m/s; points come from distance (at most 10 per
-// metre at x5), air, hops, near misses and lost items (generously, 2500 a second) plus a small allowance.
+// metre at x5), air, hops, near misses, lost items and tricks (generously, 9000 a second) plus a small allowance.
 function plausible(r) {
   if (r.t < 2 || r.t > MAX_RUN_S) return false;
   if (r.d < 0 || r.d > r.t * 24 + 50) return false;
-  if (r.s < 0 || r.s > r.d * 10 + r.t * 2500 + 5000) return false;
+  if (r.s < 0 || r.s > r.d * 10 + r.t * 9000 + 5000) return false;
   if (r.c < 0 || r.c > r.t + 1) return false;
   if (r.j < 0 || r.j > r.t * 3 + 5) return false;
   return true;
