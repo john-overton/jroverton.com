@@ -1238,19 +1238,8 @@
     show('over'); loadBoard();
     setTimeout(function () { if (matchMedia('(pointer: fine)').matches) inp.focus(); }, 60);
   }
-  // Viewport read-out on the pause card of an installed app, to pin down the iOS bottom-strip bug.
-  function diag() {
-    const el = $('diag'); if (!el) return;
-    const dm = ['fullscreen', 'standalone', 'minimal-ui', 'browser'].filter(function (m) { return window.matchMedia('(display-mode: ' + m + ')').matches; })[0];
-    if (!IOS_APP && dm === 'browser') { el.textContent = ''; return; }
-    const cs = getComputedStyle($('probe')), vv = window.visualViewport, de = document.documentElement;
-    el.textContent = 'inner ' + window.innerWidth + 'x' + window.innerHeight + '  screen ' + screen.width + 'x' + screen.height +
-      '\nvisual ' + (vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) + ' @' + Math.round(vv.offsetTop) : 'n/a') + '  doc ' + de.clientWidth + 'x' + de.clientHeight +
-      '\ninsets t' + parseInt(cs.paddingTop, 10) + ' r' + parseInt(cs.paddingRight, 10) + ' b' + parseInt(cs.paddingBottom, 10) + ' l' + parseInt(cs.paddingLeft, 10) +
-      '  mode ' + dm + (IOS_APP ? ' ios' : '') + '  dpr ' + window.devicePixelRatio;
-  }
   function togglePause(force) {
-    if (mode === 'play' && force !== false) { mode = 'pause'; show('paused'); diag(); }
+    if (mode === 'play' && force !== false) { mode = 'pause'; show('paused'); }
     else if (mode === 'pause' && force !== true) { mode = 'play'; show(null); last = performance.now(); }
   }
   function setKit(k) {

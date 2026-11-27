@@ -34,8 +34,6 @@
       background: linear-gradient(to bottom, var(--band, #f2f6fb) 0%, color-mix(in srgb, var(--band, #f2f6fb) 72%, transparent) 28%, color-mix(in srgb, var(--band, #f2f6fb) 30%, transparent) 62%, transparent 100%); }
     html.ios-app #fade { display: block; }
 
-    #diag { margin-top: 14px; font-size: 15px; line-height: 1.15; color: #7f8ba3; white-space: pre-line; }
-    #probe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
     #hint { display: none; position: fixed; left: 50%; top: 58%; transform: translateX(-50%); pointer-events: none; white-space: nowrap;
       font-family: 'Press Start 2P', monospace; font-size: 10px; letter-spacing: .06em; color: var(--cream); background: rgba(11,17,33,.82); border: 2px solid rgba(247,238,221,.7); padding: 10px 12px; animation: nudge 1.1s steps(2) infinite; }
     body.mode-play.holding #hint { display: block; }
@@ -162,7 +160,6 @@
   <canvas id="ski-canvas" aria-label="Glade Run game"></canvas>
   <div id="fade" aria-hidden="true"></div>
   <div id="pops" aria-hidden="true"></div>
-  <div id="probe" aria-hidden="true"></div>
 
   <div id="hud" aria-hidden="true">
     <div class="hud-box">
@@ -239,7 +236,6 @@
         <button id="btn-resume" class="btn" type="button">KEEP SKIING</button>
         <a class="link" href="/">&larr; OPEN GLADES</a>
       </div>
-      <div id="diag" aria-hidden="true"></div>
     </div>
   </div>
 
