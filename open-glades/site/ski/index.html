@@ -120,6 +120,18 @@
       padding: 2px 6px 3px; border: 2px solid #0b1121; box-shadow: 2px 2px 0 rgba(11,17,33,.35); opacity: 0; animation: say 1.75s steps(12) forwards; }
     .say::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 6px; height: 6px; margin-left: -3px; background: #fff; border-right: 2px solid #0b1121; border-bottom: 2px solid #0b1121; transform: rotate(45deg) translate(-2px, -2px); }
     @keyframes say { 0% { opacity: 0; scale: .4; } 8% { opacity: 1; scale: 1.12; } 14% { scale: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+    #combo { position: absolute; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; transform: translateY(-50%); transform-origin: left center; }
+    #combo .cap { font-family: 'Press Start 2P', monospace; font-size: 7px; letter-spacing: .06em; color: var(--cream); text-shadow: 1px 1px 0 #0b1121, -1px 1px 0 #0b1121, 1px -1px 0 #0b1121, -1px -1px 0 #0b1121; }
+    #combo .keys { display: flex; gap: 4px; flex-wrap: wrap; max-width: 150px; }
+    .kc { display: inline-flex; align-items: center; gap: 4px; height: 20px; min-width: 20px; justify-content: center; padding: 0 4px; box-sizing: border-box; background: var(--cream); border: 2px solid #0b1121; box-shadow: 0 2px 0 #9aa7ba;
+      font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--navy); }
+    .kc b { font-weight: 400; }
+    .ar { width: 0; height: 0; border: 5px solid transparent; }
+    .ar.front { border-top-color: var(--navy); margin-top: 5px; } .ar.back { border-bottom-color: var(--navy); margin-bottom: 5px; }
+    .ar.left { border-right-color: var(--navy); margin-left: -5px; } .ar.right { border-left-color: var(--navy); margin-right: -5px; }
+    #combo.flash { animation: kpop 1.25s linear forwards; } #combo.flash .kc { animation: kflash .25s steps(2) 4; }
+    @keyframes kpop { 0% { scale: 1; } 8% { scale: 1.5; } 18% { scale: 1.25; } 80% { scale: 1.25; opacity: 1; } 100% { scale: 1.25; opacity: 0; } }
+    @keyframes kflash { 50% { background: #4ff0ff; box-shadow: 0 2px 0 #1f8a9c, 0 0 10px rgba(79,240,255,.9); } }
     @keyframes rise { 0% { opacity: 0; margin-top: 8px; } 12% { opacity: 1; margin-top: 0; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -34px; } }
 
     /* cards */

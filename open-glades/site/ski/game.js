@@ -863,6 +863,32 @@
     }
   }
   function clearSays() { for (let i = 0; i < says.length; i++) says[i].el.remove(); says.length = 0; }
+  // The key combo, shown beside the skier as it is tapped in and flashed when the trick is landed,
+  // so a good one can be learned: each arrow is one tap of jump with that direction held.
+  const comboEl = document.createElement('div'); comboEl.id = 'combo'; comboEl.hidden = true; pops.appendChild(comboEl);
+  let combo = [], comboT = 0;
+  function drawCombo() {
+    let html = '<span class="cap">' + (matchMedia('(pointer: coarse)').matches ? 'JUMP' : 'SPACE') + ' +</span><span class="keys">';
+    for (let i = 0; i < combo.length;) {
+      let n = 1; while (combo[i + n] === combo[i]) n++;
+      html += '<span class="kc"><i class="ar ' + combo[i] + '"></i>' + (n > 1 ? '<b>x' + n + '</b>' : '') + '</span>';
+      i += n;
+    }
+    comboEl.innerHTML = html + '</span>'; comboEl.hidden = !combo.length;
+  }
+  function comboKey(d) { combo.push(d); comboT = 0; comboEl.classList.remove('flash'); drawCombo(); placeCombo(0); }
+  function comboEnd(landed) {                            // landed: hold it up and flash it for a second; otherwise take it away
+    if (landed && combo.length) { comboT = 1.25; comboEl.classList.remove('flash'); void comboEl.offsetWidth; comboEl.classList.add('flash'); }
+    else { comboEl.hidden = true; comboEl.classList.remove('flash'); comboT = 0; }
+    combo = [];
+  }
+  function placeCombo(dt) {
+    if (comboEl.hidden) return;
+    if (comboT > 0) { comboT -= dt; if (comboT <= 0) { comboEl.hidden = true; comboEl.classList.remove('flash'); return; } }
+    const x = (s.x - camX) * SCALE, w = comboEl.offsetWidth, right = x + 16 * SCALE;
+    comboEl.style.left = Math.round(right + w > window.innerWidth - 6 ? Math.max(6, x - 16 * SCALE - w) : right) + 'px';   // to the right, unless there is no room
+    comboEl.style.top = Math.round((s.y - camY - s.z - 6) * SCALE) + 'px';
+  }
   function mult() { return 1 + Math.min(4, Math.floor(run.clean / 12)); }
   function add(pts) { const p = Math.round(pts * mult()); run.score += p; return p; }
   let hudT = 0, lastMult = 1;
@@ -885,7 +911,7 @@
   }
   function launch(vz, from, z0) {
     s.state = 'air'; s.vz = vz; s.z = z0 || 0.01; s.airT = 0; s.from = from; s.hops = [];
-    s.flip = s.spin = s.flipT = s.spinT = 0; s.trk = 0;
+    s.flip = s.spin = s.flipT = s.spinT = 0; s.trk = 0; comboEnd(false);
     burst(6);
   }
   // Tricks: every press of jump in the air is a quarter turn, the way the arrows or the stick point.
@@ -897,7 +923,7 @@
     else if (keys.down) d = 'front'; else if (keys.up) d = 'back'; else if (keys.left) d = 'left'; else if (keys.right) d = 'right';
     if (!d) d = s.th < -0.15 ? 'left' : 'right';
     if (d === 'front') s.flipT += HALF; else if (d === 'back') s.flipT -= HALF; else if (d === 'left') s.spinT -= HALF; else s.spinT += HALF;
-    s.trk++; snd('spin', s.trk);
+    s.trk++; snd('spin', s.trk); comboKey(d);
   }
   function popTrick(word, line, tier) {
     const px = Math.round((s.x - camX) * SCALE), py = Math.round((s.y - camY - 30) * SCALE), dur = 1500 + tier * 250;
@@ -931,6 +957,7 @@
     const short = Math.abs(s.flip - nf * TAU) > 1.75;    // came down part way round a flip
     s.flip = s.spin = s.flipT = s.spinT = 0; s.trk = 0;
     if (short && s.inv <= 0) { fall('FACE PLANT!'); return; }
+    comboEnd(tricked && !short && !!(nf || nh));
     snd('land');
     if (!short && nh % 2) {                              // half a spin over: land riding backwards (a butter), or come back out of one
       if (wasSw) endButter('BUTTER');
@@ -972,7 +999,7 @@
   }
   function fall(msg, stuckAt) {
     if (s.inv > 0 || s.state === 'fall' || s.state === 'stuck') return;
-    endButter(null);
+    endButter(null); comboEnd(false);
     run.falls++; if (run.clean > run.bestClean) run.bestClean = run.clean; run.clean = 0; lastMult = 1;
     s.v = 0; s.z = 0; s.vz = 0;
     if (stuckAt) {
@@ -1433,7 +1460,7 @@
     if (mode === 'pause') { draw(); return; }
     const sub = dt > 0.02 ? 2 : 1;                       // two physics steps on slow frames, so nothing tunnels
     for (let i = 0; i < sub; i++) update(dt / sub);
-    stepFx(dt); draw(); placeSays(dt); if (mode === 'play') hud(false);
+    stepFx(dt); draw(); placeSays(dt); placeCombo(dt); if (mode === 'play') hud(false);
   }
 
   // ---- leaderboard -----------------------------------------------------------------------------
@@ -1491,7 +1518,7 @@
   // ---- screens --------------------------------------------------------------------------------
   function show(id) { ['menu', 'over', 'paused'].forEach(function (k) { $(k).hidden = k !== id; }); document.body.className = 'mode-' + mode; syncEdge(); }
   function startRun() {
-    resetWorld(); clearSays(); SK = buildSkier(KITS[kit]);
+    resetWorld(); clearSays(); comboEnd(false); SK = buildSkier(KITS[kit]);
     if (AU) { AU.unlock(); AU.resume(); AU.startMusic(run.started > 0); snd('start'); }
     mode = 'play'; s.state = 'ski'; s.th = HALF * 0.999; s.v = 0; s.hold = true; lastMult = 1; run.started = Date.now();   // standing at the top until you steer
     useMouse = false; show(null); hud(true);
