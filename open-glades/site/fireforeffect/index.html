@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>Fire for Effect — Open Glades</title>
+  <meta name="description" content="Fire for Effect: a pixel-art artillery game from Open Glades. Set your angle and power, mind the wind, and reshape the battlefield." />
+  <link rel="canonical" href="https://openglades.com/fireforeffect/" />
+  <meta name="theme-color" content="#171c40" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Fire for Effect" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/vt323-400-latin.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/pressstart2p-400-latin.woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <style>
+    :root { --ink: #141226; --cream: #f7eedd; --gold: #ffce5c; --mute: #b9aecf; --fire: #e0524a;
+      --sl: max(10px, env(safe-area-inset-left)); --sr: max(10px, env(safe-area-inset-right)); --st: max(8px, env(safe-area-inset-top)); --sb: max(8px, env(safe-area-inset-bottom)); }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #171c40; color: var(--cream); font-family: 'VT323', monospace; }
+    html, body { touch-action: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-user-select: none; user-select: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+    #ffe-canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+    button { font: inherit; color: inherit; cursor: pointer; touch-action: none; }
+    .ps, button, #top, #banner, .lab { font-family: 'Press Start 2P', monospace; }
+
+    /* top bar: tanks, wind, menu */
+    #top { position: fixed; left: var(--sl); right: var(--sr); top: var(--st); display: flex; align-items: flex-start; gap: 8px; pointer-events: none; font-size: 8px; letter-spacing: .06em; }
+    #tanks { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+    .tk { display: flex; align-items: center; gap: 6px; padding: 5px 7px; background: rgba(20,18,38,.78); border: 2px solid rgba(247,238,221,.35); }
+    .tk i { width: 8px; height: 8px; } .tk em { font-style: normal; color: var(--mute); }
+    .tk .hp { width: 44px; height: 6px; background: rgba(247,238,221,.16); } .tk .hp b { display: block; height: 100%; transition: width .3s steps(6); }
+    .tk.cur { border-color: var(--gold); } .tk.dead { opacity: .35; }
+    #wind, #btn-menu { padding: 6px 8px; background: rgba(20,18,38,.78); border: 2px solid rgba(247,238,221,.35); color: var(--mute); white-space: nowrap; font-size: 8px; }
+    #wind b { color: var(--cream); font-weight: 400; }
+    #btn-menu { pointer-events: auto; color: var(--cream); }
+    #banner { position: fixed; left: 50%; top: 24%; transform: translateX(-50%); padding: 9px 12px; font-size: 10px; letter-spacing: .08em; white-space: nowrap; pointer-events: none;
+      background: rgba(20,18,38,.85); border: 2px solid currentColor; opacity: 0; transition: opacity .25s; }
+    #banner.on { opacity: 1; }
+
+    /* controls */
+    #ctl { position: fixed; left: var(--sl); right: var(--sr); bottom: var(--sb); display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; transition: opacity .2s; }
+    #ctl.off { opacity: .32; } #ctl.off * { pointer-events: none !important; }
+    #ctl > div { display: flex; gap: 8px; align-items: flex-end; pointer-events: auto; }
+    .dial { display: grid; grid-template-columns: 34px 46px 34px; grid-template-rows: auto 34px; background: rgba(20,18,38,.8); border: 2px solid rgba(247,238,221,.4); }
+    .dial .lab { grid-column: 1 / 4; text-align: center; font-size: 7px; letter-spacing: .1em; color: var(--mute); padding: 4px 0 2px; }
+    .dial button { background: rgba(247,238,221,.1); border: 0; font-size: 10px; } .dial button:active { background: var(--gold); color: var(--ink); }
+    .dial b { display: grid; place-items: center; font: 400 10px 'Press Start 2P', monospace; white-space: nowrap; }
+    #wpn { height: 48px; padding: 0 10px; background: rgba(20,18,38,.8); border: 2px solid rgba(247,238,221,.4); font-size: 8px; letter-spacing: .06em; display: flex; flex-direction: column; justify-content: center; gap: 6px; align-items: flex-start; }
+    #wpn #w-ammo { color: var(--gold); } #wpn:active { border-color: var(--gold); }
+    #fire { height: 48px; padding: 0 16px; background: var(--fire); color: #fff; border: 2px solid #fff3c4; box-shadow: 0 3px 0 #8f2a2e; font-size: 12px; letter-spacing: .08em; }
+    #fire:active { transform: translateY(2px); box-shadow: 0 1px 0 #8f2a2e; }
+    #picker { position: fixed; right: var(--sr); bottom: calc(var(--sb) + 56px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 6px; background: rgba(20,18,38,.94); border: 2px solid var(--cream); box-shadow: 4px 4px 0 rgba(10,8,24,.5); max-width: calc(100vw - 20px); max-height: calc(100vh - var(--sb) - 110px); overflow-y: auto; touch-action: pan-y; }
+    .wp { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 7px; background: rgba(247,238,221,.07); border: 2px solid rgba(247,238,221,.3); font-size: 7px; letter-spacing: .04em; white-space: nowrap; }
+    .wp b { font-weight: 400; color: var(--gold); } .wp.sel { border-color: var(--gold); background: rgba(255,206,92,.16); } .wp:disabled { opacity: .3; }
+    body:not(.mode-play) #picker, body.paused #picker { display: none; }
+    body:not(.mode-play) #top, body:not(.mode-play) #ctl, body:not(.mode-play) #banner { display: none; }
+
+    /* cards */
+    .card { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(430px, calc(100vw - 24px)); max-height: calc(100vh - 16px); overflow: auto; padding: 16px 18px;
+      background: rgba(20,18,38,.93); border: 3px solid var(--cream); box-shadow: 6px 6px 0 rgba(10,8,24,.5); text-align: center; }
+    .card h1 { margin: 0 0 4px; font: 400 18px/1.4 'Press Start 2P', monospace; color: var(--gold); letter-spacing: .04em; text-shadow: 3px 3px 0 #8f2a2e; }
+    .card h2 { margin: 0 0 8px; font: 400 14px/1.5 'Press Start 2P', monospace; }
+    .card p { margin: 6px 0; font-size: 19px; line-height: 1.15; color: var(--mute); }
+    #slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0 4px; }
+    #opts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 6px 0 4px; } #opts .slot { flex-direction: column; align-items: flex-start; gap: 6px; font-size: 7px; } #opts .slot span { color: var(--mute); }
+    #env { padding: 6px 8px; background: rgba(20,18,38,.78); border: 2px solid rgba(247,238,221,.35); color: var(--gold); white-space: nowrap; font-size: 7px; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
+    .slot { display: flex; align-items: center; gap: 8px; padding: 9px 8px; background: rgba(247,238,221,.06); border: 2px solid rgba(247,238,221,.4); font-size: 8px; letter-spacing: .06em; }
+    .slot i { width: 10px; height: 10px; flex: none; } .slot span { flex: 1; text-align: left; } .slot b { font-weight: 400; color: var(--gold); }
+    .slot.m0 { opacity: .5; } .slot.m0 b { color: var(--mute); }
+    .btn { display: inline-block; margin: 8px 4px 0; padding: 12px 16px; background: var(--gold); color: var(--ink); border: 2px solid var(--cream); box-shadow: 0 3px 0 #9a7420; font-size: 10px; letter-spacing: .08em; }
+    .btn.alt { background: transparent; color: var(--cream); box-shadow: none; } .btn[aria-pressed="false"] { color: var(--mute); border-color: rgba(185,174,207,.4); } .btn:disabled { opacity: .4; }
+    .keys { font-size: 17px !important; }
+    @media (pointer: coarse) { .keys .desk { display: none; } } @media (pointer: fine) { .keys .touch { display: none; } }
+    @media (max-height: 380px) { .card { padding: 10px 14px; } .card h1 { font-size: 14px; } .card p { font-size: 17px; margin: 3px 0; } .slot { padding: 7px 8px; } .btn { padding: 10px 14px; } }
+
+    #rotate { display: none; position: fixed; inset: 0; z-index: 9; background: #171c40; align-items: center; justify-content: center; text-align: center; padding: 24px; font: 400 11px/1.9 'Press Start 2P', monospace; }
+    @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+  </style>
+</head>
+<body class="mode-menu">
+  <canvas id="ffe-canvas"></canvas>
+
+  <div id="top"><div id="tanks"></div><div id="env"></div><div id="wind"></div><button id="btn-menu" aria-label="Pause">II</button></div>
+  <div id="banner"></div>
+  <div id="ctl">
+    <div>
+      <div class="dial"><span class="lab">ANGLE</span><button data-k="al" aria-label="Swing left">&#9668;</button><b id="v-ang">60</b><button data-k="ar" aria-label="Swing right">&#9658;</button></div>
+      <div class="dial"><span class="lab">POWER</span><button data-k="pd" aria-label="Less power">-</button><b id="v-pow">60</b><button data-k="pu" aria-label="More power">+</button></div>
+    </div>
+    <div>
+      <button id="wpn" aria-label="Change weapon"><span id="w-name">SHELL</span><span id="w-ammo"></span></button>
+      <button id="fire">FIRE</button>
+    </div>
+  </div>
+
+  <div id="picker" hidden></div>
+
+  <div class="card" id="card-menu">
+    <h1>FIRE FOR EFFECT</h1>
+    <p>Set the angle, set the power, mind the wind. Last tank standing wins.</p>
+    <div id="slots"></div>
+    <div id="opts"></div>
+    <p id="setup-note">&nbsp;</p>
+    <button class="btn" id="btn-start">START</button><button class="btn alt" data-snd>SOUND ON</button>
+    <p class="keys"><span class="desk">Arrows aim and set power. Q / E change weapon. Space fires. M mutes.</span><span class="touch">Drag the field to aim: sideways for angle, up and down for power.</span></p>
+  </div>
+  <div class="card" id="card-over" hidden>
+    <h2 id="over-title">GAME OVER</h2>
+    <p id="over-sub"></p>
+    <button class="btn" id="btn-again">REMATCH</button><button class="btn alt" id="btn-setup">SETUP</button>
+  </div>
+  <div class="card" id="card-pause" hidden>
+    <h2>PAUSED</h2>
+    <button class="btn" id="btn-resume">RESUME</button><button class="btn alt" id="btn-quit">QUIT MATCH</button><br /><button class="btn alt" data-snd>SOUND ON</button>
+  </div>
+
+  <div id="rotate">TURN YOUR PHONE<br />SIDEWAYS TO PLAY</div>
+  <script src="audio.js?v=17"></script>
+  <script src="game.js?v=17"></script>
+</body>
+</html>
