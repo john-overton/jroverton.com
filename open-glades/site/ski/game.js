@@ -446,6 +446,20 @@
     P(x, y + 4, 5, 1, K.scarf); P(x, y + 4, 1, 1, K.scarfSh);
     if (K.pom) P(x + 2, y - 1, 1, 1, K.pom);
   }
+  // The ordinary pose seen from behind: the face, buttons and buckle painted out and the back of the head put in.
+  function backPose(P, K, i, air) {
+    skierPose(function (x, y, w, h, c) { P(x, y + 4, w, h, c); }, K, i, air);
+    const sx = Math.sin(i * HALF / 4), l = Math.round(sx * 2), side = i >= 3 ? 1 : i <= -3 ? -1 : 0, hx = 13 + l + side, dy = air ? 0 : 2;
+    if (K.style === 'snowman') { P(14 + l, 12 + dy, 3, 1, C.white); P(14 + l, 14 + dy, 3, 1, C.white); P(14 + Math.round(sx), 17 + dy, 3, 1, C.white); P(hx - 1, 5 + dy, 7, 4, C.white); trickHead(P, K, hx, 4 + dy, 'back'); }
+    else if (K.style === 'sasquatch') { P(14 + l, 11 + dy, 3, 3, K.jacket); P(13 + l, 9 + dy, 1, 1, K.jacket); P(17 + l, 13 + dy, 1, 1, K.jacket); P(15 + l, 10 + dy, 1, 4, K.jacketSh); trickHead(P, K, hx, 3 + dy, 'back'); }
+    else if (K.style === 'santa') { P(14 + l, 13 + dy, 2, 1, OUTHEX); P(13 + l, 10 + dy, 5, 1, K.jacket); P(hx - 1, 4 + dy, 7, 2, 'rgba(0,0,0,0)'); trickHead(P, K, hx, 5 + dy, 'back'); }
+    else trickHead(P, K, hx, 5 + dy, 'back');
+  }
+  function buildBack(K) {                                // skiing switch: nine headings, seen from behind
+    const out = [];
+    for (let i = -4; i <= 4; i++) out.push(mk(30, 34, (function (i) { return function (P) { backPose(P, K, i, false); }; })(i), OUT));
+    return out;
+  }
   function trickTorso(P, K, x, y, w, h) {
     if (K.style === 'snowman') { P(x, y, w, h, C.white); P(x, y, 1, h, C.snowSh); P(x + 1, y + h - 1, w - 1, 1, C.snowSh); P(x, y, w, 1, K.scarf); return; }
     P(x, y, w, h, K.jacket); P(x, y, 1, h, K.jacketSh); P(x, y + h - 1, w, 1, K.jacketSh);
@@ -464,13 +478,7 @@
       }, OUT);
     };
     // seen from behind, in the air: the ordinary air pose with the face, buttons and buckle painted out
-    const back = function (P) {
-      skierPose(function (x, y, w, h, c) { P(x, y + 4, w, h, c); }, K, 0, true);
-      if (snow) { P(15, 12, 1, 1, C.white); P(15, 14, 1, 1, C.white); P(15, 17, 1, 1, C.white); P(13, 5, 5, 4, C.white); trickHead(P, K, 13, 4, 'back'); }
-      else if (big) { P(14, 11, 3, 3, K.jacket); P(13, 9, 1, 1, K.jacket); P(17, 13, 1, 1, K.jacket); P(15, 10, 1, 4, K.jacketSh); trickHead(P, K, 13, 3, 'back'); }
-      else if (K.style === 'santa') { P(14, 13, 2, 1, OUTHEX); P(14, 10, 3, 1, K.jacket); trickHead(P, K, 13, 5, 'back'); }
-      else trickHead(P, K, 13, 5, 'back');
-    };
+    const back = function (P) { backPose(P, K, 0, true); };
     // side on, facing right: skis level, knees bent, hands forward, poles trailing
     const side = function (P) {
       if (K.board) { P(7, 24, 14, 2, K.ski); P(6, 24, 1, 1, K.skiEdge); P(21, 24, 1, 1, K.skiEdge); P(21, 23, 1, 1, K.ski); }
@@ -771,7 +779,7 @@
   let W = 480, H = 270, SCALE = 3;
   let mode = 'menu';                 // menu | play | pause | over
   let kit = 'A';
-  const s = { x: 0, y: 0, th: HALF, v: 0, z: 0, vz: 0, state: 'idle', timer: 0, inv: 0, airT: 0, from: '', hops: [], well: null, flip: 0, spin: 0, flipT: 0, spinT: 0, trk: 0 };
+  const s = { x: 0, y: 0, th: HALF, v: 0, z: 0, vz: 0, state: 'idle', timer: 0, inv: 0, airT: 0, from: '', hops: [], well: null, flip: 0, spin: 0, flipT: 0, spinT: 0, trk: 0, sw: false, butT: 0, butPts: 0 };
   const run = { t: 0, score: 0, falls: 0, clean: 0, bestClean: 0, jumps: 0, bigAir: 0, items: 0, top: 0, token: null, started: 0 };
   let camX = 0, camY = 0, look = 0;
   const vis = [], tracks = [], parts = [], flakes = [], smoke = [], npcs = [];
@@ -801,7 +809,7 @@
     seed = Math.floor(Math.random() * 1e9) | 0;
     chunks = new Map(); majors = new Map(); pz0 = vnoise(0, 0, seed + 33);
     tracks.length = 0; parts.length = 0; smoke.length = 0;
-    s.x = 0; s.y = 0; s.th = HALF * 0.999; s.v = 0; s.z = 0; s.vz = 0; s.state = 'idle'; s.timer = 0; s.inv = 0; s.hops = [];
+    s.x = 0; s.y = 0; s.th = HALF * 0.999; s.v = 0; s.sw = false; s.butT = 0; s.butPts = 0; s.z = 0; s.vz = 0; s.state = 'idle'; s.timer = 0; s.inv = 0; s.hops = [];
     run.t = 0; run.score = 0; run.falls = 0; run.clean = 0; run.bestClean = 0; run.jumps = 0; run.bigAir = 0; run.items = 0; run.top = 0; run.tricks = 0; run.token = null;
     look = 0; camX = s.x - W / 2; camY = s.y - skierRow();
     npcs.length = 0; npcT = 0; ntracks.length = 0; resetLift();                           // the crowd just off the lift, setting off one by one
@@ -812,6 +820,8 @@
   }
 
   // ---- popups + HUD -------------------------------------------------------------------------
+  const AU = window.GladeAudio || null;                 // music and sound effects (audio.js); the game runs fine without it
+  function snd(name, arg, delay) { if (AU) AU.sfx(name, arg, delay); }
   const pops = $('pops');
   function pop(text, cls) {
     const el = document.createElement('div'); el.className = 'pop ' + (cls || ''); el.textContent = text;
@@ -838,7 +848,7 @@
       if (Math.random() > chance) continue;
       let line = lines[Math.floor(Math.random() * lines.length)]; if (used.indexOf(line) >= 0) continue; used.push(line);
       const o = near[i].o, el = document.createElement('div'); el.className = 'say'; el.textContent = line; el.style.animationDelay = (120 + n * 260) + 'ms';
-      o._say = now + 2600; says.push({ o: o, el: el, t: 1.9 + n * 0.26 }); pops.appendChild(el); n++;
+      snd('say', 0, 0.12 + n * 0.26); o._say = now + 2600; says.push({ o: o, el: el, t: 1.9 + n * 0.26 }); pops.appendChild(el); n++;
     }
     placeSays(0);
   }
@@ -860,10 +870,10 @@
     const now = performance.now(); if (!force && now - hudT < 90) return; hudT = now;
     $('h-score').textContent = Math.floor(run.score).toLocaleString('en-US');
     const m = mult(); const hm = $('h-mult'); hm.textContent = 'x' + m; hm.className = 'm' + m;
-    if (m > lastMult && mode === 'play') pop('CLEAN RUN  x' + m, 'gold'); lastMult = m;
+    if (m > lastMult && mode === 'play') { pop('CLEAN RUN  x' + m, 'gold'); snd('mult', m); } lastMult = m;
     syncEdge();
     $('h-clean').textContent = fmtTime(run.clean);
-    const sp = $('h-speed'); sp.textContent = Math.round(s.v * 0.36) + ' km/h'; sp.className = s.v > 105 ? 'hot' : '';
+    const sp = $('h-speed'); sp.textContent = s.sw ? 'BUTTER +' + Math.round(s.butPts).toLocaleString('en-US') : Math.round(s.v * 0.36) + ' km/h'; sp.className = s.sw || s.v > 105 ? 'hot' : '';
     $('h-time').textContent = fmtTime(run.t);
     $('h-dist').textContent = Math.max(0, Math.floor(s.y / 10)).toLocaleString('en-US') + ' m';
     const hs = $('h-falls').children; for (let i = 0; i < hs.length; i++) hs[i].className = i < MAX_FALLS - run.falls ? '' : 'off';
@@ -887,7 +897,7 @@
     else if (keys.down) d = 'front'; else if (keys.up) d = 'back'; else if (keys.left) d = 'left'; else if (keys.right) d = 'right';
     if (!d) d = s.th < -0.15 ? 'left' : 'right';
     if (d === 'front') s.flipT += HALF; else if (d === 'back') s.flipT -= HALF; else if (d === 'left') s.spinT -= HALF; else s.spinT += HALF;
-    s.trk++;
+    s.trk++; snd('spin', s.trk);
   }
   function popTrick(word, line, tier) {
     const px = Math.round((s.x - camX) * SCALE), py = Math.round((s.y - camY - 30) * SCALE), dur = 1500 + tier * 250;
@@ -913,14 +923,19 @@
     if (mode === 'play' && s.state === 'air') { trick(); return; }
     if (mode !== 'play' || s.state !== 'ski') return;
     if (s.hold) { s.hold = false; s.th = 0; document.body.classList.remove('holding'); return; }   // the first press just sets you off
-    launch(86, 'hop');
+    launch(86, 'hop'); snd('jump');
   }
   function land() {
     s.state = 'ski'; s.z = 0; s.vz = 0; burst(8);
-    const nf = Math.round(s.flip / TAU), nh = Math.round(s.spin / Math.PI), tricked = s.trk > 0;
+    const nf = Math.round(s.flip / TAU), nh = Math.round(s.spin / Math.PI), tricked = s.trk > 0, wasSw = s.sw;
     const short = Math.abs(s.flip - nf * TAU) > 1.75;    // came down part way round a flip
     s.flip = s.spin = s.flipT = s.spinT = 0; s.trk = 0;
     if (short && s.inv <= 0) { fall('FACE PLANT!'); return; }
+    snd('land');
+    if (!short && nh % 2) {                              // half a spin over: land riding backwards (a butter), or come back out of one
+      if (wasSw) endButter('BUTTER');
+      else { s.sw = true; s.butT = 0; s.butPts = 0; pop('BUTTER!', 'gold'); }
+    }
     const t = s.airT; let pts = 0; const lines = [];
     if (s.from !== 'hop' || t > 0.5) { run.jumps++; }
     if (t > run.bigAir) run.bigAir = t;
@@ -938,6 +953,7 @@
       run.tricks = (run.tricks || 0) + 1;
       burst(10 + tier * 10, '#4ff0ff');
       chatter(CHEERS[Math.min(tier, 2)], Math.min(3, tier + 1), tier ? 0.85 : 0.5);
+      snd('trick', tier, 0.03);
       popTrick(WORDS[tier][Math.floor(Math.random() * 4)], names.join(' + ') + (af && ah ? '  x3' : '') + (lines.length ? ' + ' + lines.join(' + ') : '') + '  +' + got.toLocaleString('en-US'), tier);
       return;
     }
@@ -946,8 +962,17 @@
       pop((lines.length ? lines.join(' + ') + '  ' : 'AIR  ') + (s.from !== 'hop' ? t.toFixed(1) + 's  ' : '') + '+' + got, s.from === 'cliff' ? 'gold' : '');
     }
   }
+  // Butter: skiing backwards on the tips. It pays the whole time you hold it, but the skis are twitchy
+  // going this way, and letting them swing too far across the hill spins you back round.
+  function endButter(why) {
+    if (!s.sw) return;
+    s.sw = false;
+    if (why && s.butT > 0.4) { pop(why + '  ' + s.butT.toFixed(1) + 's  +' + Math.round(s.butPts).toLocaleString('en-US'), why === 'BUTTER' ? 'gold' : ''); snd('mult', Math.min(5, 1 + Math.floor(s.butT / 2))); if (s.butT > 3) chatter(CHEERS[s.butT > 7 ? 1 : 0], 1, 0.7); }
+    s.butT = 0; s.butPts = 0;
+  }
   function fall(msg, stuckAt) {
     if (s.inv > 0 || s.state === 'fall' || s.state === 'stuck') return;
+    endButter(null);
     run.falls++; if (run.clean > run.bestClean) run.bestClean = run.clean; run.clean = 0; lastMult = 1;
     s.v = 0; s.z = 0; s.vz = 0;
     if (stuckAt) {
@@ -955,6 +980,7 @@
       const side = s.x >= stuckAt.x ? 1 : -1; s.x = stuckAt.x + side * 6; s.y = stuckAt.y + 3;
     } else { s.state = 'fall'; s.timer = 1.05; }
     burst(16); pop(msg, 'bad'); hud(true); chatter(OUCH, 2, 0.7);
+    snd(stuckAt ? 'well' : msg === 'SORRY!' || msg === 'ON YOUR LEFT!' ? 'bump' : 'crash');
     if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) { /* not allowed */ } }
   }
   function gather() {
@@ -971,17 +997,17 @@
       if (dy > 40 || dy < -40 || dx > 70 || dx < -70) continue;
       if (o.t === 'item') {
         if (!o.got && dx * dx + dy * dy < 72 && s.z < 16) {
-          o.got = 1; burst(7, C.gold);
+          o.got = 1; burst(7, C.gold); snd(o.heart ? 'heart' : 'pickup');
           if (o.heart) {
             if (run.falls > 0) { run.falls--; pop('+1 LIFE', 'gold'); } else pop('SPARE HEART  +' + add(300), 'gold');
             hud(true);
           } else { run.items++; pop(o.label + '  +' + add(o.pts), 'gold'); }
         }
       } else if (o.t === 'kick') {
-        if (!air && prevY < o.y && s.y >= o.y && Math.abs(dx) < 10 && Math.cos(s.th) > 0.45) launch(60 + s.v * 0.5, 'kick');
+        if (!air && prevY < o.y && s.y >= o.y && Math.abs(dx) < 10 && Math.cos(s.th) > 0.45) { launch(60 + s.v * 0.5, 'kick'); snd('boost'); }
       } else if (o.t === 'cliff') {
         if (Math.abs(dx) < o.w / 2 - 2) {
-          if (!air && prevY < o.y && s.y >= o.y) launch(42 + s.v * 0.34, 'cliff', o.h);
+          if (!air && prevY < o.y && s.y >= o.y) { launch(42 + s.v * 0.34, 'cliff', o.h); snd('boost'); }
           else if (!air && dy > 1 && dy < o.h) fall('ROCKS!');
         }
       } else if (o.t === 'log') {
@@ -992,7 +1018,7 @@
         const rr = o.r + 1.5, d2 = dx * dx + dy * dy;
         if (d2 < rr * rr) { if (s.z < o.h) fall(o.msg); else if (o.hop && !o._c) { o._c = 1; s.hops.push(o.hop); } }
         else if (o.wr && !air && dx * dx + dy * dy * 2.6 < o.wr * o.wr) fall('TREE WELL!', o);
-        else if (o.tree && !air && !o._n && d2 < 72 && s.v > 70 && s.inv <= 0) { o._n = 1; pop('CLOSE!  +' + add(20), 'dim'); }
+        else if (o.tree && !air && !o._n && d2 < 72 && s.v > 70 && s.inv <= 0) { o._n = 1; pop('CLOSE!  +' + add(20), 'dim'); snd('close'); }
       }
       if (s.state === 'fall' || s.state === 'stuck') return;
     }
@@ -1161,8 +1187,8 @@
       if (braking) target = s.th >= 0 ? HALF : -HALF;
       else if (stick.x * stick.x + stick.y * stick.y > 0.05) target = stick.y <= 0.02 ? (stick.x >= 0 ? HALF : -HALF) : Math.atan2(stick.x, stick.y);
     } else if (keys.left || keys.right || keys.up || keys.down) {
-      if (keys.left) s.th -= 3.3 * rate * dt;
-      if (keys.right) s.th += 3.3 * rate * dt;
+      if (keys.left) s.th -= 3.3 * rate * dt * (s.sw ? 1.5 : 1);
+      if (keys.right) s.th += 3.3 * rate * dt * (s.sw ? 1.5 : 1);
       if (keys.down && !keys.left && !keys.right) target = 0;
       if (keys.up) target = s.th >= 0 ? HALF : -HALF;
     } else if (useMouse) {
@@ -1183,6 +1209,17 @@
     const prevY = s.y, step = s.v * dt;
     s.x += Math.sin(s.th) * step; s.y += cs * step;
     run.score += (s.y - prevY) / 10 * 2 * mult();
+    if (s.sw && !air) {
+      if (braking || s.hold) endButter('BUTTER');
+      else {
+        s.butT += dt;
+        const wob = (Math.sin(run.t * 5.3) + Math.sin(run.t * 3.1 + 1.3)) * 0.55 * (1 + Math.min(1.5, s.butT * 0.12));   // the tails want to come round
+        s.th = clamp(s.th + (wob + s.th * (0.9 + Math.min(1.2, s.butT * 0.1))) * dt, -HALF, HALF);   // and once they start to go, they keep going unless you steer back
+        const got = (25 + s.v * 0.45) * mult() * dt; run.score += got; s.butPts += got;
+        if (Math.random() < 0.5) parts.push({ x: s.x + (Math.random() - 0.5) * 6, y: s.y + 3, vx: (Math.random() - 0.5) * 40, vy: 10 + Math.random() * 20, life: 0.25 + Math.random() * 0.25, c: C.white });
+        if (Math.abs(s.th) > 1.2) { endButter('SWUNG OUT'); burst(10); s.v *= 0.8; }
+      }
+    }
     if (s.v > 105) run.score += (s.v - 105) * 0.4 * mult() * dt;   // speed bonus: nothing below a brisk pace, then more the faster you go
     if (s.v > run.top) run.top = s.v;
     run.clean += dt;
@@ -1192,7 +1229,9 @@
       const tk = TRICK_RATE * dt;
       s.flip += clamp(s.flipT - s.flip, -tk, tk); s.spin += clamp(s.spinT - s.spin, -tk, tk);
       if (s.z <= 0) land();
+      if (AU) AU.ski(0, 0, true);
     } else {
+      if (AU) AU.ski(s.v, Math.abs(s.th) / HALF, false);
       const lt = tracks[tracks.length - 1];
       if (!lt || Math.abs(lt.x - s.x) + Math.abs(lt.y - s.y) > 1.2) { tracks.push({ x: s.x, y: s.y, c: cs, n: Math.sin(s.th) }); if (tracks.length > 620) tracks.shift(); }
       if (s.v > 55 && Math.abs(s.th) > 0.5 && Math.random() < 0.6) {
@@ -1371,10 +1410,11 @@
     if (s.inv > 0 && Math.floor(s.inv * 12) % 2 === 0) return;
     const idx = clamp(Math.round(s.th / HALF * 4), -4, 4) + 4, air = s.state === 'air';
     const yy = y - Math.round(s.z);
-    if (air && (s.flip || s.spin)) {                     // mid-trick: a drawn frame for each quarter turn
-      ctx.drawImage(trickFrame(SK, s.flip, s.spin) || SK.air[idx], x - 15, yy - 24);
+    if (air && (s.flip || s.spin || s.sw)) {                     // mid-trick: a drawn frame for each quarter turn
+      ctx.drawImage(trickFrame(SK, s.flip, s.spin + (s.sw ? Math.PI : 0)) || SK.air[idx], x - 15, yy - 24);
       return;
     }
+    if (s.sw && !air) { ctx.drawImage((SK.back || (SK.back = buildBack(SK.K)))[idx], x - 15, yy - 24 - (Math.floor(run.t * 6) % 2)); return; }   // on the tips, bobbing
     ctx.drawImage((air ? SK.air : SK.dir)[idx], x - 15, yy - 24);
     if (s.state !== 'idle') {                            // scarf tail streaming back up the hill
       const n = 2 + Math.round(s.v / 55), lean = Math.round(Math.sin(s.th) * 2), by = yy - (air ? 15 : 13), t = performance.now() / 90;
@@ -1452,12 +1492,13 @@
   function show(id) { ['menu', 'over', 'paused'].forEach(function (k) { $(k).hidden = k !== id; }); document.body.className = 'mode-' + mode; syncEdge(); }
   function startRun() {
     resetWorld(); clearSays(); SK = buildSkier(KITS[kit]);
+    if (AU) { AU.unlock(); AU.resume(); AU.startMusic(run.started > 0); snd('start'); }
     mode = 'play'; s.state = 'ski'; s.th = HALF * 0.999; s.v = 0; s.hold = true; lastMult = 1; run.started = Date.now();   // standing at the top until you steer
     useMouse = false; show(null); hud(true);
     fetch(API + '/run', { method: 'POST' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.token) run.token = j.token; }).catch(function () { });
   }
   function gameOver() {
-    mode = 'over'; document.body.classList.remove('holding'); if (run.clean > run.bestClean) run.bestClean = run.clean;
+    mode = 'over'; document.body.classList.remove('holding'); if (AU) { AU.ski(0, 0, true); AU.duck(true); snd('over', 0, 0.35); } if (run.clean > run.bestClean) run.bestClean = run.clean;
     $('o-score').textContent = Math.floor(run.score).toLocaleString('en-US');
     $('o-time').textContent = fmtTime(run.t);
     $('o-dist').textContent = Math.floor(s.y / 10).toLocaleString('en-US') + ' m';
@@ -1471,8 +1512,8 @@
     setTimeout(function () { if (matchMedia('(pointer: fine)').matches) inp.focus(); }, 60);
   }
   function togglePause(force) {
-    if (mode === 'play' && force !== false) { mode = 'pause'; show('paused'); }
-    else if (mode === 'pause' && force !== true) { mode = 'play'; show(null); last = performance.now(); }
+    if (mode === 'play' && force !== false) { mode = 'pause'; show('paused'); if (AU) AU.pause(); }
+    else if (mode === 'pause' && force !== true) { mode = 'play'; show(null); last = performance.now(); if (AU) AU.resume(); }
   }
   function setKit(k) {
     if (k === 'bigfoot') k = 'sasquatch';
@@ -1496,7 +1537,9 @@
   });
   window.addEventListener('keyup', function (e) { const k = KEYMAP[e.key]; if (k) keys[k] = false; });
   window.addEventListener('blur', function () { keys.left = keys.right = keys.up = keys.down = false; brakeBtn = false; togglePause(true); });
-  document.addEventListener('visibilitychange', function () { if (document.hidden) togglePause(true); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { togglePause(true); if (AU) AU.pause(); } else if (AU && mode !== 'pause') AU.resume();   // no music from a hidden tab
+  });
 
   function point(e) { mouse.x = e.clientX / SCALE; mouse.y = e.clientY / SCALE; }
   cv.addEventListener('pointermove', function (e) { if (e.pointerType === 'touch') return; point(e); useMouse = true; });
@@ -1541,6 +1584,33 @@
   const kitBtns = document.querySelectorAll('[data-kit]');
   for (let i = 0; i < kitBtns.length; i++) kitBtns[i].addEventListener('click', function () { setKit(this.getAttribute('data-kit')); });
 
+  // music and sound switches, on the menu and the pause card; M mutes or unmutes both
+  const audBtns = document.querySelectorAll('[data-aud]');
+  function syncAud() { for (let i = 0; i < audBtns.length; i++) { const b = audBtns[i], on = AU && AU.get(b.getAttribute('data-aud')); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = (b.getAttribute('data-aud') === 'music' ? 'MUSIC ' : 'SOUND ') + (on ? 'ON' : 'OFF'); } }
+  for (let i = 0; i < audBtns.length; i++) audBtns[i].addEventListener('click', function () {
+    if (!AU) return; const k = this.getAttribute('data-aud'); AU.unlock(); AU.set(k, !AU.get(k)); syncAud(); if (mode !== 'pause') snd('ui');
+  });
+  if (!AU || !AU.ok) { const rows = document.querySelectorAll('.aud-row'); for (let i = 0; i < rows.length; i++) rows[i].hidden = true; }
+  syncAud();
+  window.addEventListener('keydown', function (e) {
+    if ((e.key === 'm' || e.key === 'M') && AU && !(e.target && e.target.tagName === 'INPUT') && !e.metaKey && !e.ctrlKey) { const on = !(AU.get('music') || AU.get('sfx')); AU.set('music', on); AU.set('sfx', on); syncAud(); }
+  });
+  window.addEventListener('pointerdown', function () { if (AU && mode !== 'pause') AU.unlock(); }, { passive: true });
+  // No zooming: a pinch, or a double tap while hammering JUMP, must never scale the page. iOS ignores
+  // user-scalable=no in the browser, so the gestures are refused here as well, and if the page does
+  // end up magnified it is snapped back.
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
+  document.addEventListener('touchmove', function (e) { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+  let lastTap = 0;
+  document.addEventListener('touchend', function (e) {
+    const now = Date.now(), quick = now - lastTap < 400; lastTap = now;
+    const t = e.target, form = t && t.closest && t.closest('a, input, .card button, .chip');   // these still need their ordinary click
+    if (e.cancelable && (quick || mode === 'play') && !form) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', function () {
+    if (window.visualViewport.scale > 1.01) { const m = document.querySelector('meta[name="viewport"]'), c = m.getAttribute('content'); m.setAttribute('content', c + ', initial-scale=1.0001'); setTimeout(function () { m.setAttribute('content', c); }, 60); }
+  });
   // which side the thumb stick sits on (touch only); remembered per device
   const SIDE_KEY = 'glade-run-stick-side';
   function setSide(side) {
@@ -1562,7 +1632,7 @@
     $('o-save').disabled = true; msg.textContent = 'Saving…';
     saveScore(n).then(function (res) {
       if (res.ok) {
-        store(NAME_KEY, n); $('o-form').hidden = true; $('o-saved').hidden = false;
+        store(NAME_KEY, n); $('o-form').hidden = true; $('o-saved').hidden = false; snd('save');
         $('o-saved').textContent = res.local ? 'Saved on this device.' : (res.rank ? 'Saved. You are #' + res.rank + ' on the mountain.' : 'Saved.');
       } else {
         $('o-save').disabled = false;
@@ -1623,6 +1693,6 @@
   let rz = 0;
   window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { resize(); camX = s.x - W / 2 + look; }, 120); });
   show('menu'); hud(true); loadBoard();
-  window.GLADE = { art: function () { return { SPR: SPR, TILE: TILE, build: buildSkier, tricks: buildTricks, KITS: KITS }; }, npcs: npcs, stick: stick, s: s, run: run, keys: keys, start: startRun, vis: vis, mode: function () { return mode; } };   // handy for testing
+  window.GLADE = { art: function () { return { SPR: SPR, TILE: TILE, build: buildSkier, tricks: buildTricks, back: buildBack, KITS: KITS }; }, npcs: npcs, stick: stick, s: s, run: run, keys: keys, start: startRun, vis: vis, mode: function () { return mode; } };   // handy for testing
   requestAnimationFrame(function (t) { last = t; requestAnimationFrame(frame); });
 })();

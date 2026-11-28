@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
   <title>Glade Run — Open Glades</title>
   <meta name="description" content="Glade Run: a cozy pixel-art downhill ski game from Open Glades. Thread the trees, hop the logs, drop the cliffs." />
   <link rel="canonical" href="https://openglades.com/ski/" />
@@ -22,6 +22,7 @@
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #f2f6fb; color: var(--cream); font-family: 'VT323', monospace; }
+    html { touch-action: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     body { touch-action: none; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
     #ski-canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; touch-action: none; }
     .ps { font-family: 'Press Start 2P', monospace; }
@@ -88,6 +89,7 @@
     html.swap #stick { left: auto; right: max(18px, env(safe-area-inset-right)); }
     html.swap #btn-jump { right: auto; left: max(18px, env(safe-area-inset-left)); }
     html.swap #btn-brake { right: auto; left: max(108px, calc(env(safe-area-inset-left) + 90px)); }
+    .aud-row { display: flex; gap: 8px; margin-top: 14px; } .aud-row .chip[aria-pressed="false"] { color: var(--mute); border-color: rgba(174,191,210,.35); }
     .swap-row { display: none; align-items: center; gap: 10px; margin-top: 14px; }
     .swap-row > span { font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: .1em; color: var(--mute); }
     .seg { display: inline-flex; border: 2px solid rgba(247,238,221,.5); }
@@ -204,11 +206,12 @@
       <h1>GLADE <span>RUN</span></h1>
       <p class="sub">Thread the trees. Hop the logs. Drop the cliffs. Three falls and it&rsquo;s cocoa time.</p>
       <ul class="how">
-        <li class="desk"><kbd>&larr;</kbd><kbd>&rarr;</kbd> steer &nbsp; <kbd>&darr;</kbd> point it &nbsp; <kbd>&uarr;</kbd> brake &nbsp; <kbd>SPACE</kbd> jump</li>
+        <li class="desk"><kbd>&larr;</kbd><kbd>&rarr;</kbd> steer &nbsp; <kbd>&darr;</kbd> point it &nbsp; <kbd>&uarr;</kbd> brake &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>M</kbd> mute</li>
         <li class="desk">Tricks: tap <kbd>SPACE</kbd> in the air. <kbd>&darr;</kbd> front flip, <kbd>&uarr;</kbd> backflip, <kbd>&larr;</kbd><kbd>&rarr;</kbd> spin. Finish the flip before you land.</li>
         <li class="desk">Or steer toward the mouse and click to jump.</li>
         <li class="touch">Push the stick the way you want to go: down to point it, sideways to traverse. JUMP hops, BRAKE stops.</li>
         <li class="touch">Tricks: tap JUMP in the air. Stick down flips forward, up flips back, sideways spins. Finish the flip before you land.</li>
+        <li>Land half a spin to butter: skiing backwards pays the whole time you hold it, but the skis are twitchy. Spin again, or brake, to come out.</li>
         <li>Big pines hide tree wells. Kickers and cliffs are free air.</li>
         <li>Groomed runs are faster and busier: dodge the other skiers. Speed earns points.</li>
         <li>Grab lost gloves, phones and poles for points. A heart gives a life back.</li>
@@ -229,6 +232,10 @@
           <button type="button" data-side="right" aria-pressed="true">RIGHT</button>
         </div>
       </div>
+      <div class="aud-row">
+        <button class="chip" type="button" data-aud="music" aria-pressed="true">MUSIC ON</button>
+        <button class="chip" type="button" data-aud="sfx" aria-pressed="true">SOUND ON</button>
+      </div>
       <div class="row">
         <button id="btn-start" class="btn" type="button">DROP IN</button>
         <a class="link" href="/">&larr; OPEN GLADES</a>
@@ -248,6 +255,10 @@
           <button type="button" data-side="left" aria-pressed="false">LEFT</button>
           <button type="button" data-side="right" aria-pressed="true">RIGHT</button>
         </div>
+      </div>
+      <div class="aud-row" style="justify-content:center;">
+        <button class="chip" type="button" data-aud="music" aria-pressed="true">MUSIC ON</button>
+        <button class="chip" type="button" data-aud="sfx" aria-pressed="true">SOUND ON</button>
       </div>
       <div class="row" style="justify-content:center;">
         <button id="btn-resume" class="btn" type="button">KEEP SKIING</button>
@@ -293,6 +304,7 @@
     </div>
   </div>
 
+  <script src="/ski/audio.js"></script>
   <script src="/ski/game.js"></script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});</script>
 </body>
